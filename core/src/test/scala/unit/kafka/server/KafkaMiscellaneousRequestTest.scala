@@ -29,22 +29,40 @@ import org.junit.Assert._
 import org.junit.{Before, Test}
 import org.junit.After
 import java.util.concurrent.atomic.AtomicInteger
+import org.apache.kafka.common.security.auth.KafkaPrincipalBuilder
+import org.apache.kafka.common.security.auth.AuthenticationContext
+import org.apache.kafka.common.security.auth.KafkaPrincipal
 
 /*
- * this test checks that a reporter that throws an exception will not affect other reporters
+ * This test bundles different, independent checks in one class for speeding up the build at the expense of clarity.
+ * 
+ * Checks that a reporter that throws an exception will not affect other reporters
  * and will not affect the broker's message handling
+ * 
+ * Checks that a Listenername is available in the Authentication Context
  */
-class KafkaMetricReporterExceptionHandlingTest extends BaseRequestTest {
+class KafkaMiscellaneousRequestTest extends BaseRequestTest {
 
   override def numBrokers: Int = 1
 
   override def propertyOverrides(properties: Properties): Unit = {
+    // for testing MetricReporterExceptionHandling
     properties.put(KafkaConfig.MetricReporterClassesProp, classOf[KafkaMetricReporterExceptionHandlingTest.BadReporter].getName + "," + classOf[KafkaMetricReporterExceptionHandlingTest.GoodReporter].getName)
+
+    // for testing ListenerAndPrincipalBuilder
+    properties.put(KafkaConfig.PrincipalBuilderClassProp, classOf[ListenerAndPrincipalBuilderTest.TestPrincipalBuilder].getName)
+    properties.put(KafkaConfig.ListenersProp, "PLAINTEXT://localhost:0,CUSTOM://localhost:0")
+    properties.put(KafkaConfig.ListenerSecurityProtocolMapProp, "PLAINTEXT:PLAINTEXT,CUSTOM:PLAINTEXT")
   }
 
   @Before
   override def setUp() {
     super.setUp()
+
+    TestUtils.retry(10000) {
+      // controller to node connection using the default security.inter.broker.protocol
+      assertEquals("PLAINTEXT", ListenerAndPrincipalBuilderTest.lastListenerName)
+    }
 
     // need a quota prop to register a "throttle-time" metrics after server startup
     val quotaProps = new Properties()
@@ -61,21 +79,28 @@ class KafkaMetricReporterExceptionHandlingTest extends BaseRequestTest {
   }
 
   @Test
-  def testBothReportersAreInvoked() {
-    val port = anySocketServer.boundPort(ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT))
+  def testMiscellaneous() {
+    val port = anySocketServer.boundPort(new ListenerName("CUSTOM"))
     val socket = new Socket("localhost", port)
     socket.setSoTimeout(10000)
 
     try {
       TestUtils.retry(10000) {
+        // checks for KafkaMetricReporterExceptionHandling
         val error = new ListGroupsResponse(requestResponse(socket, "clientId", 0, new ListGroupsRequest.Builder())).error()
         assertEquals(Errors.NONE, error)
         assertEquals(KafkaMetricReporterExceptionHandlingTest.goodReporterRegistered.get, KafkaMetricReporterExceptionHandlingTest.badReporterRegistered.get)
         assertTrue(KafkaMetricReporterExceptionHandlingTest.goodReporterRegistered.get > 0)
+
+        // using the simplest possible builder to send a request for the ListenerAndPrincipalBuilderTest
+        requestResponse(socket, "clientId", 0, new ListGroupsRequest.Builder())
       }
     } finally {
       socket.close()
     }
+    
+    // check for ListenerAndPrincipalBuilder
+    assertEquals("CUSTOM", ListenerAndPrincipalBuilderTest.lastListenerName)
   }
 }
 
@@ -114,3 +139,15 @@ object KafkaMetricReporterExceptionHandlingTest {
     }
   }
 }
+
+object ListenerAndPrincipalBuilderTest {
+  var lastListenerName = ""
+
+  class TestPrincipalBuilder extends KafkaPrincipalBuilder {
+    override def build(context: AuthenticationContext): KafkaPrincipal = {
+      lastListenerName = context.listenerName
+      KafkaPrincipal.ANONYMOUS
+    }
+  }
+}
+
