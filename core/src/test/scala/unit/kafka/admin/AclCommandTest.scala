@@ -26,6 +26,10 @@ import kafka.zk.ZooKeeperTestHarness
 import org.apache.kafka.common.resource.PatternType.{LITERAL, PREFIXED}
 import org.apache.kafka.common.security.auth.KafkaPrincipal
 import org.junit.{Before, Test}
+import java.io.BufferedInputStream
+import java.io.PipedInputStream
+import java.io.ByteArrayInputStream
+import scala.io.StdIn
 
 class AclCommandTest extends ZooKeeperTestHarness with Logging {
 
@@ -156,6 +160,20 @@ class AclCommandTest extends ZooKeeperTestHarness with Logging {
   def testInvalidAuthorizerProperty() {
     val args = Array("--authorizer-properties", "zookeeper.connect " + zkConnect)
     AclCommand.withAuthorizer(new AclCommandOptions(args))(null)
+  }
+  
+  @Test
+  def testDeleteAclWithConfirmation() {
+    val inputStream = new ByteArrayInputStream("y\n".getBytes)
+    Console.withIn(inputStream) {
+ 
+      val resourceCmd = Array("--topic", "test-1")
+      val cmd = Array("--allow-principal", principal.toString, "--producer") ++ resourceCmd
+  
+      AclCommand.main(zkArgs ++ cmd :+ "--add")
+      
+      AclCommand.main(zkArgs ++ resourceCmd :+ "--remove")
+    }
   }
 
   private def testRemove(resources: Set[Resource], resourceCmd: Array[String], brokerProps: Properties) {
