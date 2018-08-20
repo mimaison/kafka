@@ -30,6 +30,7 @@ import java.io.BufferedInputStream
 import java.io.PipedInputStream
 import java.io.ByteArrayInputStream
 import scala.io.StdIn
+import java.nio.charset.StandardCharsets
 
 class AclCommandTest extends ZooKeeperTestHarness with Logging {
 
@@ -161,17 +162,14 @@ class AclCommandTest extends ZooKeeperTestHarness with Logging {
     val args = Array("--authorizer-properties", "zookeeper.connect " + zkConnect)
     AclCommand.withAuthorizer(new AclCommandOptions(args))(null)
   }
-  
+
   @Test
   def testDeleteAclWithConfirmation() {
-    val inputStream = new ByteArrayInputStream("y\n".getBytes)
+    val resourceCmd = Array("--topic", "test-1")
+    val cmd = Array("--allow-principal", principal.toString, "--producer") ++ resourceCmd
+    val inputStream = new ByteArrayInputStream("y\n".getBytes(StandardCharsets.UTF_8))
     Console.withIn(inputStream) {
- 
-      val resourceCmd = Array("--topic", "test-1")
-      val cmd = Array("--allow-principal", principal.toString, "--producer") ++ resourceCmd
-  
       AclCommand.main(zkArgs ++ cmd :+ "--add")
-      
       AclCommand.main(zkArgs ++ resourceCmd :+ "--remove")
     }
   }
