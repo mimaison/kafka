@@ -26,8 +26,6 @@ import kafka.zk.ZooKeeperTestHarness
 import org.apache.kafka.common.resource.PatternType.{LITERAL, PREFIXED}
 import org.apache.kafka.common.security.auth.KafkaPrincipal
 import org.junit.{Before, Test}
-import java.io.BufferedInputStream
-import java.io.PipedInputStream
 import java.io.ByteArrayInputStream
 import scala.io.StdIn
 import java.nio.charset.StandardCharsets
