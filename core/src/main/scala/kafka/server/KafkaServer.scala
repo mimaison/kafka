@@ -51,7 +51,7 @@ import org.apache.kafka.common.{ClusterResource, Node}
 
 import scala.collection.JavaConverters._
 import scala.collection.{Map, Seq, mutable}
-import org.apache.kafka.common.config.ClientDnsLookup
+import org.apache.kafka.clients.ClientDnsLookup
 
 object KafkaServer {
   // Copy the subset of properties that are relevant to Logs
