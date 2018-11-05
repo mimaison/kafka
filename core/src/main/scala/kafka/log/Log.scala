@@ -47,6 +47,8 @@ import org.apache.kafka.common.{KafkaException, TopicPartition}
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.collection.{Seq, Set, mutable}
+import java.nio.ByteBuffer
+import scala.util.control.Breaks._
 
 object LogAppendInfo {
   val UnknownLogAppendInfo = LogAppendInfo(None, -1, RecordBatch.NO_TIMESTAMP, -1L, RecordBatch.NO_TIMESTAMP, -1L,
@@ -760,7 +762,20 @@ class Log(@volatile var dir: File,
    * @return Information about the appended messages including the first and last offset.
    */
   def appendAsLeader(records: MemoryRecords, leaderEpoch: Int, isFromClient: Boolean = true): LogAppendInfo = {
-    append(records, isFromClient, assignOffsets = true, leaderEpoch)
+    var assignOffsets = true
+    val headers = records.records().iterator().next().headers()
+    breakable { 
+      for (h <- headers) {
+        if ("offset".equals(h.key())) {
+          assignOffsets = false
+          for (batch <- records.batches.asScala) {
+            batch.setPartitionLeaderEpoch(leaderEpoch)
+          }
+          break
+        }
+      }
+    }
+    append(records, isFromClient, assignOffsets, leaderEpoch)
   }
 
   /**
@@ -1043,9 +1058,10 @@ class Log(@volatile var dir: File,
 
     for (batch <- records.batches.asScala) {
       // we only validate V2 and higher to avoid potential compatibility issues with older clients
-      if (batch.magic >= RecordBatch.MAGIC_VALUE_V2 && isFromClient && batch.baseOffset != 0)
-        throw new InvalidRecordException(s"The baseOffset of the record batch in the append to $topicPartition should " +
-          s"be 0, but it is ${batch.baseOffset}")
+//EDO      
+//      if (batch.magic >= RecordBatch.MAGIC_VALUE_V2 && isFromClient && batch.baseOffset != 0)
+//        throw new InvalidRecordException(s"The baseOffset of the record batch in the append to $topicPartition should " +
+//          s"be 0, but it is ${batch.baseOffset}")
 
       // update the first offset if on the first message. For magic versions older than 2, we use the last offset
       // to avoid the need to decompress the data (the last offset can be obtained directly from the wrapper message).
