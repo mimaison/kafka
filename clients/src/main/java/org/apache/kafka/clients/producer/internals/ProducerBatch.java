@@ -95,6 +95,11 @@ public final class ProducerBatch {
         recordsBuilder.setEstimatedCompressionRatio(compressionRatioEstimation);
     }
 
+    @Deprecated
+    public FutureRecordMetadata tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers, Callback callback, long now) {
+        return tryAppend(timestamp, key, value, headers, OptionalLong.empty(), callback, now);
+    }
+
     /**
      * Append the record to the current record set and return the relative offset within that record set
      *
@@ -302,7 +307,7 @@ public final class ProducerBatch {
         // for the newly created batch. This will be set when the batch is dequeued for sending (which is consistent
         // with how normal batches are handled).
         MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, magic(), recordsBuilder.compressionType(),
-                TimestampType.CREATE_TIME, 0L);
+                TimestampType.CREATE_TIME, 0L); //EDO record.offset?
         return new ProducerBatch(topicPartition, builder, this.createdMs, true);
     }
 

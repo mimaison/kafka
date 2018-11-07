@@ -53,6 +53,7 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -896,6 +897,57 @@ public class RecordAccumulatorTest {
             assertEquals("RecordAccumulator has expired batches if the partition is not muted", mute  ? 1 : 0, expiredBatches.size());
         }
     }
+
+    @Test
+    public void testAppendWithOffsets() throws Exception {
+        int batchSize = 512;
+        byte[] value = new byte[10];
+        RecordAccumulator accum = createTestRecordAccumulator(
+                batchSize + DefaultRecordBatch.RECORD_BATCH_OVERHEAD, 10 * 1024, CompressionType.NONE, 0L);
+        accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.of(1000L), null, maxBlockTimeMs);
+        accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.of(1100L), null, maxBlockTimeMs);
+
+        Deque<ProducerBatch> batches = accum.batches().get(tp1);
+        assertEquals(1, batches.size());
+        ProducerBatch producerBatch = batches.peek();
+        List<MutableRecordBatch> recordBatches = TestUtils.toList(producerBatch.records().batches());
+        assertEquals(1, recordBatches.size());
+        MutableRecordBatch recordBatch = recordBatches.get(0);
+        assertEquals(1000L, recordBatch.baseOffset());
+        List<Record> records = TestUtils.toList(recordBatch);
+        assertEquals(2, records.size());
+        Record record = records.get(0);
+        assertEquals(1000L, record.offset());
+        Record record2 = records.get(1);
+        assertEquals(1100L, record2.offset());
+    }
+
+    @Test
+    public void testAppendWithOffsetsCannotMix1() throws Exception {
+        int batchSize = 512;
+        byte[] value = new byte[10];
+        RecordAccumulator accum = createTestRecordAccumulator(
+                batchSize + DefaultRecordBatch.RECORD_BATCH_OVERHEAD, 10 * 1024, CompressionType.NONE, 0L);
+        accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.empty(), null, maxBlockTimeMs);
+        try {
+            accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.of(1100L), null, maxBlockTimeMs);
+            fail("IllegalArgumentException Expected");
+        } catch (IllegalArgumentException expected) {}
+    }
+
+    @Test
+    public void testAppendWithOffsetsCannotMix2() throws Exception {
+        int batchSize = 512;
+        byte[] value = new byte[10];
+        RecordAccumulator accum = createTestRecordAccumulator(
+                batchSize + DefaultRecordBatch.RECORD_BATCH_OVERHEAD, 10 * 1024, CompressionType.NONE, 0L);
+        accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.of(1100L), null, maxBlockTimeMs);
+        try {
+            accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.empty(), null, maxBlockTimeMs);
+            fail("IllegalArgumentException Expected");
+        } catch (IllegalArgumentException expected) {}
+    }
+    //EDO split batch with offset
 
     private int prepareSplitBatches(RecordAccumulator accum, long seed, int recordSize, int numRecords)
         throws InterruptedException {

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.ApiVersions;
 import org.apache.kafka.clients.producer.Callback;
@@ -86,6 +87,7 @@ public final class RecordAccumulator {
     private int drainIndex;
     private final TransactionManager transactionManager;
     private long nextBatchExpiryTimeMs = Long.MAX_VALUE; // the earliest time (absolute) a batch will expire.
+    private final AtomicReference<Boolean> usesOffsets = new AtomicReference<Boolean>(null);
 
     /**
      * Create a new record accumulator
@@ -167,6 +169,17 @@ public final class RecordAccumulator {
         bufferExhaustedRecordSensor.add(new Meter(rateMetricName, totalMetricName));
     }
 
+    @Deprecated
+    public RecordAppendResult append(TopicPartition tp,
+            long timestamp,
+            byte[] key,
+            byte[] value,
+            Header[] headers,
+            Callback callback,
+            long maxTimeToBlock) throws InterruptedException {
+        return append(tp, timestamp, key, value, headers, OptionalLong.empty(), callback, maxTimeToBlock);
+    }
+
     /**
      * Add a record to the accumulator, return the append result
      * <p>
@@ -189,6 +202,12 @@ public final class RecordAccumulator {
                                      OptionalLong offset,
                                      Callback callback,
                                      long maxTimeToBlock) throws InterruptedException {
+
+        usesOffsets.compareAndSet(null, offset.isPresent());
+        if (!usesOffsets.get().equals(offset.isPresent())) {
+            throw new IllegalArgumentException("Cannot mix produce with and without offsets");
+        }
+
         // We keep track of the number of appending thread to make sure we do not miss batches in
         // abortIncompleteBatches().
         appendsInProgress.incrementAndGet();
@@ -221,7 +240,7 @@ public final class RecordAccumulator {
                     return appendResult;
                 }
 
-                MemoryRecordsBuilder recordsBuilder = recordsBuilder(buffer, maxUsableMagic);
+                MemoryRecordsBuilder recordsBuilder = recordsBuilder(buffer, maxUsableMagic, offset);
                 ProducerBatch batch = new ProducerBatch(tp, recordsBuilder, time.milliseconds());
                 FutureRecordMetadata future = Utils.notNull(batch.tryAppend(timestamp, key, value, headers, offset, callback, time.milliseconds()));
 
@@ -239,12 +258,12 @@ public final class RecordAccumulator {
         }
     }
 
-    private MemoryRecordsBuilder recordsBuilder(ByteBuffer buffer, byte maxUsableMagic) {
+    private MemoryRecordsBuilder recordsBuilder(ByteBuffer buffer, byte maxUsableMagic, OptionalLong offset) {
         if (transactionManager != null && maxUsableMagic < RecordBatch.MAGIC_VALUE_V2) {
             throw new UnsupportedVersionException("Attempting to use idempotence with a broker which does not " +
                 "support the required message format (v2). The broker must be version 0.11 or later.");
         }
-        return MemoryRecords.builder(buffer, maxUsableMagic, compression, TimestampType.CREATE_TIME, 0L);
+        return MemoryRecords.builder(buffer, maxUsableMagic, compression, TimestampType.CREATE_TIME, offset.orElse(0L));
     }
 
     /**
