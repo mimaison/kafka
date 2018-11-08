@@ -477,6 +477,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         requiredAcks = produceRequest.acks,
         internalTopicsAllowed = internalTopicsAllowed,
         isFromClient = true,
+        assignOffsets = !produceRequest.useOffsets,
         entriesPerPartition = authorizedRequestInfo,
         responseCallback = sendResponseCallback,
         recordConversionStatsCallback = processingStatsCallback)
@@ -1683,6 +1684,7 @@ class KafkaApis(val requestChannel: RequestChannel,
           requiredAcks = -1,
           internalTopicsAllowed = true,
           isFromClient = false,
+          assignOffsets = true,
           entriesPerPartition = controlRecords,
           responseCallback = maybeSendResponseCallback(producerId, marker.transactionResult))
       }

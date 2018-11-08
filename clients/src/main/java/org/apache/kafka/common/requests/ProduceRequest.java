@@ -406,6 +406,10 @@ public class ProduceRequest extends AbstractRequest {
         return idempotent;
     }
 
+    public boolean useOffsets() {
+        return useOffsets;
+    }
+
     /**
      * Returns the partition records or throws IllegalStateException if clearPartitionRecords() has been invoked.
      */

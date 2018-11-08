@@ -174,6 +174,7 @@ object AbstractCoordinatorConcurrencyTest {
                                requiredAcks: Short,
                                internalTopicsAllowed: Boolean,
                                isFromClient: Boolean,
+                               assignOffsets: Boolean,
                                entriesPerPartition: Map[TopicPartition, MemoryRecords],
                                responseCallback: Map[TopicPartition, PartitionResponse] => Unit,
                                delayedProduceLock: Option[Lock] = None,
