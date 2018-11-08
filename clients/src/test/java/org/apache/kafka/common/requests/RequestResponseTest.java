@@ -880,7 +880,7 @@ public class RequestResponseTest {
         byte magic = version == 2 ? RecordBatch.MAGIC_VALUE_V1 : RecordBatch.MAGIC_VALUE_V2;
         MemoryRecords records = MemoryRecords.withRecords(magic, CompressionType.NONE, new SimpleRecord("woot".getBytes()));
         Map<TopicPartition, MemoryRecords> produceData = Collections.singletonMap(new TopicPartition("test", 0), records);
-        return ProduceRequest.Builder.forMagic(magic, (short) 1, 5000, produceData, "transactionalId")
+        return ProduceRequest.Builder.forMagic(magic, (short) 1, 5000, produceData, "transactionalId", false)
                 .build((short) version);
     }
 

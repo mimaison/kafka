@@ -778,7 +778,7 @@ public class Sender implements Runnable {
             transactionalId = transactionManager.transactionalId();
         }
         ProduceRequest.Builder requestBuilder = ProduceRequest.Builder.forMagic(minUsedMagic, acks, timeout,
-                produceRecordsByPartition, transactionalId);
+                produceRecordsByPartition, transactionalId, accumulator.useOffsets());
         RequestCompletionHandler callback = new RequestCompletionHandler() {
             public void onComplete(ClientResponse response) {
                 handleProduceResponse(response, recordsByPartition, time.milliseconds());

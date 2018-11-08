@@ -84,7 +84,7 @@ public class ProduceRequestTest {
         produceData.put(new TopicPartition("test", 0), builder.build());
 
         ProduceRequest.Builder requestBuilder = ProduceRequest.Builder.forMagic(RecordBatch.MAGIC_VALUE_V1, (short) 1,
-                5000, produceData, null);
+                5000, produceData, null, false);
         assertEquals(2, requestBuilder.oldestAllowedVersion());
         assertEquals(2, requestBuilder.latestAllowedVersion());
     }
@@ -99,7 +99,7 @@ public class ProduceRequestTest {
         produceData.put(new TopicPartition("test", 0), builder.build());
 
         ProduceRequest.Builder requestBuilder = ProduceRequest.Builder.forMagic(RecordBatch.CURRENT_MAGIC_VALUE,
-                (short) 1, 5000, produceData, null);
+                (short) 1, 5000, produceData, null, false);
         assertEquals(3, requestBuilder.oldestAllowedVersion());
         assertEquals(ApiKeys.PRODUCE.latestVersion(), requestBuilder.latestAllowedVersion());
     }
@@ -170,7 +170,7 @@ public class ProduceRequestTest {
 
         // Can't create ProduceRequest instance with version within [3, 7)
         for (short version = 3; version < 7; version++) {
-            ProduceRequest.Builder requestBuilder = new ProduceRequest.Builder(version, version, (short) 1, 5000, produceData, null);
+            ProduceRequest.Builder requestBuilder = new ProduceRequest.Builder(version, version, (short) 1, 5000, produceData, null, false);
             assertThrowsInvalidRecordExceptionForAllVersions(requestBuilder);
         }
 

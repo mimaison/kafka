@@ -87,7 +87,7 @@ public final class RecordAccumulator {
     private int drainIndex;
     private final TransactionManager transactionManager;
     private long nextBatchExpiryTimeMs = Long.MAX_VALUE; // the earliest time (absolute) a batch will expire.
-    private final AtomicReference<Boolean> usesOffsets = new AtomicReference<Boolean>(null);
+    private final AtomicReference<Boolean> useOffsets = new AtomicReference<Boolean>(null);
 
     /**
      * Create a new record accumulator
@@ -203,8 +203,8 @@ public final class RecordAccumulator {
                                      Callback callback,
                                      long maxTimeToBlock) throws InterruptedException {
 
-        usesOffsets.compareAndSet(null, offset.isPresent());
-        if (!usesOffsets.get().equals(offset.isPresent())) {
+        useOffsets.compareAndSet(null, offset.isPresent());
+        if (!useOffsets.get().equals(offset.isPresent())) {
             throw new IllegalArgumentException("Cannot mix produce with and without offsets");
         }
 
@@ -829,5 +829,10 @@ public final class RecordAccumulator {
             this.nextReadyCheckDelayMs = nextReadyCheckDelayMs;
             this.unknownLeaderTopics = unknownLeaderTopics;
         }
+    }
+
+    boolean useOffsets() {
+        Boolean useOffsets = this.useOffsets.get();
+        return useOffsets != null ? useOffsets : false;
     }
 }

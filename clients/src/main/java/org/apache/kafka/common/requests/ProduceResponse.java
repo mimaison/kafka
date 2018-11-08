@@ -149,9 +149,14 @@ public class ProduceResponse extends AbstractResponse {
      */
     private static final Schema PRODUCE_RESPONSE_V7 = PRODUCE_RESPONSE_V6;
 
+    /**
+     * V8 introduces producer offsets
+     */
+    private static final Schema PRODUCE_RESPONSE_V8 = PRODUCE_RESPONSE_V7; //EDO Tbd
+
     public static Schema[] schemaVersions() {
         return new Schema[]{PRODUCE_RESPONSE_V0, PRODUCE_RESPONSE_V1, PRODUCE_RESPONSE_V2, PRODUCE_RESPONSE_V3,
-            PRODUCE_RESPONSE_V4, PRODUCE_RESPONSE_V5, PRODUCE_RESPONSE_V6, PRODUCE_RESPONSE_V7};
+            PRODUCE_RESPONSE_V4, PRODUCE_RESPONSE_V5, PRODUCE_RESPONSE_V6, PRODUCE_RESPONSE_V7, PRODUCE_RESPONSE_V8};
     }
 
     private final Map<TopicPartition, PartitionResponse> responses;
