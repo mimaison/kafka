@@ -168,7 +168,7 @@ public class ProduceRequest extends AbstractRequest {
                 minVersion = 2;
                 maxVersion = 2;
             } else {
-                minVersion = useOffsets ? (short)8 : (short)3;
+                minVersion = useOffsets ? (short) 8 : (short) 3;
                 maxVersion = ApiKeys.PRODUCE.latestVersion();
             }
             return new Builder(minVersion, maxVersion, acks, timeout, partitionRecords, transactionalId, useOffsets);
