@@ -2129,8 +2129,7 @@ public class SenderTest {
                     return false;
 
                 MutableRecordBatch batch = batches.get(0);
-                return batch.baseOffset() == 0L &&
-                        batch.baseSequence() == sequence &&
+                return batch.baseSequence() == sequence &&
                         batch.producerId() == producerIdAndEpoch.producerId &&
                         batch.producerEpoch() == producerIdAndEpoch.epoch &&
                         batch.isTransactional() == isTransactional;

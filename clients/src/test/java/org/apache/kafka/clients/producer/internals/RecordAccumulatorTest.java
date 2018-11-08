@@ -796,6 +796,40 @@ public class RecordAccumulatorTest {
     }
 
     @Test
+    public void testSplitBatchOffAccumulatorWithOffsets() throws InterruptedException {
+        RecordAccumulator accum = createTestRecordAccumulator(1024, 3 * 1024, CompressionType.NONE, 0L);
+
+        byte[] value = new byte[1025];
+        accum.append(tp1, 0L, null, value, Record.EMPTY_HEADERS, OptionalLong.of(1001), null, 0);
+        accum.append(tp1, 0L, null, value, Record.EMPTY_HEADERS, OptionalLong.of(1101), null, 0);
+
+        RecordAccumulator.ReadyCheckResult result1 = accum.ready(cluster, time.milliseconds());
+        assertFalse(result1.readyNodes.isEmpty());
+        Map<Integer, List<ProducerBatch>> batches = accum.drain(cluster, result1.readyNodes, Integer.MAX_VALUE, time.milliseconds());
+        assertEquals(1, batches.size());
+        assertEquals(1, batches.values().iterator().next().size());
+        ProducerBatch batch = batches.values().iterator().next().get(0);
+        assertEquals(1001, batch.records().batchIterator().peek().baseOffset());
+
+        accum.splitAndReenqueue(batch);
+        accum.deallocate(batch);
+
+        RecordAccumulator.ReadyCheckResult result = accum.ready(cluster, time.milliseconds());
+        Map<Integer, List<ProducerBatch>> drained1 =
+                accum.drain(cluster, result.readyNodes, Integer.MAX_VALUE, time.milliseconds());
+        List<ProducerBatch> batches1 = drained1.values().iterator().next();
+        Map<Integer, List<ProducerBatch>> drained2 =
+                accum.drain(cluster, result.readyNodes, Integer.MAX_VALUE, time.milliseconds());
+        List<ProducerBatch> batches2 = drained2.values().iterator().next();
+
+        assertEquals(1, batches1.size());
+        assertEquals(1, batches2.size());
+
+        assertEquals(1001, batches1.get(0).records().batchIterator().peek().baseOffset());
+        assertEquals(1101, batches2.get(0).records().batchIterator().peek().baseOffset());
+    }
+
+    @Test
     public void testSplitFrequency() throws InterruptedException {
         long seed = System.currentTimeMillis();
         Random random = new Random();
