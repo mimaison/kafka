@@ -307,7 +307,7 @@ public final class ProducerBatch {
         // for the newly created batch. This will be set when the batch is dequeued for sending (which is consistent
         // with how normal batches are handled).
         MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, magic(), recordsBuilder.compressionType(),
-                TimestampType.CREATE_TIME, 0L); //EDO record.offset?
+                TimestampType.CREATE_TIME, record.offset());
         return new ProducerBatch(topicPartition, builder, this.createdMs, true);
     }
 

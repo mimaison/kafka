@@ -34,6 +34,7 @@ import org.junit.Test;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.kafka.common.record.RecordBatch.MAGIC_VALUE_V0;
@@ -220,12 +221,37 @@ public class ProducerBatchTest {
 
                     for (RecordBatch splitBatch : splitProducerBatch.records().batches()) {
                         assertEquals(magic, splitBatch.magic());
-                        assertEquals(0L, splitBatch.baseOffset());
                         assertEquals(compressionType, splitBatch.compressionType());
                     }
                 }
             }
         }
+    }
+
+    @Test
+    public void testSplitPreservesOffset() throws ExecutionException, InterruptedException {
+        // Create a big batch
+        ByteBuffer buffer = ByteBuffer.allocate(4096);
+        MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, CompressionType.NONE, TimestampType.CREATE_TIME, 900L);
+        ProducerBatch batch = new ProducerBatch(new TopicPartition("topic", 1), builder, now, true);
+
+        // Append two messages so the batch is too big.
+        byte[] value = new byte[1024];
+        batch.tryAppend(now, null, value, Record.EMPTY_HEADERS, OptionalLong.of(1000L), null, now);
+        batch.tryAppend(now, null, value, Record.EMPTY_HEADERS, OptionalLong.of(1100L), null, now);
+        batch.close();
+
+        assertEquals(900L, batch.records().batchIterator().peek().baseOffset());
+
+        // Split the batch.
+        Deque<ProducerBatch> splits = batch.split(1024);
+        assertEquals(2, splits.size());
+
+        ProducerBatch batch1 = splits.getFirst();
+        assertEquals(1000L, batch1.records().batchIterator().peek().baseOffset());
+
+        ProducerBatch batch2 = splits.getLast();
+        assertEquals(1100L, batch2.records().batchIterator().peek().baseOffset());
     }
 
     /**
