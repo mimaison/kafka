@@ -17,6 +17,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.CommonFields;
 import org.apache.kafka.common.protocol.Errors;
@@ -167,7 +168,7 @@ public class ProduceRequest extends AbstractRequest {
                 minVersion = 2;
                 maxVersion = 2;
             } else {
-                minVersion = 3;
+                minVersion = useOffsets ? (short)8 : (short)3;
                 maxVersion = ApiKeys.PRODUCE.latestVersion();
             }
             return new Builder(minVersion, maxVersion, acks, timeout, partitionRecords, transactionalId, useOffsets);
@@ -190,6 +191,9 @@ public class ProduceRequest extends AbstractRequest {
 
         @Override
         public ProduceRequest build(short version) {
+            if (useOffsets && version < 8)
+                throw new UnsupportedVersionException("ProduceRequest versions older than 8 don't support the " +
+                        "useOffsets field");
             return new ProduceRequest(version, acks, timeout, partitionRecords, transactionalId, useOffsets);
         }
 
@@ -364,6 +368,7 @@ public class ProduceRequest extends AbstractRequest {
             case 5:
             case 6:
             case 7:
+            case 8:
                 return new ProduceResponse(responseMap, throttleTimeMs);
             default:
                 throw new IllegalArgumentException(String.format("Version %d is not valid. Valid versions for %s are 0 to %d",
@@ -435,6 +440,7 @@ public class ProduceRequest extends AbstractRequest {
             case 5:
             case 6:
             case 7:
+            case 8:
                 return RecordBatch.MAGIC_VALUE_V2;
 
             default:

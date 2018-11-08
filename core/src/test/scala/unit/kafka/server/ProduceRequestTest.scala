@@ -132,7 +132,7 @@ class ProduceRequestTest extends BaseRequestTest {
 
     // produce request with v7: works fine!
     val res1 = sendProduceRequest(leader,
-      new ProduceRequest.Builder(7, 7, -1, 3000, partitionRecords.asJava, null).build())
+      new ProduceRequest.Builder(7, 7, -1, 3000, partitionRecords.asJava, null, false).build())
     val (tp, partitionResponse) = res1.responses.asScala.head
     assertEquals(topicPartition, tp)
     assertEquals(Errors.NONE, partitionResponse.error)

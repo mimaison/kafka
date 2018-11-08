@@ -18,6 +18,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.InvalidRecordException;
@@ -176,6 +177,29 @@ public class ProduceRequestTest {
 
         // Works fine with current version (>= 7)
         ProduceRequest.Builder.forCurrentMagic((short) 1, 5000, produceData);
+    }
+
+    @Test
+    public void testV7AndBelowCannotUseOffsets() {
+        ByteBuffer buffer = ByteBuffer.allocate(256);
+        MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, RecordBatch.MAGIC_VALUE_V2, CompressionType.NONE,
+            TimestampType.CREATE_TIME, 0L);
+        builder.append(10L, null, "a".getBytes());
+
+        Map<TopicPartition, MemoryRecords> produceData = new HashMap<>();
+        produceData.put(new TopicPartition("test", 0), builder.build());
+
+        // Can't create ProduceRequest instance with version within [3, 8)
+        for (short version = 3; version < 8; version++) {
+            try {
+                new ProduceRequest.Builder(version, version, (short) 1, 5000, produceData, null, true).build(version);
+                fail("UnsupportedVersionException expected");
+            } catch (UnsupportedVersionException expected) { }
+        }
+
+        // Works fine with current version (>= 8)
+        ProduceRequest.Builder.forMagic(RecordBatch.MAGIC_VALUE_V2, 
+                (short) 1, 5000, produceData, null, true).build(ApiKeys.PRODUCE.latestVersion());
     }
 
     private void assertThrowsInvalidRecordExceptionForAllVersions(ProduceRequest.Builder builder) {
