@@ -966,7 +966,7 @@ public class RecordAccumulatorTest {
         try {
             accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.of(1100L), null, maxBlockTimeMs);
             fail("IllegalArgumentException Expected");
-        } catch (IllegalArgumentException expected) {}
+        } catch (IllegalArgumentException expected) { }
     }
 
     @Test
@@ -979,7 +979,7 @@ public class RecordAccumulatorTest {
         try {
             accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, OptionalLong.empty(), null, maxBlockTimeMs);
             fail("IllegalArgumentException Expected");
-        } catch (IllegalArgumentException expected) {}
+        } catch (IllegalArgumentException expected) { }
     }
     //EDO split batch with offset
 

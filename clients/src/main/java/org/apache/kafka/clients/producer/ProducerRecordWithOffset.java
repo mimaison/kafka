@@ -33,12 +33,12 @@ public class ProducerRecordWithOffset<K, V> extends ProducerRecord<K, V> {
      * @param offset The offset that Kafka should use when appending this record to the log. For regular clients this is expected to be null.
      */
     public ProducerRecordWithOffset(String topic, Integer partition, Long timestamp, K key, V value, Iterable<Header> headers, long offset) {
-       super(topic, partition, timestamp, key, value, headers);
-       if (offset < 0)
-           throw new IllegalArgumentException(
-                   String.format("Invalid offset: %d. Offset should always be non-negative.", offset));
-       
-       this.offset = offset;
+        super(topic, partition, timestamp, key, value, headers);
+        if (offset < 0)
+            throw new IllegalArgumentException(
+                    String.format("Invalid offset: %d. Offset should always be non-negative.", offset));
+
+        this.offset = offset;
     }
 
     @Override
@@ -72,7 +72,7 @@ public class ProducerRecordWithOffset<K, V> extends ProducerRecord<K, V> {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        ProducerRecordWithOffset<?,?> other = (ProducerRecordWithOffset<?,?>) obj;
+        ProducerRecordWithOffset<?, ?> other = (ProducerRecordWithOffset<?, ?>) obj;
         if (offset != other.offset)
             return false;
         return true;
