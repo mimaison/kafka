@@ -2832,8 +2832,45 @@ class LogTest {
     //Then leader epoch should be set on messages
     for (i <- records.indices) {
       val read = readLog(log, i, 100, Some(i+1)).records.batches.iterator.next()
-      assertEquals("Should have set leader epoch", 72, read.partitionLeaderEpoch)
+      assertEquals("Should have set leader epoch", epoch, read.partitionLeaderEpoch)
     }
+  }
+
+  @Test
+  def testAppendAsLeaderWithGivenOffsets() {
+    val records = (0 until 50).toArray.map(id => new SimpleRecord(id.toString.getBytes))
+
+    val epoch = 72
+    val log = createLog(logDir, LogConfig())
+    log.leaderEpochCache.assign(epoch, records.size)
+
+    //appending messages as a leader with given offsets starting at 1000 by 10
+    var offset = 1000L
+    for (record <- records) {
+      log.appendAsLeader(
+        MemoryRecords.withRecords(offset, CompressionType.NONE, record),
+        leaderEpoch = epoch,
+        isFromClient = true,
+        assignOffsets = false
+      )
+      offset += 10L
+    }
+
+    //reading one by one
+    for (i <- (1000 until 1500 by 10)) {
+      val batchesIter = readLog(log, i, 100000, Some(i+10)).records.batches.iterator
+      val read = batchesIter.next()
+      assertEquals("Should have set leader epoch", epoch, read.partitionLeaderEpoch)
+      assertEquals(i, read.baseOffset)
+      assertFalse(batchesIter.hasNext())
+    }
+
+    //reading all at once
+    val recordsIter = readLog(log, 1000, 100000, Some(1500)).records.records.iterator
+    for (i <- (1000 until 1500 by 10)) {
+      assertEquals(i, recordsIter.next.offset)
+    }
+    assertFalse(recordsIter.hasNext())
   }
 
   @Test
