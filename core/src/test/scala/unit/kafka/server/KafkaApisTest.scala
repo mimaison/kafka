@@ -339,6 +339,7 @@ class KafkaApisTest {
       EasyMock.anyShort(),
       EasyMock.eq(true),
       EasyMock.eq(false),
+      EasyMock.eq(true),
       EasyMock.anyObject(),
       EasyMock.anyObject(),
       EasyMock.anyObject(),
