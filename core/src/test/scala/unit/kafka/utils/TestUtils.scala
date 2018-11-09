@@ -381,6 +381,26 @@ object TestUtils extends Logging {
     records.foreach(builder.append)
     builder.build()
   }
+ 
+  def recordsWithOffset(records: Iterable[SimpleRecord],
+              offsets: Iterable[Long],
+              magicValue: Byte = RecordBatch.CURRENT_MAGIC_VALUE,
+              codec: CompressionType = CompressionType.NONE,
+              producerId: Long = RecordBatch.NO_PRODUCER_ID,
+              producerEpoch: Short = RecordBatch.NO_PRODUCER_EPOCH,
+              sequence: Int = RecordBatch.NO_SEQUENCE,
+              baseOffset: Long = 0L,
+              partitionLeaderEpoch: Int = RecordBatch.NO_PARTITION_LEADER_EPOCH): MemoryRecords = {
+    val buf = ByteBuffer.allocate(DefaultRecordBatch.sizeInBytes(records.asJava))
+    val builder = MemoryRecords.builder(buf, magicValue, codec, TimestampType.CREATE_TIME, baseOffset,
+      System.currentTimeMillis, producerId, producerEpoch, sequence, false, partitionLeaderEpoch)
+    val recIter = records.iterator
+    for (offset <- offsets) {
+      val record = recIter.next
+      builder.appendWithOffset(offset, record)
+    }
+    builder.build()
+  }
 
   /**
    * Generate an array of random bytes

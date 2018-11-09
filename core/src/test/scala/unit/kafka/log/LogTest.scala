@@ -2844,15 +2844,14 @@ class LogTest {
     val log = createLog(logDir, LogConfig())
     log.leaderEpochCache.assign(epoch, records.size)
 
-    //appending messages as a leader with given offsets starting at 1000 by 10
+    //appending messages one by one as a leader with given offsets starting at 1000 by 10
     var offset = 1000L
     for (record <- records) {
       log.appendAsLeader(
         MemoryRecords.withRecords(offset, CompressionType.NONE, record),
         leaderEpoch = epoch,
         isFromClient = true,
-        assignOffsets = false
-      )
+        assignOffsets = false)
       offset += 10L
     }
 
@@ -2866,8 +2865,34 @@ class LogTest {
     }
 
     //reading all at once
-    val recordsIter = readLog(log, 1000, 100000, Some(1500)).records.records.iterator
+    var recordsIter = readLog(log, 1000, 100000, Some(1500)).records.records.iterator
     for (i <- (1000 until 1500 by 10)) {
+      assertEquals(i, recordsIter.next.offset)
+    }
+    assertFalse(recordsIter.hasNext())
+
+    //appending a batch of messages as a leader with given offsets starting at 2000 by 10
+    val offsets = (2000L until 2500L by 10L).toArray
+    val memoryRecords = TestUtils.recordsWithOffset(records, offsets, baseOffset = 2000L)
+    log.appendAsLeader(memoryRecords,
+        leaderEpoch = epoch,
+        isFromClient = true,
+        assignOffsets = false)
+
+    // read all at once
+    val read = readLog(log, 2000, 100000, Some(2500)).records
+
+    // check batch base offset and epoch
+    val batchesIter = read.batches.asScala
+    assertEquals(1, batchesIter.size)
+    for (b <- batchesIter) {
+      assertEquals("Should have set leader epoch", epoch, b.partitionLeaderEpoch)
+      assertEquals(2000, b.baseOffset)
+    }
+
+    // check each record's offset
+    recordsIter = read.records.iterator
+    for (i <- offsets) {
       assertEquals(i, recordsIter.next.offset)
     }
     assertFalse(recordsIter.hasNext())
