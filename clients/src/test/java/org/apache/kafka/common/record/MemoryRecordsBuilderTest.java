@@ -460,6 +460,19 @@ public class MemoryRecordsBuilderTest {
         builder.appendWithOffset(0L, System.currentTimeMillis(), "b".getBytes(), null);
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testAppendAtInvalidOffsetbecauseOfBaseOffset() {
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+        buffer.position(bufferOffset);
+
+        long logAppendTime = System.currentTimeMillis();
+        MemoryRecordsBuilder builder = new MemoryRecordsBuilder(buffer, RecordBatch.MAGIC_VALUE_V1, compressionType,
+                TimestampType.CREATE_TIME, 1000L, logAppendTime, RecordBatch.NO_PRODUCER_ID, RecordBatch.NO_PRODUCER_EPOCH, RecordBatch.NO_SEQUENCE,
+                false, false, RecordBatch.NO_PARTITION_LEADER_EPOCH, buffer.capacity());
+
+        builder.appendWithOffset(999L, System.currentTimeMillis(), "b".getBytes(), null);
+    }
+
     @Test
     public void convertV2ToV1UsingMixedCreateAndLogAppendTime() {
         if (compressionType == CompressionType.ZSTD) {
