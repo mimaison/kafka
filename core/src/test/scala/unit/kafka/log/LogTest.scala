@@ -2911,6 +2911,37 @@ class LogTest {
   }
 
   @Test
+  def testAppendAsLeaderAssignsOffsetsRejectsRecordsWithOffsets() {
+    val records = (0 until 50).toArray.map(id => new SimpleRecord(id.toString.getBytes))
+
+    val epoch = 72
+    val log = createLog(logDir, LogConfig())
+    log.leaderEpochCache.assign(epoch, records.size)
+    val offsets = (2000L until 2500L by 10L).toArray
+
+    // Try appending an invalid batch with correct start offset
+    try {
+      log.appendAsLeader(TestUtils.recordsWithOffset(records, offsets, baseOffset = 0L),
+          leaderEpoch = epoch,
+          isFromClient = true,
+          assignOffsets = true)
+    } catch {
+      case _: InvalidRecordException => // expected
+    }
+
+    // Try appending a valid batch with incorrect start offset
+    try {
+      log.appendAsLeader(
+          MemoryRecords.withRecords(2000L, CompressionType.NONE, new SimpleRecord("value".getBytes)),
+          leaderEpoch = epoch,
+          isFromClient = true,
+          assignOffsets = true)
+    } catch {
+      case _: InvalidRecordException => // expected
+    }
+  }
+
+  @Test
   def followerShouldSaveEpochInformationFromReplicatedMessagesToTheEpochCache() {
     val messageIds = (0 until 50).toArray
     val records = messageIds.map(id => new SimpleRecord(id.toString.getBytes))
