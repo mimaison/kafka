@@ -64,6 +64,47 @@ class ProduceRequestTest extends BaseRequestTest {
   }
 
   @Test
+  def testProduceRequestWithOffsetGoldenPath() {
+    val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
+
+    def sendAndCheck(memoryRecords: MemoryRecords, expectedOffset: Long, useOffsets: Boolean): ProduceResponse.PartitionResponse = {
+      val topicPartition = new TopicPartition("topic", partition)
+      val partitionRecords = Map(topicPartition -> memoryRecords)
+
+      val produceResponse = sendProduceRequest(leader,
+          ProduceRequest.Builder.forMagic(RecordBatch.CURRENT_MAGIC_VALUE,
+                                          -1, 3000, 
+                                          partitionRecords.asJava,
+                                          null, useOffsets).build())
+
+      assertEquals(1, produceResponse.responses.size)
+      val (tp, partitionResponse) = produceResponse.responses.asScala.head
+      assertEquals(topicPartition, tp)
+      assertEquals(Errors.NONE, partitionResponse.error)
+      assertEquals(expectedOffset, partitionResponse.baseOffset)
+      assertEquals(-1, partitionResponse.logAppendTime)
+      partitionResponse
+    }
+
+    sendAndCheck(MemoryRecords.withRecords(2000, CompressionType.NONE,
+      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
+      2000, true)
+
+    sendAndCheck(MemoryRecords.withRecords(3000, CompressionType.GZIP,
+      new SimpleRecord(System.currentTimeMillis(), "key1".getBytes, "value1".getBytes),
+      new SimpleRecord(System.currentTimeMillis(), "key2".getBytes, "value2".getBytes)), 
+      3000, true)
+
+    sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
+      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
+      3002, false)
+  }
+
+  //EDO test error on bad sent offset
+  // in another test class - test ACL
+  // in another test - test end2end
+
+  @Test
   def testProduceToNonReplica() {
     val topic = "topic"
     val partition = 0
