@@ -389,6 +389,14 @@ class KafkaApis(val requestChannel: RequestChannel,
       return
     }
 
+    // The producer must have ClusterAction on ClusterResource in order to impose offsets.
+    if (produceRequest.useOffsets) {
+      if (!authorize(request.session, ClusterAction, Resource.ClusterResource)) {
+        sendErrorResponseMaybeThrottle(request, new ClusterAuthorizationException("Produce with offsets requires ClusterAction authorization"))
+        return
+      }
+    }
+
     val unauthorizedTopicResponses = mutable.Map[TopicPartition, PartitionResponse]()
     val nonExistingTopicResponses = mutable.Map[TopicPartition, PartitionResponse]()
     val authorizedRequestInfo = mutable.Map[TopicPartition, MemoryRecords]()
