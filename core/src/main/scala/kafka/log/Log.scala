@@ -849,6 +849,13 @@ class Log(@volatile var dir: File,
           }
         } else {
           // we are taking the offsets we are given
+
+          if (isFromClient) { // produce with offset
+            for (batch <- records.batches.asScala) {
+              batch.setPartitionLeaderEpoch(leaderEpoch)
+            }
+          }
+
           if (!appendInfo.offsetsMonotonic)
             throw new OffsetsOutOfOrderException(s"Out of order offsets found in append to $topicPartition: " +
                                                  records.records.asScala.map(_.offset))
