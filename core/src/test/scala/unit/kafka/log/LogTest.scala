@@ -2896,6 +2896,18 @@ class LogTest {
       assertEquals(i, recordsIter.next.offset)
     }
     assertFalse(recordsIter.hasNext())
+
+    // check failure on append on bad offset
+    try {
+      log.appendAsLeader(
+        MemoryRecords.withRecords(2000, CompressionType.NONE, records.iterator.next),
+        leaderEpoch = epoch,
+        isFromClient = true,
+        assignOffsets = false)
+        fail("UnexpectedAppendOffsetException should be thrown")
+    } catch {
+      case _: UnexpectedAppendOffsetException => // this is good
+    }
   }
 
   @Test
