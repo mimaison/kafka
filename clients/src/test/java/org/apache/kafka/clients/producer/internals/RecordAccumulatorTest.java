@@ -981,7 +981,6 @@ public class RecordAccumulatorTest {
             fail("IllegalArgumentException Expected");
         } catch (IllegalArgumentException expected) { }
     }
-    //EDO split batch with offset
 
     private int prepareSplitBatches(RecordAccumulator accum, long seed, int recordSize, int numRecords)
         throws InterruptedException {
