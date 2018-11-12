@@ -89,14 +89,14 @@ class ProduceRequestTest extends BaseRequestTest {
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
       2000, true)
 
-    sendAndCheck(MemoryRecords.withRecords(2500, CompressionType.GZIP,
-      new SimpleRecord(System.currentTimeMillis(), "key1".getBytes, "value1".getBytes),
-      new SimpleRecord(System.currentTimeMillis(), "key2".getBytes, "value2".getBytes)), 
-      2500, true)
+    val simpleRecords = (0 until 50).toArray.map(id => new SimpleRecord(id.toString.getBytes))
+    val offsets = (2001L until 2500L by 10L).toArray
+    val memoryRecords = TestUtils.recordsWithOffset(simpleRecords, offsets, baseOffset = 2001L)
+    sendAndCheck(memoryRecords, 2001, true)
 
     sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2502, false)
+      2492, false)
   }
 
   //EDO test error on bad sent offset
