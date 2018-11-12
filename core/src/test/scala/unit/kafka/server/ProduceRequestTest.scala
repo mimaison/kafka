@@ -41,7 +41,7 @@ class ProduceRequestTest extends BaseRequestTest {
   def testSimpleProduceRequest() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedOffset: Long): ProduceResponse.PartitionResponse = {
+    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long): ProduceResponse.PartitionResponse = {
       val topicPartition = new TopicPartition("topic", partition)
       val partitionRecords = Map(topicPartition -> memoryRecords)
       val produceResponse = sendProduceRequest(leader,
@@ -50,24 +50,26 @@ class ProduceRequestTest extends BaseRequestTest {
       val (tp, partitionResponse) = produceResponse.responses.asScala.head
       assertEquals(topicPartition, tp)
       assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedOffset, partitionResponse.baseOffset)
+      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
       assertEquals(-1, partitionResponse.logAppendTime)
+      assertEquals(0, partitionResponse.logStartOffset)
+      assertEquals(expectedLEO, partitionResponse.logEndOffset)
       partitionResponse
     }
 
     sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 0)
+      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 0, 0)
 
     sendAndCheck(MemoryRecords.withRecords(CompressionType.GZIP,
       new SimpleRecord(System.currentTimeMillis(), "key1".getBytes, "value1".getBytes),
-      new SimpleRecord(System.currentTimeMillis(), "key2".getBytes, "value2".getBytes)), 1)
+      new SimpleRecord(System.currentTimeMillis(), "key2".getBytes, "value2".getBytes)), 1, 2)
   }
 
   @Test
   def testProduceRequestWithOffsetGoldenPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedOffset: Long, useOffsets: Boolean) {
+    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long, useOffsets: Boolean) {
       val topicPartition = new TopicPartition("topic", partition)
       val partitionRecords = Map(topicPartition -> memoryRecords)
 
@@ -81,29 +83,31 @@ class ProduceRequestTest extends BaseRequestTest {
       val (tp, partitionResponse) = produceResponse.responses.asScala.head
       assertEquals(topicPartition, tp)
       assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedOffset, partitionResponse.baseOffset)
+      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
+      assertEquals(0, partitionResponse.logStartOffset)
       assertEquals(-1, partitionResponse.logAppendTime)
+      assertEquals(expectedLEO, partitionResponse.logEndOffset)
     }
 
     sendAndCheck(MemoryRecords.withRecords(2000, CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2000, true)
+      2000, 2000, true)
 
     val simpleRecords = (0 until 50).toArray.map(id => new SimpleRecord(id.toString.getBytes))
     val offsets = (2001L until 2500L by 10L).toArray
     val memoryRecords = TestUtils.recordsWithOffset(simpleRecords, offsets, baseOffset = 2001L)
-    sendAndCheck(memoryRecords, 2001, true)
+    sendAndCheck(memoryRecords, 2001, 2491, true)
 
     sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2492, false)
+      2492, 2492, false)
   }
 
   @Test
   def testProduceRequestWithOffsetErrorPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedOffset: Long, useOffsets: Boolean) {
+    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long, useOffsets: Boolean) {
       val topicPartition = new TopicPartition("topic", partition)
       val partitionRecords = Map(topicPartition -> memoryRecords)
 
@@ -117,11 +121,13 @@ class ProduceRequestTest extends BaseRequestTest {
       val (tp, partitionResponse) = produceResponse.responses.asScala.head
       assertEquals(topicPartition, tp)
       assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedOffset, partitionResponse.baseOffset)
+      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
+      assertEquals(0, partitionResponse.logStartOffset)
+      assertEquals(expectedLEO, partitionResponse.logEndOffset)
       assertEquals(-1, partitionResponse.logAppendTime)
     }
 
-    def sendAndExpect(memoryRecords: MemoryRecords, expectedError: Errors) {
+    def sendAndExpect(memoryRecords: MemoryRecords, expectedLEO: Long, expectedError: Errors) {
       val topicPartition = new TopicPartition("topic", partition)
       val partitionRecords = Map(topicPartition -> memoryRecords)
 
@@ -135,15 +141,16 @@ class ProduceRequestTest extends BaseRequestTest {
       val (tp, partitionResponse) = produceResponse.responses.asScala.head
       assertEquals(topicPartition, tp)
       assertEquals(expectedError, partitionResponse.error)
+      assertEquals(expectedLEO, partitionResponse.logEndOffset)
     }
 
     sendAndCheck(MemoryRecords.withRecords(2000, CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2000, true)
+      2000, 2000, true)
 
     sendAndExpect(MemoryRecords.withRecords(2000, CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      Errors.INVALID_OFFSET)
+      2000, Errors.INVALID_OFFSET)
   }
 
   @Test

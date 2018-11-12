@@ -262,6 +262,7 @@ public class ProduceResponse extends AbstractResponse {
         public long baseOffset;
         public long logAppendTime;
         public long logStartOffset;
+        public long logEndOffset;
 
         public PartitionResponse(Errors error) {
             this(error, INVALID_OFFSET, RecordBatch.NO_TIMESTAMP, INVALID_OFFSET);
