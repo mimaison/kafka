@@ -99,9 +99,6 @@ class ProduceRequestTest extends BaseRequestTest {
       2492, false)
   }
 
-  //EDO test error on bad sent offset
-  // in another test class - test ACL
-  // in another test - test end2end
   @Test
   def testProduceRequestWithOffsetErrorPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
@@ -146,7 +143,7 @@ class ProduceRequestTest extends BaseRequestTest {
 
     sendAndExpect(MemoryRecords.withRecords(2000, CompressionType.NONE,
       new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      Errors.UNKNOWN_SERVER_ERROR) //EDO we want a much better error here!
+      Errors.INVALID_OFFSET)
   }
 
   @Test

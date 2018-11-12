@@ -44,6 +44,7 @@ import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidFetchSessionEpochException;
 import org.apache.kafka.common.errors.InvalidFetchSizeException;
 import org.apache.kafka.common.errors.InvalidGroupIdException;
+import org.apache.kafka.common.errors.InvalidOffsetException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidPidMappingException;
 import org.apache.kafka.common.errors.InvalidPrincipalTypeException;
@@ -287,7 +288,9 @@ public enum Errors {
     UNKNOWN_LEADER_EPOCH(75, "The leader epoch in the request is newer than the epoch on the broker",
             UnknownLeaderEpochException::new),
     UNSUPPORTED_COMPRESSION_TYPE(76, "The requesting client does not support the compression type of given partition.",
-            UnsupportedCompressionTypeException::new);
+            UnsupportedCompressionTypeException::new),
+    INVALID_OFFSET(77, "The offset of the message is out of acceptable range.",
+            InvalidOffsetException::new);
 
     private static final Logger log = LoggerFactory.getLogger(Errors.class);
 

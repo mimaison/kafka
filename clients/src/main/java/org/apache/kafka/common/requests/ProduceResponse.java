@@ -67,6 +67,7 @@ public class ProduceResponse extends AbstractResponse {
      * INVALID_PRODUCER_EPOCH (47)
      * CLUSTER_AUTHORIZATION_FAILED (31)
      * TRANSACTIONAL_ID_AUTHORIZATION_FAILED (53)
+     * INVALID_OFFSET (77)
      */
 
     private static final String BASE_OFFSET_KEY_NAME = "base_offset";
@@ -152,7 +153,7 @@ public class ProduceResponse extends AbstractResponse {
     /**
      * V8 introduces producer offsets
      */
-    private static final Schema PRODUCE_RESPONSE_V8 = PRODUCE_RESPONSE_V7; //EDO what to put in response for offset
+    private static final Schema PRODUCE_RESPONSE_V8 = PRODUCE_RESPONSE_V7;
 
     public static Schema[] schemaVersions() {
         return new Schema[]{PRODUCE_RESPONSE_V0, PRODUCE_RESPONSE_V1, PRODUCE_RESPONSE_V2, PRODUCE_RESPONSE_V3,
