@@ -37,120 +37,51 @@ import scala.collection.JavaConverters._
   */
 class ProduceRequestTest extends BaseRequestTest {
 
+  val sr = new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)
+
   @Test
   def testSimpleProduceRequest() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long): ProduceResponse.PartitionResponse = {
-      val topicPartition = new TopicPartition("topic", partition)
-      val partitionRecords = Map(topicPartition -> memoryRecords)
-      val produceResponse = sendProduceRequest(leader,
-          ProduceRequest.Builder.forCurrentMagic(-1, 3000, partitionRecords.asJava).build())
-      assertEquals(1, produceResponse.responses.size)
-      val (tp, partitionResponse) = produceResponse.responses.asScala.head
-      assertEquals(topicPartition, tp)
-      assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
-      assertEquals(-1, partitionResponse.logAppendTime)
-      assertEquals(0, partitionResponse.logStartOffset)
-      assertEquals(expectedLEO, partitionResponse.logEndOffset)
-      partitionResponse
-    }
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.NONE, sr),
+      expectedBaseOffset = 0,
+      expectedLEO = 0)
 
-    sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 0, 0)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.GZIP, sr, sr),
+      expectedBaseOffset = 1,
+      expectedLEO = 2)
 
-    sendAndCheck(MemoryRecords.withRecords(CompressionType.GZIP,
-      new SimpleRecord(System.currentTimeMillis(), "key1".getBytes, "value1".getBytes),
-      new SimpleRecord(System.currentTimeMillis(), "key2".getBytes, "value2".getBytes)), 1, 2)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr),
+      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2, expectedError = Errors.CORRUPT_MESSAGE)
   }
 
   @Test
   def testProduceRequestWithOffsetGoldenPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long, useOffsets: Boolean) {
-      val topicPartition = new TopicPartition("topic", partition)
-      val partitionRecords = Map(topicPartition -> memoryRecords)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
+      expectedBaseOffset = 2000,
+      expectedLEO = 2000)
 
-      val produceResponse = sendProduceRequest(leader,
-          ProduceRequest.Builder.forMagic(RecordBatch.CURRENT_MAGIC_VALUE,
-                                          -1, 3000, 
-                                          partitionRecords.asJava,
-                                          null, useOffsets).build())
-
-      assertEquals(1, produceResponse.responses.size)
-      val (tp, partitionResponse) = produceResponse.responses.asScala.head
-      assertEquals(topicPartition, tp)
-      assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
-      assertEquals(0, partitionResponse.logStartOffset)
-      assertEquals(-1, partitionResponse.logAppendTime)
-      assertEquals(expectedLEO, partitionResponse.logEndOffset)
-    }
-
-    sendAndCheck(MemoryRecords.withRecords(2000, CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2000, 2000, true)
-
-    val simpleRecords = (0 until 50).toArray.map(id => new SimpleRecord(id.toString.getBytes))
+    val simpleRecords = (0 until 50).toArray.map(id => sr)
     val offsets = (2001L until 2500L by 10L).toArray
-    val memoryRecords = TestUtils.recordsWithOffset(simpleRecords, offsets, baseOffset = 2001L)
-    sendAndCheck(memoryRecords, 2001, 2491, true)
+    val memoryRecordsWithOffsets = TestUtils.recordsWithOffset(simpleRecords, offsets, baseOffset = 2001L)
+    sendAndCheck(partition, leader, memoryRecordsWithOffsets, useOffsets = true,
+        expectedBaseOffset = 2001, expectedLEO = 2491)
 
-    sendAndCheck(MemoryRecords.withRecords(CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2492, 2492, false)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.NONE, sr),
+      expectedBaseOffset = 2492, expectedLEO = 2492)
   }
 
   @Test
   def testProduceRequestWithOffsetErrorPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    def sendAndCheck(memoryRecords: MemoryRecords, expectedBaseOffset: Long, expectedLEO: Long, useOffsets: Boolean) {
-      val topicPartition = new TopicPartition("topic", partition)
-      val partitionRecords = Map(topicPartition -> memoryRecords)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
+      expectedBaseOffset = 2000, expectedLEO = 2000)
 
-      val produceResponse = sendProduceRequest(leader,
-          ProduceRequest.Builder.forMagic(RecordBatch.CURRENT_MAGIC_VALUE,
-                                          -1, 3000, 
-                                          partitionRecords.asJava,
-                                          null, useOffsets).build())
-
-      assertEquals(1, produceResponse.responses.size)
-      val (tp, partitionResponse) = produceResponse.responses.asScala.head
-      assertEquals(topicPartition, tp)
-      assertEquals(Errors.NONE, partitionResponse.error)
-      assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
-      assertEquals(0, partitionResponse.logStartOffset)
-      assertEquals(expectedLEO, partitionResponse.logEndOffset)
-      assertEquals(-1, partitionResponse.logAppendTime)
-    }
-
-    def sendAndExpect(memoryRecords: MemoryRecords, expectedLEO: Long, expectedError: Errors) {
-      val topicPartition = new TopicPartition("topic", partition)
-      val partitionRecords = Map(topicPartition -> memoryRecords)
-
-      val produceResponse = sendProduceRequest(leader,
-          ProduceRequest.Builder.forMagic(RecordBatch.CURRENT_MAGIC_VALUE,
-                                          -1, 3000, 
-                                          partitionRecords.asJava,
-                                          null, true).build())
-
-      assertEquals(1, produceResponse.responses.size)
-      val (tp, partitionResponse) = produceResponse.responses.asScala.head
-      assertEquals(topicPartition, tp)
-      assertEquals(expectedError, partitionResponse.error)
-      assertEquals(expectedLEO, partitionResponse.logEndOffset)
-    }
-
-    sendAndCheck(MemoryRecords.withRecords(2000, CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2000, 2000, true)
-
-    sendAndExpect(MemoryRecords.withRecords(2000, CompressionType.NONE,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)), 
-      2000, Errors.INVALID_OFFSET)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
+      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2000, expectedError = Errors.INVALID_OFFSET)
   }
 
   @Test
@@ -166,7 +97,7 @@ class ProduceRequestTest extends BaseRequestTest {
     val nonReplicaId =  nonReplicaOpt.get.config.brokerId
 
     // Send the produce request to the non-replica
-    val records = MemoryRecords.withRecords(CompressionType.NONE, new SimpleRecord("key".getBytes, "value".getBytes))
+    val records = MemoryRecords.withRecords(CompressionType.NONE, sr)
     val topicPartition = new TopicPartition("topic", partition)
     val partitionRecords = Map(topicPartition -> records)
     val produceRequest = ProduceRequest.Builder.forCurrentMagic(-1, 3000, partitionRecords.asJava).build()
@@ -188,8 +119,7 @@ class ProduceRequestTest extends BaseRequestTest {
   def testCorruptLz4ProduceRequest() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
     val timestamp = 1000000
-    val memoryRecords = MemoryRecords.withRecords(CompressionType.LZ4,
-      new SimpleRecord(timestamp, "key".getBytes, "value".getBytes))
+    val memoryRecords = MemoryRecords.withRecords(CompressionType.LZ4, sr)
     // Change the lz4 checksum value (not the kafka record crc) so that it doesn't match the contents
     val lz4ChecksumOffset = 6
     memoryRecords.buffer.array.update(DefaultRecordBatch.RECORD_BATCH_OVERHEAD + lz4ChecksumOffset, 0)
@@ -203,6 +133,7 @@ class ProduceRequestTest extends BaseRequestTest {
     assertEquals(Errors.CORRUPT_MESSAGE, partitionResponse.error)
     assertEquals(-1, partitionResponse.baseOffset)
     assertEquals(-1, partitionResponse.logAppendTime)
+    assertEquals(-1, partitionResponse.logStartOffset)
   }
 
   @Test
@@ -215,8 +146,7 @@ class ProduceRequestTest extends BaseRequestTest {
     topicConfig.setProperty(LogConfig.CompressionTypeProp, ZStdCompressionCodec.name)
     val partitionToLeader = TestUtils.createTopic(zkClient, topic, 1, 1, servers, topicConfig)
     val leader = partitionToLeader(partition)
-    val memoryRecords = MemoryRecords.withRecords(CompressionType.ZSTD,
-      new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes))
+    val memoryRecords = MemoryRecords.withRecords(CompressionType.ZSTD, sr)
     val topicPartition = new TopicPartition("topic", partition)
     val partitionRecords = Map(topicPartition -> memoryRecords)
 
@@ -228,11 +158,39 @@ class ProduceRequestTest extends BaseRequestTest {
     assertEquals(Errors.NONE, partitionResponse.error)
     assertEquals(0, partitionResponse.baseOffset)
     assertEquals(-1, partitionResponse.logAppendTime)
-  }
+    assertEquals(0, partitionResponse.logStartOffset)
+}
 
   private def sendProduceRequest(leaderId: Int, request: ProduceRequest): ProduceResponse = {
     val response = connectAndSend(request, ApiKeys.PRODUCE, destination = brokerSocketServer(leaderId))
     ProduceResponse.parse(response, request.version)
   }
 
+  private def sendAndCheck(partition: Int, 
+                          leader: Int, 
+                          memoryRecords: MemoryRecords,
+                          useOffsets: Boolean = false,
+                          expectedBaseOffset: Long,
+                          expectedLSO : Long = 0, //logs have not rolled in this test
+                          expectedLEO: Long,
+                          expectedError: Errors = Errors.NONE) {
+    val topicPartition = new TopicPartition("topic", partition)
+    val partitionRecords = Map(topicPartition -> memoryRecords)
+
+    val produceResponse = sendProduceRequest(leader, ProduceRequest.Builder.forMagic(
+                                                      RecordBatch.CURRENT_MAGIC_VALUE,
+                                                      -1, 3000,
+                                                      partitionRecords.asJava,
+                                                      null, useOffsets).build())
+
+    assertEquals(1, produceResponse.responses.size)
+    val (tp, partitionResponse) = produceResponse.responses.asScala.head
+    assertEquals(topicPartition, tp)
+    assertEquals(expectedError, partitionResponse.error)
+
+    assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
+    assertEquals(expectedLSO, partitionResponse.logStartOffset)
+   //EDO assertEquals(expectedLEO, partitionResponse.logEndOffset)
+    assertEquals(-1, partitionResponse.logAppendTime) // we're using create time
+  }
 }
