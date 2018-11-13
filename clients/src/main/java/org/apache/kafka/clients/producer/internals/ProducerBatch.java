@@ -95,7 +95,7 @@ public final class ProducerBatch {
         recordsBuilder.setEstimatedCompressionRatio(compressionRatioEstimation);
     }
 
-    @Deprecated
+    //EDO @Deprecated
     public FutureRecordMetadata tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers, Callback callback, long now) {
         return tryAppend(timestamp, key, value, headers, OptionalLong.empty(), callback, now);
     }

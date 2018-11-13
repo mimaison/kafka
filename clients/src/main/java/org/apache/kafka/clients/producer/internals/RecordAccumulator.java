@@ -169,7 +169,7 @@ public final class RecordAccumulator {
         bufferExhaustedRecordSensor.add(new Meter(rateMetricName, totalMetricName));
     }
 
-    @Deprecated
+    //EDO @Deprecated
     public RecordAppendResult append(TopicPartition tp,
             long timestamp,
             byte[] key,
