@@ -476,7 +476,8 @@ class ReplicaManager(val config: KafkaConfig,
         topicPartition ->
                 ProducePartitionStatus(
                   result.info.lastOffset + 1, // required offset
-                  new PartitionResponse(result.error, result.info.firstOffset.getOrElse(-1), result.info.logAppendTime, result.info.logStartOffset)) // response status
+                  new PartitionResponse(result.error, result.info.firstOffset.getOrElse(-1), 
+                      result.info.logAppendTime, result.info.logStartOffset, result.info.logEndOffset)) // response status
       }
 
       recordConversionStatsCallback(localProduceResults.mapValues(_.info.recordConversionStats))
@@ -504,7 +505,8 @@ class ReplicaManager(val config: KafkaConfig,
       // Just return an error and don't handle the request at all
       val responseStatus = entriesPerPartition.map { case (topicPartition, _) =>
         topicPartition -> new PartitionResponse(Errors.INVALID_REQUIRED_ACKS,
-          LogAppendInfo.UnknownLogAppendInfo.firstOffset.getOrElse(-1), RecordBatch.NO_TIMESTAMP, LogAppendInfo.UnknownLogAppendInfo.logStartOffset)
+          LogAppendInfo.UnknownLogAppendInfo.firstOffset.getOrElse(-1), RecordBatch.NO_TIMESTAMP, 
+          LogAppendInfo.UnknownLogAppendInfo.logStartOffset, LogAppendInfo.UnknownLogAppendInfo.logEndOffset)
       }
       responseCallback(responseStatus)
     }
@@ -756,9 +758,16 @@ class ReplicaManager(val config: KafkaConfig,
                    _: RecordBatchTooLargeException |
                    _: CorruptRecordException |
                    _: KafkaStorageException |
-                   _: InvalidTimestampException |
-                   _: InvalidOffsetException) =>
+                   _: InvalidTimestampException) =>
             (topicPartition, LogAppendResult(LogAppendInfo.UnknownLogAppendInfo, Some(e)))
+          case ioe: InvalidOffsetException =>
+            val logEndOffset = getPartition(topicPartition) match {
+              case Some(partition) =>
+                partition.logEndOffset
+              case _ =>
+                -1
+            }
+            (topicPartition, LogAppendResult(LogAppendInfo.unknownLogAppendInfoWithLogEndOffset(logEndOffset), Some(ioe)))
           case t: Throwable =>
             val logStartOffset = getPartition(topicPartition) match {
               case Some(partition) =>

@@ -192,7 +192,7 @@ class ProduceRequestTest extends BaseRequestTest {
 
     assertEquals(expectedBaseOffset, partitionResponse.baseOffset)
     assertEquals(expectedLSO, partitionResponse.logStartOffset)
-   //EDO assertEquals(expectedLEO, partitionResponse.logEndOffset)
+    assertEquals(expectedLEO, partitionResponse.logEndOffset)
     assertEquals(-1, partitionResponse.logAppendTime) // we're using create time
   }
 }
