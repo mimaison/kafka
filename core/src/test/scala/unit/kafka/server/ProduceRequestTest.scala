@@ -45,14 +45,16 @@ class ProduceRequestTest extends BaseRequestTest {
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.NONE, sr),
       expectedBaseOffset = 0,
-      expectedLEO = 0)
+      expectedLEO = 1)
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.GZIP, sr, sr),
       expectedBaseOffset = 1,
-      expectedLEO = 2)
+      expectedLEO = 3)
 
+    // sending a batch with non-0 base offset
     sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr),
-      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2, expectedError = Errors.CORRUPT_MESSAGE)
+      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = -1,
+      expectedError = Errors.CORRUPT_MESSAGE)
   }
 
   @Test
@@ -61,16 +63,16 @@ class ProduceRequestTest extends BaseRequestTest {
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
       expectedBaseOffset = 2000,
-      expectedLEO = 2000)
+      expectedLEO = 2001)
 
     val simpleRecords = (0 until 50).toArray.map(id => sr)
     val offsets = (2001L until 2500L by 10L).toArray
     val memoryRecordsWithOffsets = TestUtils.recordsWithOffset(simpleRecords, offsets, baseOffset = 2001L)
     sendAndCheck(partition, leader, memoryRecordsWithOffsets, useOffsets = true,
-        expectedBaseOffset = 2001, expectedLEO = 2491)
+        expectedBaseOffset = 2001, expectedLEO = 2492)
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.NONE, sr),
-      expectedBaseOffset = 2492, expectedLEO = 2492)
+      expectedBaseOffset = 2492, expectedLEO = 2493)
   }
 
   @Test
@@ -78,10 +80,10 @@ class ProduceRequestTest extends BaseRequestTest {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
-      expectedBaseOffset = 2000, expectedLEO = 2000)
+      expectedBaseOffset = 2000, expectedLEO = 2001)
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
-      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2000, expectedError = Errors.INVALID_OFFSET)
+      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2001, expectedError = Errors.INVALID_OFFSET)
   }
 
   @Test
