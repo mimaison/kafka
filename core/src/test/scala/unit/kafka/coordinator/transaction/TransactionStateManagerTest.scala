@@ -507,7 +507,7 @@ class TransactionStateManagerTest {
           override def answer(): Unit = {
             capturedArgument.getValue.apply(
               Map(partition ->
-                new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L)
+                new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)
               )
             )
           }
@@ -620,7 +620,7 @@ class TransactionStateManagerTest {
     ).andAnswer(new IAnswer[Unit] {
         override def answer(): Unit = capturedArgument.getValue.apply(
           Map(new TopicPartition(TRANSACTION_STATE_TOPIC_NAME, partitionId) ->
-            new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L)
+            new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)
           )
         )
       }

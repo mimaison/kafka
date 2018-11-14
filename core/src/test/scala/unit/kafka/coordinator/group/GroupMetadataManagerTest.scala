@@ -991,7 +991,7 @@ class GroupMetadataManagerTest {
     assertTrue(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
     capturedResponseCallback.getValue.apply(Map(groupTopicPartition ->
-      new PartitionResponse(Errors.NONE, 0L, RecordBatch.NO_TIMESTAMP, 0L)))
+      new PartitionResponse(Errors.NONE, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)))
 
     assertTrue(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
@@ -1031,7 +1031,7 @@ class GroupMetadataManagerTest {
     assertTrue(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
     capturedResponseCallback.getValue.apply(Map(groupTopicPartition ->
-      new PartitionResponse(Errors.NOT_ENOUGH_REPLICAS, 0L, RecordBatch.NO_TIMESTAMP, 0L)))
+      new PartitionResponse(Errors.NOT_ENOUGH_REPLICAS, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)))
 
     assertFalse(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
@@ -1070,7 +1070,7 @@ class GroupMetadataManagerTest {
     assertTrue(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
     capturedResponseCallback.getValue.apply(Map(groupTopicPartition ->
-      new PartitionResponse(Errors.NONE, 0L, RecordBatch.NO_TIMESTAMP, 0L)))
+      new PartitionResponse(Errors.NONE, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)))
 
     assertTrue(group.hasOffsets)
     assertTrue(group.allOffsets.isEmpty)
@@ -1149,7 +1149,7 @@ class GroupMetadataManagerTest {
     groupMetadataManager.storeOffsets(group, memberId, offsets, callback)
     assertTrue(group.hasOffsets)
     capturedResponseCallback.getValue.apply(Map(groupTopicPartition ->
-      new PartitionResponse(appendError, 0L, RecordBatch.NO_TIMESTAMP, 0L)))
+      new PartitionResponse(appendError, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)))
 
     assertFalse(commitErrors.isEmpty)
     val maybeError = commitErrors.get.get(topicPartition)
@@ -1856,7 +1856,7 @@ class GroupMetadataManagerTest {
     ).andAnswer(new IAnswer[Unit] {
       override def answer = capturedCallback.getValue.apply(
         Map(groupTopicPartition ->
-          new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L)
+          new PartitionResponse(error, 0L, RecordBatch.NO_TIMESTAMP, 0L, -1L)
         )
       )})
     EasyMock.expect(replicaManager.getMagic(EasyMock.anyObject())).andStubReturn(Some(RecordBatch.CURRENT_MAGIC_VALUE))
