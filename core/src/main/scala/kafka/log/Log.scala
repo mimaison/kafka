@@ -944,6 +944,7 @@ class Log(@volatile var dir: File,
 
         // increment the log end offset
         updateLogEndOffset(appendInfo.lastOffset + 1)
+        appendInfo.logEndOffset = logEndOffset
 
         // update the first unstable offset (which is used to compute LSO)
         updateFirstUnstableOffset()
@@ -1111,7 +1112,7 @@ class Log(@volatile var dir: File,
 
     // Apply broker-side compression if any
     val targetCodec = BrokerCompressionCodec.getTargetCompressionCodec(config.compressionType, sourceCodec)
-    LogAppendInfo(firstOffset, lastOffset, maxTimestamp, offsetOfMaxTimestamp, RecordBatch.NO_TIMESTAMP, logStartOffset, logEndOffset,
+    LogAppendInfo(firstOffset, lastOffset, maxTimestamp, offsetOfMaxTimestamp, RecordBatch.NO_TIMESTAMP, logStartOffset, -1L,
       RecordConversionStats.EMPTY, sourceCodec, targetCodec, shallowMessageCount, validBytesCount, monotonic, lastOffsetOfFirstBatch)
   }
 

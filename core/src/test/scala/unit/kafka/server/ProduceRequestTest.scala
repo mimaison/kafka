@@ -40,6 +40,15 @@ class ProduceRequestTest extends BaseRequestTest {
   val sr = new SimpleRecord(System.currentTimeMillis(), "key".getBytes, "value".getBytes)
 
   @Test
+  def testSimpleProduceRequest1() {
+    val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
+
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(CompressionType.NONE, sr),
+      expectedBaseOffset = 0,
+      expectedLEO = 1)
+  }
+
+  @Test
   def testSimpleProduceRequest() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
@@ -79,11 +88,11 @@ class ProduceRequestTest extends BaseRequestTest {
   def testProduceRequestWithOffsetErrorPath() {
     val (partition, leader) = createTopicAndFindPartitionWithLeader("topic")
 
-    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
-      expectedBaseOffset = 2000, expectedLEO = 2001)
+    sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr, sr, sr), useOffsets = true,
+      expectedBaseOffset = 2000, expectedLEO = 2003)
 
     sendAndCheck(partition, leader, MemoryRecords.withRecords(2000, CompressionType.NONE, sr), useOffsets = true,
-      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2001, expectedError = Errors.INVALID_OFFSET)
+      expectedBaseOffset = -1, expectedLSO = -1, expectedLEO = 2003, expectedError = Errors.INVALID_OFFSET)
   }
 
   @Test
