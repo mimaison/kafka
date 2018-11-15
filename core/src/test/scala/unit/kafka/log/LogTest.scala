@@ -2904,9 +2904,9 @@ class LogTest {
         leaderEpoch = epoch,
         isFromClient = true,
         assignOffsets = false)
-        fail("UnexpectedAppendOffsetException should be thrown")
+        fail("InvalidProduceOffsetException should be thrown")
     } catch {
-      case _: UnexpectedAppendOffsetException => // this is good
+      case _: InvalidProduceOffsetException => // this is good
     }
   }
 
