@@ -760,7 +760,7 @@ class ReplicaManager(val config: KafkaConfig,
                    _: KafkaStorageException |
                    _: InvalidTimestampException) =>
             (topicPartition, LogAppendResult(LogAppendInfo.UnknownLogAppendInfo, Some(e)))
-          case ioe: InvalidOffsetException =>
+          case ioe: InvalidProduceOffsetException =>
             val logEndOffset = getPartition(topicPartition) match {
               case Some(partition) =>
                 partition.logEndOffset

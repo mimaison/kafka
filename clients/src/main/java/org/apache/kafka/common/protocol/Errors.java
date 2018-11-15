@@ -16,86 +16,7 @@
  */
 package org.apache.kafka.common.protocol;
 
-import org.apache.kafka.common.errors.ApiException;
-import org.apache.kafka.common.errors.BrokerNotAvailableException;
-import org.apache.kafka.common.errors.ClusterAuthorizationException;
-import org.apache.kafka.common.errors.ConcurrentTransactionsException;
-import org.apache.kafka.common.errors.ControllerMovedException;
-import org.apache.kafka.common.errors.CoordinatorLoadInProgressException;
-import org.apache.kafka.common.errors.CoordinatorNotAvailableException;
-import org.apache.kafka.common.errors.CorruptRecordException;
-import org.apache.kafka.common.errors.DuplicateSequenceException;
-import org.apache.kafka.common.errors.DelegationTokenAuthorizationException;
-import org.apache.kafka.common.errors.DelegationTokenDisabledException;
-import org.apache.kafka.common.errors.DelegationTokenExpiredException;
-import org.apache.kafka.common.errors.DelegationTokenNotFoundException;
-import org.apache.kafka.common.errors.DelegationTokenOwnerMismatchException;
-import org.apache.kafka.common.errors.FencedLeaderEpochException;
-import org.apache.kafka.common.errors.ListenerNotFoundException;
-import org.apache.kafka.common.errors.FetchSessionIdNotFoundException;
-import org.apache.kafka.common.errors.GroupAuthorizationException;
-import org.apache.kafka.common.errors.GroupIdNotFoundException;
-import org.apache.kafka.common.errors.GroupNotEmptyException;
-import org.apache.kafka.common.errors.IllegalGenerationException;
-import org.apache.kafka.common.errors.IllegalSaslStateException;
-import org.apache.kafka.common.errors.InconsistentGroupProtocolException;
-import org.apache.kafka.common.errors.InvalidCommitOffsetSizeException;
-import org.apache.kafka.common.errors.InvalidConfigurationException;
-import org.apache.kafka.common.errors.InvalidFetchSessionEpochException;
-import org.apache.kafka.common.errors.InvalidFetchSizeException;
-import org.apache.kafka.common.errors.InvalidGroupIdException;
-import org.apache.kafka.common.errors.InvalidOffsetException;
-import org.apache.kafka.common.errors.InvalidPartitionsException;
-import org.apache.kafka.common.errors.InvalidPidMappingException;
-import org.apache.kafka.common.errors.InvalidPrincipalTypeException;
-import org.apache.kafka.common.errors.InvalidReplicaAssignmentException;
-import org.apache.kafka.common.errors.InvalidReplicationFactorException;
-import org.apache.kafka.common.errors.InvalidRequestException;
-import org.apache.kafka.common.errors.InvalidRequiredAcksException;
-import org.apache.kafka.common.errors.InvalidSessionTimeoutException;
-import org.apache.kafka.common.errors.InvalidTimestampException;
-import org.apache.kafka.common.errors.InvalidTopicException;
-import org.apache.kafka.common.errors.InvalidTxnStateException;
-import org.apache.kafka.common.errors.InvalidTxnTimeoutException;
-import org.apache.kafka.common.errors.KafkaStorageException;
-import org.apache.kafka.common.errors.LeaderNotAvailableException;
-import org.apache.kafka.common.errors.LogDirNotFoundException;
-import org.apache.kafka.common.errors.NetworkException;
-import org.apache.kafka.common.errors.NotControllerException;
-import org.apache.kafka.common.errors.NotCoordinatorException;
-import org.apache.kafka.common.errors.NotEnoughReplicasAfterAppendException;
-import org.apache.kafka.common.errors.NotEnoughReplicasException;
-import org.apache.kafka.common.errors.NotLeaderForPartitionException;
-import org.apache.kafka.common.errors.OffsetMetadataTooLarge;
-import org.apache.kafka.common.errors.OffsetOutOfRangeException;
-import org.apache.kafka.common.errors.OperationNotAttemptedException;
-import org.apache.kafka.common.errors.OutOfOrderSequenceException;
-import org.apache.kafka.common.errors.PolicyViolationException;
-import org.apache.kafka.common.errors.ProducerFencedException;
-import org.apache.kafka.common.errors.ReassignmentInProgressException;
-import org.apache.kafka.common.errors.RebalanceInProgressException;
-import org.apache.kafka.common.errors.RecordBatchTooLargeException;
-import org.apache.kafka.common.errors.RecordTooLargeException;
-import org.apache.kafka.common.errors.ReplicaNotAvailableException;
-import org.apache.kafka.common.errors.RetriableException;
-import org.apache.kafka.common.errors.SaslAuthenticationException;
-import org.apache.kafka.common.errors.SecurityDisabledException;
-import org.apache.kafka.common.errors.TimeoutException;
-import org.apache.kafka.common.errors.TopicAuthorizationException;
-import org.apache.kafka.common.errors.TopicDeletionDisabledException;
-import org.apache.kafka.common.errors.TopicExistsException;
-import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
-import org.apache.kafka.common.errors.TransactionCoordinatorFencedException;
-import org.apache.kafka.common.errors.UnknownLeaderEpochException;
-import org.apache.kafka.common.errors.UnknownMemberIdException;
-import org.apache.kafka.common.errors.UnknownProducerIdException;
-import org.apache.kafka.common.errors.UnknownServerException;
-import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
-import org.apache.kafka.common.errors.UnsupportedByAuthenticationException;
-import org.apache.kafka.common.errors.UnsupportedCompressionTypeException;
-import org.apache.kafka.common.errors.UnsupportedForMessageFormatException;
-import org.apache.kafka.common.errors.UnsupportedSaslMechanismException;
-import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.errors.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -289,8 +210,8 @@ public enum Errors {
             UnknownLeaderEpochException::new),
     UNSUPPORTED_COMPRESSION_TYPE(76, "The requesting client does not support the compression type of given partition.",
             UnsupportedCompressionTypeException::new),
-    INVALID_OFFSET(77, "The offset of the message is out of acceptable range.",
-            InvalidOffsetException::new);
+    INVALID_PRODUCE_OFFSET(77, "The supplied producer offset is smaller than the log end offset of given partition.",
+            InvalidProduceOffsetException::new);
 
     private static final Logger log = LoggerFactory.getLogger(Errors.class);
 

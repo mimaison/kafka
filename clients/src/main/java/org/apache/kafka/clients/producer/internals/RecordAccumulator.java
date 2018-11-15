@@ -241,7 +241,7 @@ public final class RecordAccumulator {
                 }
 
                 MemoryRecordsBuilder recordsBuilder = recordsBuilder(buffer, maxUsableMagic, offset);
-                ProducerBatch batch = new ProducerBatch(tp, recordsBuilder, time.milliseconds());
+                ProducerBatch batch = new ProducerBatch(tp, recordsBuilder, time.milliseconds(), offset.isPresent());
                 FutureRecordMetadata future = Utils.notNull(batch.tryAppend(timestamp, key, value, headers, offset, callback, time.milliseconds()));
 
                 dq.addLast(batch);

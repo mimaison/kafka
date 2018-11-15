@@ -724,7 +724,7 @@ public class RecordAccumulatorTest {
         // Create a big batch
         ByteBuffer buffer = ByteBuffer.allocate(4096);
         MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, CompressionType.NONE, TimestampType.CREATE_TIME, 0L);
-        ProducerBatch batch = new ProducerBatch(tp1, builder, now, true);
+        ProducerBatch batch = new ProducerBatch(tp1, builder, now, false, true);
 
         byte[] value = new byte[1024];
         final AtomicInteger acked = new AtomicInteger(0);

@@ -67,7 +67,7 @@ public class ProduceResponse extends AbstractResponse {
      * INVALID_PRODUCER_EPOCH (47)
      * CLUSTER_AUTHORIZATION_FAILED (31)
      * TRANSACTIONAL_ID_AUTHORIZATION_FAILED (53)
-     * INVALID_OFFSET (77)
+     * INVALID_PRODUCE_OFFSET (77)
      */
 
     private static final String BASE_OFFSET_KEY_NAME = "base_offset";

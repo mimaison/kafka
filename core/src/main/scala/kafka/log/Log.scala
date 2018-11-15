@@ -876,7 +876,7 @@ class Log(@volatile var dir: File,
 
             val firstOrLast = if (appendInfo.firstOffset.isDefined) "First offset" else "Last offset of the first batch"
             if (isFromClient) // produce with offset
-              throw new InvalidOffsetException(
+              throw new InvalidProduceOffsetException(
                 s"Invalid offset in append to $topicPartition. $firstOrLast " +
                 s"${appendInfo.firstOrLastOffsetOfFirstBatch} is less than the next offset ${nextOffsetMetadata.messageOffset}.")
             else
