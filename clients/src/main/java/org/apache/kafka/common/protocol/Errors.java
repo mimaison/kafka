@@ -24,13 +24,15 @@ import org.apache.kafka.common.errors.ControllerMovedException;
 import org.apache.kafka.common.errors.CoordinatorLoadInProgressException;
 import org.apache.kafka.common.errors.CoordinatorNotAvailableException;
 import org.apache.kafka.common.errors.CorruptRecordException;
+import org.apache.kafka.common.errors.DuplicateSequenceException;
 import org.apache.kafka.common.errors.DelegationTokenAuthorizationException;
 import org.apache.kafka.common.errors.DelegationTokenDisabledException;
 import org.apache.kafka.common.errors.DelegationTokenExpiredException;
 import org.apache.kafka.common.errors.DelegationTokenNotFoundException;
 import org.apache.kafka.common.errors.DelegationTokenOwnerMismatchException;
-import org.apache.kafka.common.errors.DuplicateSequenceException;
 import org.apache.kafka.common.errors.FencedLeaderEpochException;
+import org.apache.kafka.common.errors.InvalidProduceOffsetException;
+import org.apache.kafka.common.errors.ListenerNotFoundException;
 import org.apache.kafka.common.errors.FetchSessionIdNotFoundException;
 import org.apache.kafka.common.errors.GroupAuthorizationException;
 import org.apache.kafka.common.errors.GroupIdNotFoundException;
@@ -46,7 +48,6 @@ import org.apache.kafka.common.errors.InvalidGroupIdException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.InvalidPidMappingException;
 import org.apache.kafka.common.errors.InvalidPrincipalTypeException;
-import org.apache.kafka.common.errors.InvalidProduceOffsetException;
 import org.apache.kafka.common.errors.InvalidReplicaAssignmentException;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.common.errors.InvalidRequestException;
@@ -58,7 +59,6 @@ import org.apache.kafka.common.errors.InvalidTxnStateException;
 import org.apache.kafka.common.errors.InvalidTxnTimeoutException;
 import org.apache.kafka.common.errors.KafkaStorageException;
 import org.apache.kafka.common.errors.LeaderNotAvailableException;
-import org.apache.kafka.common.errors.ListenerNotFoundException;
 import org.apache.kafka.common.errors.LogDirNotFoundException;
 import org.apache.kafka.common.errors.NetworkException;
 import org.apache.kafka.common.errors.NotControllerException;
@@ -84,8 +84,8 @@ import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.TopicDeletionDisabledException;
 import org.apache.kafka.common.errors.TopicExistsException;
-import org.apache.kafka.common.errors.TransactionCoordinatorFencedException;
 import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
+import org.apache.kafka.common.errors.TransactionCoordinatorFencedException;
 import org.apache.kafka.common.errors.UnknownLeaderEpochException;
 import org.apache.kafka.common.errors.UnknownMemberIdException;
 import org.apache.kafka.common.errors.UnknownProducerIdException;
@@ -319,6 +319,61 @@ public enum Errors {
     }
 
     /**
+     * An instance of the exception
+     */
+    public ApiException exception() {
+        return this.exception;
+    }
+
+    /**
+     * Create an instance of the ApiException that contains the given error message.
+     *
+     * @param message    The message string to set.
+     * @return           The exception.
+     */
+    public ApiException exception(String message) {
+        if (message == null) {
+            // If no error message was specified, return an exception with the default error message.
+            return exception;
+        }
+        // Return an exception with the given error message.
+        return builder.apply(message);
+    }
+
+    /**
+     * Returns the class name of the exception or null if this is {@code Errors.NONE}.
+     */
+    public String exceptionName() {
+        return exception == null ? null : exception.getClass().getName();
+    }
+
+    /**
+     * The error code for the exception
+     */
+    public short code() {
+        return this.code;
+    }
+
+    /**
+     * Throw the exception corresponding to this error if there is one
+     */
+    public void maybeThrow() {
+        if (exception != null) {
+            throw this.exception;
+        }
+    }
+
+    /**
+     * Get a friendly description of the error (if one is available).
+     * @return the error message
+     */
+    public String message() {
+        if (exception != null)
+            return exception.getMessage();
+        return toString();
+    }
+
+    /**
      * Throw the exception if there is one
      */
     public static Errors forCode(short code) {
@@ -377,60 +432,5 @@ public enum Errors {
 
     public static void main(String[] args) {
         System.out.println(toHtml());
-    }
-
-    /**
-     * An instance of the exception
-     */
-    public ApiException exception() {
-        return this.exception;
-    }
-
-    /**
-     * Create an instance of the ApiException that contains the given error message.
-     *
-     * @param message    The message string to set.
-     * @return           The exception.
-     */
-    public ApiException exception(String message) {
-        if (message == null) {
-            // If no error message was specified, return an exception with the default error message.
-            return exception;
-        }
-        // Return an exception with the given error message.
-        return builder.apply(message);
-    }
-
-    /**
-     * Returns the class name of the exception or null if this is {@code Errors.NONE}.
-     */
-    public String exceptionName() {
-        return exception == null ? null : exception.getClass().getName();
-    }
-
-    /**
-     * The error code for the exception
-     */
-    public short code() {
-        return this.code;
-    }
-
-    /**
-     * Throw the exception corresponding to this error if there is one
-     */
-    public void maybeThrow() {
-        if (exception != null) {
-            throw this.exception;
-        }
-    }
-
-    /**
-     * Get a friendly description of the error (if one is available).
-     * @return the error message
-     */
-    public String message() {
-        if (exception != null)
-            return exception.getMessage();
-        return toString();
     }
 }
