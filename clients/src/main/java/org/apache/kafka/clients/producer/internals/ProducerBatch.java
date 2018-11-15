@@ -208,7 +208,7 @@ public final class ProducerBatch {
 
         if (this.finalState.compareAndSet(null, tryFinalState)) {
             // do not set offset to individual RecordMetadata when using producer offsets
-            completeFutureAndFireCallbacks( this.useOffsets ? ProduceResponse.INVALID_OFFSET : baseOffset, logAppendTime, exception);
+            completeFutureAndFireCallbacks(this.useOffsets ? ProduceResponse.INVALID_OFFSET : baseOffset, logAppendTime, exception);
             return true;
         }
 

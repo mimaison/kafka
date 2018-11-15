@@ -20,7 +20,6 @@ package kafka.api
 import java.nio.charset.StandardCharsets
 import java.util.Properties
 import java.util.concurrent.{Future, TimeUnit}
-import java.util.concurrent.atomic.AtomicReference
 
 import collection.JavaConverters._
 import kafka.integration.KafkaServerTestHarness
@@ -29,7 +28,7 @@ import kafka.server.KafkaConfig
 import kafka.utils.TestUtils
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer._
-import org.apache.kafka.common.errors.{InvalidOffsetException, InvalidProduceOffsetException}
+import org.apache.kafka.common.errors.InvalidProduceOffsetException
 import org.apache.kafka.common.{KafkaException, TopicPartition}
 import org.apache.kafka.common.record.TimestampType
 import org.apache.kafka.common.security.auth.SecurityProtocol

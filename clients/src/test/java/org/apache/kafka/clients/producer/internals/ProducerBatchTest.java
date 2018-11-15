@@ -34,7 +34,6 @@ import org.junit.Test;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 
@@ -278,7 +277,7 @@ public class ProducerBatchTest {
 
         // Append two messages so the batch is too big.
         byte[] value = new byte[1024];
-        for (int i=0; i<4; i++) {
+        for (int i = 0; i < 4; i++) {
             batch.tryAppend(now, null, value, Record.EMPTY_HEADERS, OptionalLong.empty(), null, now);
         }
         batch.close();
@@ -291,10 +290,10 @@ public class ProducerBatchTest {
 
         ProducerBatch batch1 = splits.getFirst();
         assertEquals(2, batch1.recordCount);
-        assertEquals(0, batch1.records().batchIterator().peek().baseOffset() );
+        assertEquals(0, batch1.records().batchIterator().peek().baseOffset());
         ProducerBatch batch2 = splits.getLast();
         assertEquals(2, batch2.recordCount);
-        assertEquals(0, batch2.records().batchIterator().peek().baseOffset() );
+        assertEquals(0, batch2.records().batchIterator().peek().baseOffset());
 
         long expectedOffset = 0L;
         for (Record r : batch1.records().records()) {
