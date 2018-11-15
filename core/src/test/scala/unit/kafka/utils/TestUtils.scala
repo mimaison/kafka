@@ -40,7 +40,7 @@ import kafka.zk._
 import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.admin.{AdminClient, AlterConfigsResult, Config, ConfigEntry}
 import org.apache.kafka.clients.consumer._
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
+import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord, ProducerRecordWithOffset}
 import org.apache.kafka.common.{KafkaFuture, TopicPartition}
 import org.apache.kafka.common.config.ConfigResource
 import org.apache.kafka.common.errors.RetriableException
@@ -1343,14 +1343,17 @@ object TestUtils extends Logging {
   }
 
   def producerRecordWithExpectedTransactionStatus(topic: String, key: Array[Byte], value: Array[Byte],
-                                                  willBeCommitted: Boolean) : ProducerRecord[Array[Byte], Array[Byte]] = {
+                                                  willBeCommitted: Boolean, producerOffset: Long = -1L) : ProducerRecord[Array[Byte], Array[Byte]] = {
     val header = new Header {override def key() = transactionStatusKey
       override def value() = if (willBeCommitted)
         committedValue
       else
         abortedValue
     }
-    new ProducerRecord[Array[Byte], Array[Byte]](topic, null, key, value, Collections.singleton(header))
+    if (producerOffset != -1L)
+      new ProducerRecordWithOffset[Array[Byte], Array[Byte]](topic, null, null, key, value, Collections.singleton(header), producerOffset)
+    else
+      new ProducerRecord[Array[Byte], Array[Byte]](topic, null, key, value, Collections.singleton(header))
   }
 
   def producerRecordWithExpectedTransactionStatus(topic: String, key: String, value: String,

@@ -18,6 +18,7 @@
 package kafka.api
 
 import java.lang.{Long => JLong}
+import java.nio.charset.StandardCharsets
 import java.util.{Optional, Properties}
 import java.util.concurrent.TimeUnit
 
@@ -28,7 +29,7 @@ import kafka.utils.TestUtils.consumeRecords
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.{KafkaException, TopicPartition}
-import org.apache.kafka.common.errors.ProducerFencedException
+import org.apache.kafka.common.errors.{InvalidProduceOffsetException, ProducerFencedException}
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 
@@ -109,6 +110,53 @@ class TransactionsTest extends KafkaServerTestHarness {
     val expectedValues = List("1", "2", "3", "4").toSet
     allRecords.foreach { record =>
       assertTrue(expectedValues.contains(TestUtils.recordValueAsString(record)))
+    }
+  }
+
+  @Test
+  def testBasicTransactionsWithProducerOffsets() = {
+    val producer = transactionalProducers.head
+    val consumer = transactionalConsumers.head
+    val unCommittedConsumer = nonTransactionalConsumers.head
+
+    producer.initTransactions()
+    try {
+    producer.beginTransaction()
+    producer.send(TestUtils.producerRecordWithExpectedTransactionStatus(topic1, "key".getBytes(StandardCharsets.UTF_8), "2".getBytes(StandardCharsets.UTF_8), willBeCommitted = false, 1001))
+    producer.send(TestUtils.producerRecordWithExpectedTransactionStatus(topic1, "key".getBytes(StandardCharsets.UTF_8), "4".getBytes(StandardCharsets.UTF_8), willBeCommitted = false, 2000)).get
+    producer.flush()
+    producer.abortTransaction()
+
+    /*producer.beginTransaction()
+    producer.send(TestUtils.producerRecordWithExpectedTransactionStatus(topic1, "key".getBytes(StandardCharsets.UTF_8), "1".getBytes(StandardCharsets.UTF_8), willBeCommitted = true, 300L))
+    producer.send(TestUtils.producerRecordWithExpectedTransactionStatus(topic1, "key".getBytes(StandardCharsets.UTF_8), "3".getBytes(StandardCharsets.UTF_8), willBeCommitted = true, 400L))
+    producer.commitTransaction()*/
+
+    producer.beginTransaction()
+
+      val rm = producer.send(TestUtils.producerRecordWithExpectedTransactionStatus(topic1, "key".getBytes(StandardCharsets.UTF_8), "5".getBytes(StandardCharsets.UTF_8), willBeCommitted = true, 3000)).get
+      println(rm.offset())
+      producer.commitTransaction()
+    } catch {
+      case e: Exception => println(e.printStackTrace())
+    }
+
+    consumer.subscribe(List(topic1, topic2).asJava)
+    unCommittedConsumer.subscribe(List(topic1, topic2).asJava)
+
+    val records = consumeRecords(consumer, 3)
+    var expectedOffsets = List(300L, 400L, 401L)
+    records.foreach { record =>
+      TestUtils.assertCommittedAndGetValue(record)
+      assertTrue(expectedOffsets.contains(record.offset()))
+    }
+
+    val allRecords = consumeRecords(unCommittedConsumer, 5)
+    val expectedValues = List("1", "2", "3", "4", "5").toSet
+    expectedOffsets = List(100L, 200L, 300L, 400L, 401L)
+    allRecords.foreach { record =>
+      assertTrue(expectedValues.contains(TestUtils.recordValueAsString(record)))
+      assertTrue(expectedOffsets.contains(record.offset()))
     }
   }
 
