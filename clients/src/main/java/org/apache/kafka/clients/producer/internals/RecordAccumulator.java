@@ -205,7 +205,10 @@ public final class RecordAccumulator {
 
         useOffsets.compareAndSet(null, offset.isPresent());
         if (!useOffsets.get().equals(offset.isPresent())) {
-            throw new IllegalArgumentException("Cannot mix produce with and without offsets");
+            throw new IllegalArgumentException("Cannot mix sending records with and without offsets");
+        }
+        if (useOffsets.get() && transactionManager!=null && transactionManager.isTransactional()) {
+            throw new IllegalArgumentException("Transactional producer does not support sending records with offsets");
         }
 
         // We keep track of the number of appending thread to make sure we do not miss batches in
