@@ -613,7 +613,7 @@ public class MemoryRecordsTest {
             assertEquals(pid1, secondBatch.producerId());
             assertEquals(epoch1, secondBatch.producerEpoch());
             assertEquals(baseSequence1, secondBatch.baseSequence());
-            //EDO assertEquals(baseSequence1 + 2, secondBatch.lastSequence());
+            assertEquals(baseSequence1 + 2, secondBatch.lastSequence());
             assertFalse(secondBatch.isTransactional());
             List<Record> secondBatchRecords = TestUtils.toList(secondBatch);
             assertEquals(2, secondBatchRecords.size());
@@ -629,7 +629,7 @@ public class MemoryRecordsTest {
             assertEquals(pid2, thirdBatch.producerId());
             assertEquals(epoch2, thirdBatch.producerEpoch());
             assertEquals(baseSequence2, thirdBatch.baseSequence());
-            //EDO assertEquals(baseSequence2 + 2, thirdBatch.lastSequence());
+            assertEquals(baseSequence2 + 2, thirdBatch.lastSequence());
             assertTrue(thirdBatch.isTransactional());
             List<Record> thirdBatchRecords = TestUtils.toList(thirdBatch);
             assertEquals(2, thirdBatchRecords.size());

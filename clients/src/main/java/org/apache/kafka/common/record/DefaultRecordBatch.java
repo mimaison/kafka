@@ -204,11 +204,7 @@ public class DefaultRecordBatch extends AbstractRecordBatch implements MutableRe
         int baseSequence = baseSequence();
         if (baseSequence == RecordBatch.NO_SEQUENCE)
             return RecordBatch.NO_SEQUENCE;
-        if (count() > 0) { //EDO incorrect for state reconstruction from disk
-            return incrementSequence(baseSequence, count() - 1);
-        } else {
-            return incrementSequence(baseSequence, lastOffsetDelta());
-        }
+        return incrementSequence(baseSequence, lastOffsetDelta());
     }
 
     @Override
