@@ -29,7 +29,7 @@ import kafka.utils.TestUtils.consumeRecords
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer, OffsetAndMetadata}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.{KafkaException, TopicPartition}
-import org.apache.kafka.common.errors.{InvalidProduceOffsetException, ProducerFencedException}
+import org.apache.kafka.common.errors.ProducerFencedException
 import org.junit.{After, Before, Test}
 import org.junit.Assert._
 

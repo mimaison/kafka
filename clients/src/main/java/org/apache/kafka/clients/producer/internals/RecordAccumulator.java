@@ -204,12 +204,7 @@ public final class RecordAccumulator {
                                      long maxTimeToBlock) throws InterruptedException {
 
         useOffsets.compareAndSet(null, offset.isPresent());
-        if (!useOffsets.get().equals(offset.isPresent())) {
-            throw new IllegalArgumentException("Cannot mix sending records with and without offsets");
-        }
-        if (useOffsets.get() && transactionManager!=null && transactionManager.isTransactional()) {
-            throw new IllegalArgumentException("Transactional producer does not support sending records with offsets");
-        }
+        validateUseOffset(offset);
 
         // We keep track of the number of appending thread to make sure we do not miss batches in
         // abortIncompleteBatches().
@@ -258,6 +253,15 @@ public final class RecordAccumulator {
             if (buffer != null)
                 free.deallocate(buffer);
             appendsInProgress.decrementAndGet();
+        }
+    }
+
+    private void validateUseOffset(OptionalLong offset) {
+        if (!useOffsets.get().equals(offset.isPresent())) {
+            throw new IllegalArgumentException("Cannot mix sending records with and without offsets");
+        }
+        if (useOffsets.get() && transactionManager != null && transactionManager.isTransactional()) {
+            throw new IllegalArgumentException("Transactional producer does not support sending records with offsets");
         }
     }
 
