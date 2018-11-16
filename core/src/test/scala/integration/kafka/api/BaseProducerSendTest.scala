@@ -35,7 +35,7 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.junit.Assert._
 import org.junit.{After, Before, Test}
 
-import scala.collection.mutable.{Buffer, ListBuffer}
+import scala.collection.mutable.Buffer
 import scala.concurrent.ExecutionException
 
 abstract class BaseProducerSendTest extends KafkaServerTestHarness {
@@ -190,28 +190,30 @@ abstract class BaseProducerSendTest extends KafkaServerTestHarness {
   def testSendWithOffset(enableIdempotent: Boolean) {
     val producer = createProducer(brokerList, enableIdempotent= enableIdempotent)
     val partition = 0
-    val offset = 100
 
     try {
       // create topic
       createTopic(topic, 1, 2)
 
       val record = new ProducerRecordWithOffset[Array[Byte], Array[Byte]](topic, partition, null, "key".getBytes(StandardCharsets.UTF_8),
-        "value".getBytes(StandardCharsets.UTF_8),null, offset)
+        "value".getBytes(StandardCharsets.UTF_8),null, 100)
       val rm = producer.send(record).get(10, TimeUnit.SECONDS)
-      assertFalse("Should not have set offset but got " + rm.offset, rm.hasOffset)
+      assertFalse(s"Should not have set offset but got ${rm.offset}", rm.hasOffset)
 
-      val futures = new ListBuffer[Future[RecordMetadata]]
-      for (off <- Array(110, 120, 130, 140, 150)) {
+      val futures = Buffer[Future[RecordMetadata]]()
+      for (off <- Array(110, 120, 130, 140, 150, 160, 170, 180, 190, 200)) {
         val r = new ProducerRecordWithOffset[Array[Byte], Array[Byte]](topic, partition, null, "key".getBytes(StandardCharsets.UTF_8),
           "value".getBytes(StandardCharsets.UTF_8),null, off)
         futures += producer.send(r)
+        if (off == 150) { // force a batch to be sent
+          futures.tail.get
+        }
       }
 
-      // assert no exceptions, we cannot check for offset
+      // assert no exceptions and no offsets
       futures.map { f =>
         val rm = f.get(10, TimeUnit.SECONDS)
-        assertFalse("Should not have set offset but got " + rm.offset, rm.hasOffset)
+        assertFalse(s"Should not have set offset but got ${rm.offset}", rm.hasOffset)
       }
 
       try {
@@ -220,7 +222,7 @@ abstract class BaseProducerSendTest extends KafkaServerTestHarness {
       } catch {
         case ee : ExecutionException =>
           assertEquals(classOf[InvalidProduceOffsetException], ee.getCause.getClass)
-          assertEquals(151, ee.getCause.asInstanceOf[InvalidProduceOffsetException].getLogEndOffset)
+          assertEquals(201, ee.getCause.asInstanceOf[InvalidProduceOffsetException].getLogEndOffset)
       }
 
     } finally {
