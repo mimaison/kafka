@@ -206,7 +206,7 @@ abstract class BaseProducerSendTest extends KafkaServerTestHarness {
           "value".getBytes(StandardCharsets.UTF_8),null, off)
         futures += producer.send(r)
         if (off == 150) { // force a batch to be sent
-          futures.tail.get
+          futures.last.get
         }
       }
 
