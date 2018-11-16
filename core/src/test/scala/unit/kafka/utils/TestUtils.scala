@@ -556,6 +556,7 @@ object TestUtils extends Logging {
                            batchSize: Int = 16384,
                            compressionType: String = "none",
                            requestTimeoutMs: Int = 20 * 1000,
+                           enableIdempotent: Boolean = false,
                            securityProtocol: SecurityProtocol = SecurityProtocol.PLAINTEXT,
                            trustStoreFile: Option[File] = None,
                            saslProperties: Option[Properties] = None,
@@ -572,6 +573,7 @@ object TestUtils extends Logging {
     producerProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMs.toString)
     producerProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize.toString)
     producerProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compressionType)
+    producerProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, String.valueOf(enableIdempotent))
     producerProps ++= producerSecurityConfigs(securityProtocol, trustStoreFile, saslProperties)
     new KafkaProducer[K, V](producerProps, keySerializer, valueSerializer)
   }

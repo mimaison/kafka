@@ -72,13 +72,15 @@ abstract class BaseProducerSendTest extends KafkaServerTestHarness {
   protected def createProducer(brokerList: String,
                                lingerMs: Int = 0,
                                batchSize: Int = 16384,
-                               compressionType: String = "none"): KafkaProducer[Array[Byte],Array[Byte]] = {
+                               compressionType: String = "none",
+                               enableIdempotent: Boolean = false): KafkaProducer[Array[Byte],Array[Byte]] = {
     val producer = TestUtils.createProducer(brokerList,
       compressionType = compressionType,
       securityProtocol = securityProtocol,
       trustStoreFile = trustStoreFile,
       saslProperties = clientSaslProperties,
-      lingerMs = lingerMs)
+      lingerMs = lingerMs,
+      enableIdempotent = enableIdempotent)
     registerProducer(producer)
   }
 
@@ -175,8 +177,18 @@ abstract class BaseProducerSendTest extends KafkaServerTestHarness {
   }
 
   @Test
-  def testSendWithOffset() {
-    val producer = createProducer(brokerList)
+  def testSendWithOffset(): Unit = {
+    testSendWithOffset(false)
+  }
+
+  @Test
+  def testSendWithOffsetIdempotent() {
+    testSendWithOffset(true)
+  }
+
+
+  def testSendWithOffset(enableIdempotent: Boolean) {
+    val producer = createProducer(brokerList, enableIdempotent= enableIdempotent)
     val partition = 0
     val offset = 100
 
