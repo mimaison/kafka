@@ -122,7 +122,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
 
     partitionReplicaAssignment.values.foreach(reps =>
       if (reps.size != reps.toSet.size)
-        throw new InvalidReplicaAssignmentException("Duplicate replica assignment found: " + partitionReplicaAssignment)
+        throw new InvalidReplicaAssignmentException(s"Duplicate replica assignment found: $partitionReplicaAssignment")
     )
 
     LogConfig.validate(config)
@@ -137,7 +137,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
       } else {
         zkClient.setTopicAssignment(topic, assignment)
       }
-      debug("Updated path %s with %s for replica assignment".format(TopicZNode.path(topic), assignment))
+      debug(s"Updated path ${TopicZNode.path(topic)} with $assignment for replica assignment")
     } catch {
       case _: NodeExistsException => throw new TopicExistsException(s"Topic '$topic' already exists.")
       case e2: Throwable => throw new AdminOperationException(e2.toString)
@@ -154,11 +154,11 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
         zkClient.createDeleteTopicPath(topic)
       } catch {
         case _: NodeExistsException => throw new TopicAlreadyMarkedForDeletionException(
-          "topic %s is already marked for deletion".format(topic))
+          s"Topic '$topic' is already marked for deletion")
         case e: Throwable => throw new AdminOperationException(e.getMessage)
        }
     } else {
-      throw new UnknownTopicOrPartitionException(s"Topic `$topic` to delete does not exist")
+      throw new UnknownTopicOrPartitionException(s"Topic '$topic' to delete does not exist")
     }
   }
 
@@ -314,7 +314,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
   def validateTopicConfig(topic: String, configs: Properties): Unit = {
     Topic.validate(topic)
     if (!zkClient.topicExists(topic))
-      throw new AdminOperationException("Topic \"%s\" does not exist.".format(topic))
+      throw new AdminOperationException(s"Topic '$topic' does not exist.")
     // remove the topic overrides
     LogConfig.validate(configs)
   }
@@ -422,6 +422,10 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
     entityPaths(None)
       .flatMap(entity => entityPaths(Some(entity + '/' + childEntityType)))
       .map(entityPath => (entityPath, fetchEntityConfig(rootEntityType, entityPath))).toMap
+  }
+
+  def createAddReplicas(topic: String, partition: Int, replicas: Seq[Int], requestedReplicationFactor: Int) {
+    zkClient.createAddReplicasTopicPath(topic, partition, replicas, requestedReplicationFactor)
   }
 
 }

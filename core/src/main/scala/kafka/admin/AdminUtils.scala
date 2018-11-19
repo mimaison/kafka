@@ -129,21 +129,32 @@ object AdminUtils extends Logging with AdminUtilities {
   def assignReplicasToBrokers(brokerMetadatas: Seq[BrokerMetadata],
                               nPartitions: Int,
                               replicationFactor: Int,
+                              minISR: Int = -1,
                               fixedStartIndex: Int = -1,
                               startPartitionId: Int = -1): Map[Int, Seq[Int]] = {
+    var availableReplicationFactor = replicationFactor
+    println(s"Replication factor $replicationFactor")
+    println(s"Min ISR $minISR")
+    println(s"Brokers ${brokerMetadatas.size}")
     if (nPartitions <= 0)
       throw new InvalidPartitionsException("Number of partitions must be larger than 0.")
     if (replicationFactor <= 0)
       throw new InvalidReplicationFactorException("Replication factor must be larger than 0.")
-    if (replicationFactor > brokerMetadatas.size)
-      throw new InvalidReplicationFactorException(s"Replication factor: $replicationFactor larger than available brokers: ${brokerMetadatas.size}.")
+    if (replicationFactor > brokerMetadatas.size) {
+      if (minISR > brokerMetadatas.size)
+        throw new InvalidReplicationFactorException(s"Replication factor: $replicationFactor larger than available brokers: ${brokerMetadatas.size}.")
+      else {
+        println(s"Not enough brokers for requested replication factor ($replicationFactor), but enough brokers for min ISR")
+        availableReplicationFactor = brokerMetadatas.size
+      }
+    }
     if (brokerMetadatas.forall(_.rack.isEmpty))
-      assignReplicasToBrokersRackUnaware(nPartitions, replicationFactor, brokerMetadatas.map(_.id), fixedStartIndex,
+      assignReplicasToBrokersRackUnaware(nPartitions, availableReplicationFactor, brokerMetadatas.map(_.id), fixedStartIndex,
         startPartitionId)
     else {
       if (brokerMetadatas.exists(_.rack.isEmpty))
         throw new AdminOperationException("Not all brokers have rack information for replica rack aware assignment.")
-      assignReplicasToBrokersRackAware(nPartitions, replicationFactor, brokerMetadatas, fixedStartIndex,
+      assignReplicasToBrokersRackAware(nPartitions, availableReplicationFactor, brokerMetadatas, fixedStartIndex,
         startPartitionId)
     }
   }
@@ -368,7 +379,7 @@ object AdminUtils extends Logging with AdminUtilities {
         zkUtils.createPersistentPath(getDeleteTopicPath(topic))
       } catch {
         case _: ZkNodeExistsException => throw new TopicAlreadyMarkedForDeletionException(
-          "topic %s is already marked for deletion".format(topic))
+          s"topic $topic is already marked for deletion")
         case e2: Throwable => throw new AdminOperationException(e2)
       }
     } else {
@@ -407,7 +418,7 @@ object AdminUtils extends Logging with AdminUtilities {
                   topicConfig: Properties = new Properties,
                   rackAwareMode: RackAwareMode = RackAwareMode.Enforced) {
     val brokerMetadatas = getBrokerMetadatas(zkUtils, rackAwareMode)
-    val replicaAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions, replicationFactor)
+    val replicaAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions, replicationFactor, replicationFactor)
     AdminUtils.createOrUpdateTopicPartitionAssignmentPathInZK(zkUtils, topic, replicaAssignment, topicConfig)
   }
 
@@ -481,7 +492,7 @@ object AdminUtils extends Logging with AdminUtilities {
         info(s"Topic update $jsonPartitionData")
         zkUtils.updatePersistentPath(zkPath, jsonPartitionData)
       }
-      debug("Updated path %s with %s for replica assignment".format(zkPath, jsonPartitionData))
+      debug(s"Updated path $zkPath with $jsonPartitionData for replica assignment")
     } catch {
       case _: ZkNodeExistsException => throw new TopicExistsException(s"Topic '$topic' already exists.")
       case e2: Throwable => throw new AdminOperationException(e2.toString)
@@ -529,7 +540,7 @@ object AdminUtils extends Logging with AdminUtilities {
   def validateTopicConfig(zkUtils: ZkUtils, topic: String, configs: Properties): Unit = {
     Topic.validate(topic)
     if (!topicExists(zkUtils, topic))
-      throw new AdminOperationException("Topic \"%s\" does not exist.".format(topic))
+      throw new AdminOperationException(s"Topic '$topic' does not exist.")
     // remove the topic overrides
     LogConfig.validate(configs)
   }

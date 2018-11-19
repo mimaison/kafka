@@ -1622,6 +1622,10 @@ class ControllerChangeHandler(controller: KafkaController, eventManager: Control
   override def handleDataChange(): Unit = eventManager.put(controller.ControllerChange)
 }
 
+class AddReplicasHandler(controller: KafkaController, eventManager: ControllerEventManager) extends ZNodeChangeHandler {
+  override val path: String = AddReplicasZNode.path
+}
+
 case class ReassignedPartitionsContext(var newReplicas: Seq[Int] = Seq.empty,
                                        val reassignIsrChangeHandler: PartitionReassignmentIsrChangeHandler) {
 

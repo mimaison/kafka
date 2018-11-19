@@ -373,6 +373,27 @@ object DeleteTopicsTopicZNode {
   def path(topic: String) = s"${DeleteTopicsZNode.path}/$topic"
 }
 
+object AddReplicasZNode {
+  def path = s"${AdminZNode.path}/add_replicas"
+}
+
+object AddReplicasTopicZNode {
+  def path(topic: String) = s"${AddReplicasZNode.path}/$topic"
+}
+
+object AddReplicasTopicPartitionZNode {
+  def path(topic: String, partition: Int) = s"${AddReplicasTopicZNode.path(topic)}/$partition"
+  def encode(replicas: Seq[Int], requestedReplicationFactor: Int) = {
+    Json.encodeAsBytes(Map("version" -> 1, "replicas" -> replicas, "requestedReplicationFactor" -> requestedReplicationFactor).asJava)
+  }
+  def decode(bytes: Array[Byte]): Option[(Seq[Int], Int)] = Json.parseBytes(bytes).map { js =>
+    val json = js.asJsonObject
+    val replicas = json("replicas").to[Seq[Int]]
+    val requestedReplicationFactor = json("requestedReplicationFactor").to[Int]
+    (replicas, requestedReplicationFactor)
+  }
+}
+
 object ReassignPartitionsZNode {
 
   /**

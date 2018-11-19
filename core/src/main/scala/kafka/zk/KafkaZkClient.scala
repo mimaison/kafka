@@ -171,7 +171,7 @@ class KafkaZkClient private[zk] (zooKeeperClient: ZooKeeperClient, isSecure: Boo
     val setDataRequest = SetDataRequest(brokerIdPath, brokerInfo.toJsonBytes, ZkVersion.MatchAnyVersion)
     val response = retryRequestUntilConnected(setDataRequest)
     response.maybeThrow()
-    info("Updated broker %d at path %s with addresses: %s".format(brokerInfo.broker.id, brokerIdPath, brokerInfo.broker.endPoints))
+    info(s"Updated broker ${brokerInfo.broker.id} at path $brokerIdPath with addresses: ${brokerInfo.broker.endPoints}")
   }
 
   /**
@@ -1651,6 +1651,10 @@ class KafkaZkClient private[zk] (zooKeeperClient: ZooKeeperClient, isSecure: Boo
 
   private def updateCurrentZKSessionId(newSessionId: Long): Unit = {
     currentZooKeeperSessionId = newSessionId
+  }
+
+  def createAddReplicasTopicPath(topicName: String, partition: Int, replicas: Seq[Int], requestedReplicationFactor: Int): Unit = {
+    createRecursive(AddReplicasTopicPartitionZNode.path(topicName, partition), AddReplicasTopicPartitionZNode.encode(replicas, requestedReplicationFactor))
   }
 
   private class CheckedEphemeral(path: String, data: Array[Byte]) extends Logging {

@@ -39,6 +39,7 @@ import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 
 import scala.collection._
 import scala.collection.JavaConverters._
+import org.apache.kafka.common.config.TopicConfig
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -86,6 +87,14 @@ class AdminManager(val config: KafkaConfig,
         }
         LogConfig.validate(configs)
 
+        val minISR: Int = {
+          if (arguments.configs.containsKey(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG)) {
+            Integer.parseInt(arguments.configs.get(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
+          } else {
+            config.minInSyncReplicas
+          }
+        }
+        println(s"Min ISR is ${minISR}")
         val assignments = {
           if ((arguments.numPartitions != NO_NUM_PARTITIONS || arguments.replicationFactor != NO_REPLICATION_FACTOR)
             && !arguments.replicasAssignments.isEmpty)
@@ -98,9 +107,10 @@ class AdminManager(val config: KafkaConfig,
               (partitionId.intValue, replicas.asScala.map(_.intValue))
             }
           } else
-            AdminUtils.assignReplicasToBrokers(brokers, arguments.numPartitions, arguments.replicationFactor)
+            AdminUtils.assignReplicasToBrokers(brokers, arguments.numPartitions, arguments.replicationFactor, minISR)
         }
         trace(s"Assignments for topic $topic are $assignments ")
+       
 
         createTopicPolicy match {
           case Some(policy) =>
@@ -116,14 +126,18 @@ class AdminManager(val config: KafkaConfig,
             policy.validate(new RequestMetadata(topic, numPartitions, replicationFactor, replicaAssignments,
               arguments.configs))
 
-            if (!validateOnly)
+            if (!validateOnly) {
               adminZkClient.createTopicWithAssignment(topic, configs, assignments)
+              a(topic, arguments.replicationFactor, assignments)
+            }
 
           case None =>
             if (validateOnly)
               adminZkClient.validateTopicCreate(topic, assignments, configs)
-            else
+            else {
               adminZkClient.createTopicWithAssignment(topic, configs, assignments)
+              a(topic, arguments.replicationFactor, assignments)
+            }
         }
         CreatePartitionsMetadata(topic, assignments, ApiError.NONE)
       } catch {
@@ -422,6 +436,14 @@ class AdminManager(val config: KafkaConfig,
     topicPurgatory.shutdown()
     CoreUtils.swallow(createTopicPolicy.foreach(_.close()), this)
     CoreUtils.swallow(alterConfigPolicy.foreach(_.close()), this)
+  }
+
+  private def a(topic: String, requestedReplicationFactor: Int, assignments: Map[Int, Seq[Int]]) {
+    assignments.foreach { case (partition, replicas) =>
+      if (requestedReplicationFactor - replicas.size > 0) {
+        adminZkClient.createAddReplicas(topic, partition, replicas, requestedReplicationFactor)
+      }
+    }
   }
 
   private def resourceNameToBrokerId(resourceName: String): Int = {
