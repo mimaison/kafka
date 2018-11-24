@@ -17,6 +17,7 @@
 
 package org.apache.kafka.clients.admin;
 
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
@@ -770,6 +771,32 @@ public abstract class AdminClient implements AutoCloseable {
     public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds) {
         return deleteConsumerGroups(groupIds, new DeleteConsumerGroupsOptions());
     }
+
+    /**
+     * <p>Commits offsets for the specified group
+     *
+     * <p>This is a convenience method for {@link #commitOffsets(String, Map, CommitOffsetsOptions)} with default options.
+     * See the overload for more details.
+     *
+     * @param groupId The group for which to commit offsets.
+     * @param offsets A map of offsets by partition with associated metadata
+     * @return              The CommitOffsetsResult.
+     */
+    public CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets) {
+        return commitOffsets(groupId, offsets, new CommitOffsetsOptions());
+    }
+
+    /**
+     * <p>Commits offsets for the specified group
+     * 
+     * <p>This operation is not transactional so it may succeed for some partition while fail for others.
+     *
+     * @param groupId The group for which to commit offsets.
+     * @param offsets A map of offsets by partition with associated metadata
+     * @param options The options to use when committing the offsets.
+     * @return              The CommitOffsetsResult.
+     */
+    public abstract CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, CommitOffsetsOptions options);
 
     /**
      * Get the metrics kept by the adminClient

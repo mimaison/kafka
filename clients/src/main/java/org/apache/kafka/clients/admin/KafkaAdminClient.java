@@ -88,6 +88,8 @@ import org.apache.kafka.common.requests.DeleteAclsRequest;
 import org.apache.kafka.common.requests.DeleteAclsResponse;
 import org.apache.kafka.common.requests.DeleteAclsResponse.AclDeletionResult;
 import org.apache.kafka.common.requests.DeleteAclsResponse.AclFilterResponse;
+import org.apache.kafka.common.requests.OffsetCommitRequest.PartitionData;
+import org.apache.kafka.common.requests.OffsetCommitResponse;
 import org.apache.kafka.common.requests.DeleteGroupsRequest;
 import org.apache.kafka.common.requests.DeleteGroupsResponse;
 import org.apache.kafka.common.requests.DeleteRecordsRequest;
@@ -112,6 +114,7 @@ import org.apache.kafka.common.requests.ListGroupsRequest;
 import org.apache.kafka.common.requests.ListGroupsResponse;
 import org.apache.kafka.common.requests.MetadataRequest;
 import org.apache.kafka.common.requests.MetadataResponse;
+import org.apache.kafka.common.requests.OffsetCommitRequest;
 import org.apache.kafka.common.requests.OffsetFetchRequest;
 import org.apache.kafka.common.requests.OffsetFetchResponse;
 import org.apache.kafka.common.requests.RenewDelegationTokenRequest;
@@ -2491,6 +2494,19 @@ public class KafkaAdminClient extends AdminClient {
         return false;
     }
 
+    private boolean handleFindCoordinatorError(FindCoordinatorResponse response, Collection<KafkaFutureImpl<Void>> futures) {
+        Errors error = response.error();
+        if (error.exception() instanceof RetriableException) {
+            throw error.exception();
+        } else if (response.hasError()) {
+            for (KafkaFutureImpl<Void> future : futures) {
+                future.completeExceptionally(error.exception());
+            }
+            return true;
+        }
+        return false;
+    }
+
     private PartitionDetails partitionDetails(NewPartitions newPartitions) {
         return new PartitionDetails(newPartitions.totalCount(), newPartitions.assignments());
     }
@@ -2770,7 +2786,81 @@ public class KafkaAdminClient extends AdminClient {
     }
 
     @Override
+    public CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, CommitOffsetsOptions options) {
+        final Map<TopicPartition, KafkaFutureImpl<Void>> futures = new HashMap<>(offsets.size());
+        for (TopicPartition tp: offsets.keySet()) {
+            futures.put(tp, new KafkaFutureImpl<>());
+        }
+
+        final long startFindCoordinatorMs = time.milliseconds();
+        final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
+
+        runnable.call(new Call("findCoordinator", deadline, new LeastLoadedNodeProvider()) {
+            @Override
+            AbstractRequest.Builder createRequest(int timeoutMs) {
+                return new FindCoordinatorRequest.Builder(FindCoordinatorRequest.CoordinatorType.GROUP, groupId);
+            }
+
+            @Override
+            void handleResponse(AbstractResponse abstractResponse) {
+                final FindCoordinatorResponse response = (FindCoordinatorResponse) abstractResponse;
+
+                if (handleFindCoordinatorError(response, futures.values()))
+                    return;
+
+                final long nowCommitOffsets = time.milliseconds();
+                final int nodeId = response.node().id();
+
+                runnable.call(new Call("commitOffsets", deadline, new ConstantNodeIdProvider(nodeId)) {
+
+                    @Override
+                    AbstractRequest.Builder createRequest(int timeoutMs) {
+                        Map<TopicPartition, PartitionData> offsetData = new HashMap<>();
+                        for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+                            OffsetAndMetadata oam = entry.getValue();
+                            offsetData.put(entry.getKey(), new PartitionData(oam.offset(), oam.leaderEpoch(), oam.metadata()));
+                        }
+                        return new OffsetCommitRequest.Builder(groupId, offsetData);
+                    }
+
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final OffsetCommitResponse response = (OffsetCommitResponse) abstractResponse;
+
+                        for (Map.Entry<TopicPartition, Errors> entry : response.responseData().entrySet()) {
+                            TopicPartition tp = entry.getKey();
+                            Errors error = entry.getValue();
+                            KafkaFutureImpl<Void> future = futures.get(tp);
+                            if (error != Errors.NONE) {
+                                future.completeExceptionally(error.exception());
+                            } else {
+                                future.complete(null);
+                            }
+                        }
+                    }
+
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        for (KafkaFutureImpl<?> future : futures.values()) {
+                            future.completeExceptionally(throwable);
+                        }
+                    }
+                }, nowCommitOffsets);
+            }
+
+            @Override
+            void handleFailure(Throwable throwable) {
+                for (KafkaFutureImpl<?> future : futures.values()) {
+                    future.completeExceptionally(throwable);
+                }
+            }
+        }, startFindCoordinatorMs);
+        return new CommitOffsetsResult(new HashMap<>(futures));
+    }
+
+    @Override
     public Map<MetricName, ? extends Metric> metrics() {
         return Collections.unmodifiableMap(this.metrics.metrics());
     }
+
 }

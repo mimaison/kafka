@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.clients.admin;
 
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
@@ -378,6 +379,11 @@ public class MockAdminClient extends AdminClient {
     }
 
     @Override
+    public CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, CommitOffsetsOptions options) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
     public void close(long duration, TimeUnit unit) {}
 
 
@@ -403,4 +409,5 @@ public class MockAdminClient extends AdminClient {
     public Map<MetricName, ? extends Metric> metrics() {
         return mockMetrics;
     }
+
 }
