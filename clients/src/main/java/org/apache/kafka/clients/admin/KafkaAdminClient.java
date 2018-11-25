@@ -28,6 +28,7 @@ import org.apache.kafka.clients.StaleMetadataException;
 import org.apache.kafka.clients.admin.DeleteAclsResult.FilterResult;
 import org.apache.kafka.clients.admin.DeleteAclsResult.FilterResults;
 import org.apache.kafka.clients.admin.DescribeReplicaLogDirsResult.ReplicaLogDirInfo;
+import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.internals.ConsumerProtocol;
@@ -110,10 +111,15 @@ import org.apache.kafka.common.requests.ExpireDelegationTokenRequest;
 import org.apache.kafka.common.requests.ExpireDelegationTokenResponse;
 import org.apache.kafka.common.requests.FindCoordinatorRequest;
 import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.IsolationLevel;
 import org.apache.kafka.common.requests.ListGroupsRequest;
 import org.apache.kafka.common.requests.ListGroupsResponse;
+import org.apache.kafka.common.requests.ListOffsetRequest;
+import org.apache.kafka.common.requests.ListOffsetResponse;
 import org.apache.kafka.common.requests.MetadataRequest;
 import org.apache.kafka.common.requests.MetadataResponse;
+import org.apache.kafka.common.requests.MetadataResponse.PartitionMetadata;
+import org.apache.kafka.common.requests.MetadataResponse.TopicMetadata;
 import org.apache.kafka.common.requests.OffsetCommitRequest;
 import org.apache.kafka.common.requests.OffsetFetchRequest;
 import org.apache.kafka.common.requests.OffsetFetchResponse;
@@ -139,6 +145,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -2861,6 +2868,104 @@ public class KafkaAdminClient extends AdminClient {
     @Override
     public Map<MetricName, ? extends Metric> metrics() {
         return Collections.unmodifiableMap(this.metrics.metrics());
+    }
+
+    @Override
+    public ListOffsetsResult listOffsets(Collection<TopicPartition> topicPartitions, ListOffsetsOptions options) {
+        final Map<TopicPartition, KafkaFutureImpl<ListOffsetsResultInfo>> futures = new HashMap<>(topicPartitions.size());
+        final ArrayList<String> topicNamesList = new ArrayList<>();
+        for (TopicPartition tp : topicPartitions) {
+            if (!futures.containsKey(tp)) {
+                futures.put(tp, new KafkaFutureImpl<>());
+                topicNamesList.add(tp.topic());
+            }
+        }
+        final long now = time.milliseconds();
+        final long deadline = calcDeadlineMs(now, options.timeoutMs());
+        runnable.call(new Call("metadata", deadline, new LeastLoadedNodeProvider()) {
+            @Override
+            MetadataRequest.Builder createRequest(int timeoutMs) {
+                return new MetadataRequest.Builder(topicNamesList, false);
+            }
+
+            @Override
+            void handleResponse(AbstractResponse abstractResponse) {
+                MetadataResponse response = (MetadataResponse) abstractResponse;
+
+                Map<Node, Set<TopicPartition>> tpByNode = new HashMap<>();
+                for (TopicMetadata tm : response.topicMetadata()) {
+                    for (PartitionMetadata pm : tm.partitionMetadata()) {
+                        TopicPartition tp = new TopicPartition(tm.topic(), pm.partition());
+                        if (topicPartitions.contains(tp)) {
+                            Node leader = leader(pm);
+                            if (leader != null) {
+                                Set<TopicPartition> tps = (tpByNode.containsKey(leader)) ? tpByNode.get(leader) : new HashSet<>();
+                                tps.add(tp);
+                                tpByNode.put(leader, tps);
+                            }
+                        }
+                    }
+                }
+
+                for (Entry<Node, Set<TopicPartition>> entry : tpByNode.entrySet()) {
+                    Node node = entry.getKey();
+                    Set<TopicPartition> tps = entry.getValue();
+                    runnable.call(new Call("listOffsets", deadline, new ConstantNodeIdProvider(node.id())) {
+    
+                        @Override
+                        ListOffsetRequest.Builder createRequest(int timeoutMs) {
+                            return ListOffsetRequest.Builder.forConsumer(true, options.isolationLevel())
+                                    .setTargetTimes(buildPartitionTimestamps(tps, options));
+                        }
+    
+                        @Override
+                        void handleResponse(AbstractResponse abstractResponse) {
+                            final ListOffsetResponse response = (ListOffsetResponse) abstractResponse;
+    
+                            for (Entry<TopicPartition, ListOffsetResponse.PartitionData> entry : response.responseData().entrySet()) {
+                                ListOffsetResponse.PartitionData value = entry.getValue();
+                                Errors error = value.error;
+                                KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(entry.getKey());
+                                if (error != Errors.NONE) {
+                                    future.completeExceptionally(error.exception());
+                                } else {
+                                    ListOffsetsResultInfo info = new ListOffsetsResultInfo(value.offset, value.timestamp);
+                                    future.complete(info);
+                                }
+                            }
+                        }
+    
+                        @Override
+                        void handleFailure(Throwable throwable) {
+                            for (TopicPartition tp : tps) {
+                                KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
+                                future.completeExceptionally(throwable);
+                            }
+                        }
+                    }, now);
+                }
+            }
+
+            private Node leader(PartitionMetadata partitionMetadata) {
+                if (partitionMetadata.leader() == null || partitionMetadata.leader().id() == Node.noNode().id())
+                    return null;
+                return partitionMetadata.leader();
+            }
+
+            private Map<TopicPartition, ListOffsetRequest.PartitionData> buildPartitionTimestamps(Set<TopicPartition> tps, ListOffsetsOptions options) {
+                Map<TopicPartition, ListOffsetRequest.PartitionData> partitionTimestamps = new HashMap<>();
+                for (TopicPartition tp : tps) {
+                    partitionTimestamps.put(tp, new ListOffsetRequest.PartitionData(options.offset(), Optional.<Integer>empty()));
+                }
+                return partitionTimestamps;
+            }
+
+            @Override
+            void handleFailure(Throwable throwable) {
+                completeAllExceptionally(futures.values(), throwable);
+            }
+        }, now);
+        return new ListOffsetsResult(new HashMap<>(futures));
     }
 
 }

@@ -798,6 +798,12 @@ public abstract class AdminClient implements AutoCloseable {
      */
     public abstract CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, CommitOffsetsOptions options);
 
+    public ListOffsetsResult listOffsets(Collection<TopicPartition> topicPartitions) {
+        return listOffsets(topicPartitions, ListOffsetsOptions.latestUncommitted());
+    }
+
+    public abstract ListOffsetsResult listOffsets(Collection<TopicPartition> topicPartitions, ListOffsetsOptions options);
+
     /**
      * Get the metrics kept by the adminClient
      */
