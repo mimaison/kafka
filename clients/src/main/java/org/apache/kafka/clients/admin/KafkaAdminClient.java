@@ -2804,7 +2804,7 @@ public class KafkaAdminClient extends AdminClient {
 
         runnable.call(new Call("findCoordinator", deadline, new LeastLoadedNodeProvider()) {
             @Override
-            AbstractRequest.Builder createRequest(int timeoutMs) {
+            FindCoordinatorRequest.Builder createRequest(int timeoutMs) {
                 return new FindCoordinatorRequest.Builder(FindCoordinatorRequest.CoordinatorType.GROUP, groupId);
             }
 
@@ -2821,7 +2821,7 @@ public class KafkaAdminClient extends AdminClient {
                 runnable.call(new Call("commitOffsets", deadline, new ConstantNodeIdProvider(nodeId)) {
 
                     @Override
-                    AbstractRequest.Builder createRequest(int timeoutMs) {
+                    OffsetCommitRequest.Builder createRequest(int timeoutMs) {
                         Map<TopicPartition, PartitionData> offsetData = new HashMap<>();
                         for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
                             OffsetAndMetadata oam = entry.getValue();
@@ -2914,7 +2914,7 @@ public class KafkaAdminClient extends AdminClient {
     
                         @Override
                         ListOffsetRequest.Builder createRequest(int timeoutMs) {
-                            return ListOffsetRequest.Builder.forConsumer(true, options.isolationLevel())
+                            return ListOffsetRequest.Builder.forConsumer(true, IsolationLevel.valueOf(options.isolationLevel()))
                                     .setTargetTimes(buildPartitionTimestamps(tps, options));
                         }
     

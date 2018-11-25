@@ -773,35 +773,51 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
-     * <p>Commits offsets for the specified group
+     * <p>Commits offsets for the specified group.
      *
      * <p>This is a convenience method for {@link #commitOffsets(String, Map, CommitOffsetsOptions)} with default options.
      * See the overload for more details.
      *
      * @param groupId The group for which to commit offsets.
-     * @param offsets A map of offsets by partition with associated metadata
-     * @return              The CommitOffsetsResult.
+     * @param offsets A map of offsets by partition with associated metadata.
+     * @return The CommitOffsetsResult.
      */
     public CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets) {
         return commitOffsets(groupId, offsets, new CommitOffsetsOptions());
     }
 
     /**
-     * <p>Commits offsets for the specified group
+     * <p>Commits offsets for the specified group.
      * 
      * <p>This operation is not transactional so it may succeed for some partition while fail for others.
      *
      * @param groupId The group for which to commit offsets.
-     * @param offsets A map of offsets by partition with associated metadata
+     * @param offsets A map of offsets by partition with associated metadata.
      * @param options The options to use when committing the offsets.
-     * @return              The CommitOffsetsResult.
+     * @return The CommitOffsetsResult.
      */
     public abstract CommitOffsetsResult commitOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets, CommitOffsetsOptions options);
 
+    /**
+     * <p>List offset for the specified partitions.
+     * 
+     * <p>This is a convenience method for {@link #listOffsets(Collection, ListOffsetsOptions)} which returns the
+     * latest uncommitted offsets.
+     * 
+     * @param topicPartitions A list of {@link TopicPartition} to retrieve offsets for.
+     * @return The ListOffsetsResult.
+     */
     public ListOffsetsResult listOffsets(Collection<TopicPartition> topicPartitions) {
         return listOffsets(topicPartitions, ListOffsetsOptions.latestUncommitted());
     }
 
+    /**
+     * <p>List offset for the specified partitions.
+     * 
+     * @param topicPartitions A list of {@link TopicPartition} to retrieve offsets for.
+     * @param options The options to use when retrieving the offsets
+     * @return The ListOffsetsResult.
+     */
     public abstract ListOffsetsResult listOffsets(Collection<TopicPartition> topicPartitions, ListOffsetsOptions options);
 
     /**

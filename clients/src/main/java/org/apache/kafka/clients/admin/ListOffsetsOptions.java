@@ -30,25 +30,25 @@ import org.apache.kafka.common.requests.ListOffsetRequest;
 public class ListOffsetsOptions extends AbstractOptions<ListOffsetsOptions> {
 
     private final long offset;
-    private final IsolationLevel isolationLevel;
+    private final String isolationLevel;
 
     public static ListOffsetsOptions latestUncommitted() {
-        return new ListOffsetsOptions(ListOffsetRequest.LATEST_TIMESTAMP, IsolationLevel.READ_UNCOMMITTED);
+        return new ListOffsetsOptions(ListOffsetRequest.LATEST_TIMESTAMP, IsolationLevel.READ_UNCOMMITTED.name());
     }
 
     public static ListOffsetsOptions latestCommitted() {
-        return new ListOffsetsOptions(ListOffsetRequest.LATEST_TIMESTAMP, IsolationLevel.READ_COMMITTED);
+        return new ListOffsetsOptions(ListOffsetRequest.LATEST_TIMESTAMP, IsolationLevel.READ_COMMITTED.name());
     }
 
     public static ListOffsetsOptions earliestUncommitted() {
-        return new ListOffsetsOptions(ListOffsetRequest.EARLIEST_TIMESTAMP, IsolationLevel.READ_UNCOMMITTED);
+        return new ListOffsetsOptions(ListOffsetRequest.EARLIEST_TIMESTAMP, IsolationLevel.READ_UNCOMMITTED.name());
     }
 
     public static ListOffsetsOptions earliestCommitted() {
-        return new ListOffsetsOptions(ListOffsetRequest.EARLIEST_TIMESTAMP, IsolationLevel.READ_COMMITTED);
+        return new ListOffsetsOptions(ListOffsetRequest.EARLIEST_TIMESTAMP, IsolationLevel.READ_COMMITTED.name());
     }
 
-    public ListOffsetsOptions(long offset, IsolationLevel isolationLevel) {
+    public ListOffsetsOptions(long offset, String isolationLevel) {
         this.offset = offset;
         this.isolationLevel = isolationLevel;
     }
@@ -57,7 +57,7 @@ public class ListOffsetsOptions extends AbstractOptions<ListOffsetsOptions> {
         return offset;
     }
 
-    public IsolationLevel isolationLevel() {
+    public String isolationLevel() {
         return isolationLevel;
     }
 }
