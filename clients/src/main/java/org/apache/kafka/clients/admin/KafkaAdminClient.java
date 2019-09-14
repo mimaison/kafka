@@ -24,6 +24,7 @@ import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.ClientUtils;
 import org.apache.kafka.clients.KafkaClient;
 import org.apache.kafka.clients.NetworkClient;
+import org.apache.kafka.clients.NodeApiVersions;
 import org.apache.kafka.clients.StaleMetadataException;
 import org.apache.kafka.clients.admin.DeleteAclsResult.FilterResult;
 import org.apache.kafka.clients.admin.DeleteAclsResult.FilterResults;
@@ -103,6 +104,8 @@ import org.apache.kafka.common.requests.AlterPartitionReassignmentsResponse;
 import org.apache.kafka.common.requests.AlterReplicaLogDirsRequest;
 import org.apache.kafka.common.requests.AlterReplicaLogDirsResponse;
 import org.apache.kafka.common.requests.ApiError;
+import org.apache.kafka.common.requests.ApiVersionsRequest;
+import org.apache.kafka.common.requests.ApiVersionsResponse;
 import org.apache.kafka.common.requests.CreateAclsRequest.AclCreation;
 import org.apache.kafka.common.requests.CreateAclsRequest;
 import org.apache.kafka.common.requests.CreateAclsResponse.AclCreationResponse;
@@ -3399,5 +3402,37 @@ public class KafkaAdminClient extends AdminClient {
                 context.getFuture().completeExceptionally(throwable);
             }
         };
+    }
+
+    @Override
+    public DescribeApiVersionsResult describeApiVersions(Collection<Node> brokers, DescribeApiVersionsOptions options) {
+        final Map<Node, KafkaFutureImpl<NodeApiVersions>> futures = new HashMap<>();
+        final long now = time.milliseconds();
+        final long deadline = calcDeadlineMs(now, options.timeoutMs());
+
+        for (Node broker : brokers) {
+            KafkaFutureImpl<NodeApiVersions> future = new KafkaFutureImpl<>();
+            futures.put(broker, future);
+            runnable.call(new Call("describeApiVersions", deadline, new ConstantNodeIdProvider(broker.id())) {
+
+                @Override
+                ApiVersionsRequest.Builder createRequest(int timeoutMs) {
+                    return new ApiVersionsRequest.Builder();
+                }
+
+                @Override
+                void handleResponse(AbstractResponse abstractResponse) {
+                    ApiVersionsResponse response = (ApiVersionsResponse) abstractResponse;
+                    NodeApiVersions apiVersions = new NodeApiVersions(response.apiVersions());
+                    futures.get(broker).complete(apiVersions);
+                }
+
+                @Override
+                void handleFailure(Throwable throwable) {
+                    futures.get(broker).completeExceptionally(throwable);
+                }
+            }, now);
+        }
+        return new DescribeApiVersionsResult(futures);
     }
 }

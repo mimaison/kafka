@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionReplica;
 import org.apache.kafka.common.acl.AclBinding;
@@ -1045,6 +1046,12 @@ public interface Admin extends AutoCloseable {
      */
     ListPartitionReassignmentsResult listPartitionReassignments(Optional<Set<TopicPartition>> partitions,
                                                                 ListPartitionReassignmentsOptions options);
+
+    default DescribeApiVersionsResult describeApiVersions(Collection<Node> brokers) {
+        return describeApiVersions(brokers, new DescribeApiVersionsOptions());
+    }
+
+    DescribeApiVersionsResult describeApiVersions(Collection<Node> brokers, DescribeApiVersionsOptions options);
 
     /**
      * Remove members from the consumer group by given member identities.
