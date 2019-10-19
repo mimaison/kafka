@@ -56,6 +56,8 @@ import org.apache.kafka.common.errors.UnknownMemberIdException;
 import org.apache.kafka.common.errors.UnknownServerException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.apache.kafka.common.message.AlterPartitionReassignmentsResponseData;
+import org.apache.kafka.common.message.CreateAclsResponseData;
+import org.apache.kafka.common.message.CreateAclsResponseData.CreatableAclResult;
 import org.apache.kafka.common.message.CreateTopicsResponseData;
 import org.apache.kafka.common.message.CreateTopicsResponseData.CreatableTopicResult;
 import org.apache.kafka.common.message.DeleteGroupsResponseData;
@@ -83,7 +85,6 @@ import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.AlterPartitionReassignmentsResponse;
 import org.apache.kafka.common.requests.ApiError;
 import org.apache.kafka.common.requests.CreateAclsResponse;
-import org.apache.kafka.common.requests.CreateAclsResponse.AclCreationResponse;
 import org.apache.kafka.common.requests.CreatePartitionsResponse;
 import org.apache.kafka.common.requests.CreateTopicsRequest;
 import org.apache.kafka.common.requests.CreateTopicsResponse;
@@ -668,8 +669,13 @@ public class KafkaAdminClientTest {
             env.kafkaClient().setNodeApiVersions(NodeApiVersions.create());
 
             // Test a call where we successfully create two ACLs.
-            env.kafkaClient().prepareResponse(new CreateAclsResponse(0,
-                asList(new AclCreationResponse(ApiError.NONE), new AclCreationResponse(ApiError.NONE))));
+            List<CreatableAclResult> car = Arrays.asList(
+                    new CreatableAclResult().setErrorCode(Errors.NONE.code()),
+                    new CreatableAclResult().setErrorCode(Errors.NONE.code()));
+            CreateAclsResponseData data = new CreateAclsResponseData()
+                    .setThrottleTimeMs(0)
+                    .setResults(car);
+            env.kafkaClient().prepareResponse(new CreateAclsResponse(data));
             CreateAclsResult results = env.adminClient().createAcls(asList(ACL1, ACL2));
             assertCollectionIs(results.values().keySet(), ACL1, ACL2);
             for (KafkaFuture<Void> future : results.values().values())
@@ -677,10 +683,13 @@ public class KafkaAdminClientTest {
             results.all().get();
 
             // Test a call where we fail to create one ACL.
-            env.kafkaClient().prepareResponse(new CreateAclsResponse(0, asList(
-                new AclCreationResponse(new ApiError(Errors.SECURITY_DISABLED, "Security is disabled")),
-                new AclCreationResponse(ApiError.NONE))
-            ));
+            car = Arrays.asList(
+                    new CreatableAclResult().setErrorCode(Errors.SECURITY_DISABLED.code()).setErrorMessage("Security is disabled"),
+                    new CreatableAclResult().setErrorCode(Errors.NONE.code()));
+            data = new CreateAclsResponseData()
+                    .setThrottleTimeMs(0)
+                    .setResults(car);
+            env.kafkaClient().prepareResponse(new CreateAclsResponse(data));
             results = env.adminClient().createAcls(asList(ACL1, ACL2));
             assertCollectionIs(results.values().keySet(), ACL1, ACL2);
             TestUtils.assertFutureError(results.values().get(ACL1), SecurityDisabledException.class);

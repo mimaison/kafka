@@ -17,142 +17,85 @@
 
 package org.apache.kafka.common.requests;
 
-import org.apache.kafka.common.acl.AccessControlEntry;
-import org.apache.kafka.common.acl.AclBinding;
-import org.apache.kafka.common.resource.ResourcePattern;
-import org.apache.kafka.common.errors.UnsupportedVersionException;
-import org.apache.kafka.common.protocol.ApiKeys;
-import org.apache.kafka.common.protocol.types.ArrayOf;
-import org.apache.kafka.common.protocol.types.Field;
-import org.apache.kafka.common.protocol.types.Schema;
-import org.apache.kafka.common.protocol.types.Struct;
-import org.apache.kafka.common.resource.PatternType;
-import org.apache.kafka.common.utils.Utils;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import static org.apache.kafka.common.protocol.CommonFields.HOST;
-import static org.apache.kafka.common.protocol.CommonFields.OPERATION;
-import static org.apache.kafka.common.protocol.CommonFields.PERMISSION_TYPE;
-import static org.apache.kafka.common.protocol.CommonFields.PRINCIPAL;
-import static org.apache.kafka.common.protocol.CommonFields.RESOURCE_NAME;
-import static org.apache.kafka.common.protocol.CommonFields.RESOURCE_PATTERN_TYPE;
-import static org.apache.kafka.common.protocol.CommonFields.RESOURCE_TYPE;
+import org.apache.kafka.common.acl.AccessControlEntry;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclOperation;
+import org.apache.kafka.common.acl.AclPermissionType;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.message.CreateAclsRequestData;
+import org.apache.kafka.common.message.CreateAclsRequestData.CreatableAcl;
+import org.apache.kafka.common.message.CreateAclsResponseData;
+import org.apache.kafka.common.message.CreateAclsResponseData.CreatableAclResult;
+import org.apache.kafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.protocol.types.Struct;
+import org.apache.kafka.common.resource.PatternType;
+import org.apache.kafka.common.resource.ResourcePattern;
+import org.apache.kafka.common.resource.ResourceType;
 
 public class CreateAclsRequest extends AbstractRequest {
-    private final static String CREATIONS_KEY_NAME = "creations";
-
-    private static final Schema CREATE_ACLS_REQUEST_V0 = new Schema(
-            new Field(CREATIONS_KEY_NAME, new ArrayOf(new Schema(
-                    RESOURCE_TYPE,
-                    RESOURCE_NAME,
-                    PRINCIPAL,
-                    HOST,
-                    OPERATION,
-                    PERMISSION_TYPE))));
-
-    /**
-     * Version 1 adds RESOURCE_PATTERN_TYPE, to support more than just literal resource patterns.
-     * For more info, see {@link PatternType}.
-     *
-     * Also, when the quota is violated, brokers will respond to a version 1 or later request before throttling.
-     */
-    private static final Schema CREATE_ACLS_REQUEST_V1 = new Schema(
-            new Field(CREATIONS_KEY_NAME, new ArrayOf(new Schema(
-                    RESOURCE_TYPE,
-                    RESOURCE_NAME,
-                    RESOURCE_PATTERN_TYPE,
-                    PRINCIPAL,
-                    HOST,
-                    OPERATION,
-                    PERMISSION_TYPE))));
-
-    public static Schema[] schemaVersions() {
-        return new Schema[]{CREATE_ACLS_REQUEST_V0, CREATE_ACLS_REQUEST_V1};
-    }
-
-    public static class AclCreation {
-        private final AclBinding acl;
-
-        public AclCreation(AclBinding acl) {
-            this.acl = acl;
-        }
-
-        static AclCreation fromStruct(Struct struct) {
-            ResourcePattern pattern = RequestUtils.resourcePatternromStructFields(struct);
-            AccessControlEntry entry = RequestUtils.aceFromStructFields(struct);
-            return new AclCreation(new AclBinding(pattern, entry));
-        }
-
-        public AclBinding acl() {
-            return acl;
-        }
-
-        void setStructFields(Struct struct) {
-            RequestUtils.resourcePatternSetStructFields(acl.pattern(), struct);
-            RequestUtils.aceSetStructFields(acl.entry(), struct);
-        }
-
-        @Override
-        public String toString() {
-            return "(acl=" + acl + ")";
-        }
-    }
 
     public static class Builder extends AbstractRequest.Builder<CreateAclsRequest> {
-        private final List<AclCreation> creations;
+        private final CreateAclsRequestData data;
 
-        public Builder(List<AclCreation> creations) {
+        public Builder(Collection<AclBinding> acls) {
             super(ApiKeys.CREATE_ACLS);
-            this.creations = creations;
+            List<CreatableAcl> creatableAcls = new ArrayList<>();
+            for (AclBinding binding : acls) {
+                AccessControlEntry entry = binding.entry();
+                ResourcePattern pattern = binding.pattern();
+                CreatableAcl acl = new CreatableAcl()
+                        .setHost(entry.host())
+                        .setOperation(entry.operation().code())
+                        .setPermissionType(entry.permissionType().code())
+                        .setPrincipal(entry.principal())
+                        .setResourceName(pattern.name())
+                        .setResourcePatternType(pattern.patternType().code())
+                        .setResourceType(pattern.resourceType().code());
+                creatableAcls.add(acl);
+            }
+            this.data = new CreateAclsRequestData().setCreations(creatableAcls);
+        }
+
+        public Builder(CreateAclsRequestData data) {
+            super(ApiKeys.CREATE_ACLS);
+            this.data = data;
         }
 
         @Override
         public CreateAclsRequest build(short version) {
-            return new CreateAclsRequest(version, creations);
+            CreateAclsRequest request = new CreateAclsRequest(version, data);
+            request.validate();
+            return request;
         }
 
         @Override
         public String toString() {
-            return "(type=CreateAclsRequest, creations=" + Utils.join(creations, ", ") + ")";
+            return data.toString();
         }
+
     }
 
-    private final List<AclCreation> aclCreations;
+    private final CreateAclsRequestData data;
 
-    CreateAclsRequest(short version, List<AclCreation> aclCreations) {
+    CreateAclsRequest(short version, CreateAclsRequestData data) {
         super(ApiKeys.CREATE_ACLS, version);
-        this.aclCreations = aclCreations;
-
-        validate(aclCreations);
+        this.data = data;
     }
 
     public CreateAclsRequest(Struct struct, short version) {
         super(ApiKeys.CREATE_ACLS, version);
-        this.aclCreations = new ArrayList<>();
-        for (Object creationStructObj : struct.getArray(CREATIONS_KEY_NAME)) {
-            Struct creationStruct = (Struct) creationStructObj;
-            aclCreations.add(AclCreation.fromStruct(creationStruct));
-        }
+        this.data = new CreateAclsRequestData(struct, version);
     }
 
     @Override
     protected Struct toStruct() {
-        Struct struct = new Struct(ApiKeys.CREATE_ACLS.requestSchema(version()));
-        List<Struct> requests = new ArrayList<>();
-        for (AclCreation creation : aclCreations) {
-            Struct creationStruct = struct.instance(CREATIONS_KEY_NAME);
-            creation.setStructFields(creationStruct);
-            requests.add(creationStruct);
-        }
-        struct.set(CREATIONS_KEY_NAME, requests.toArray());
-        return struct;
-    }
-
-    public List<AclCreation> aclCreations() {
-        return aclCreations;
+        return data.toStruct(version());
     }
 
     @Override
@@ -161,37 +104,66 @@ public class CreateAclsRequest extends AbstractRequest {
         switch (versionId) {
             case 0:
             case 1:
-                List<CreateAclsResponse.AclCreationResponse> responses = new ArrayList<>();
-                for (int i = 0; i < aclCreations.size(); i++)
-                    responses.add(new CreateAclsResponse.AclCreationResponse(ApiError.fromThrowable(throwable)));
-                return new CreateAclsResponse(throttleTimeMs, responses);
+                ApiError error = ApiError.fromThrowable(throwable);
+                List<CreatableAclResult> results = data.creations()
+                       .stream().map(acl -> new CreatableAclResult()
+                            .setErrorCode(error.error().code())
+                            .setErrorMessage(error.message())).collect(Collectors.toList());
+
+                CreateAclsResponseData data = new CreateAclsResponseData()
+                        .setThrottleTimeMs(throttleTimeMs)
+                        .setResults(results);
+                return new CreateAclsResponse(data);
             default:
-                throw new IllegalArgumentException(String.format("Version %d is not valid. Valid versions for %s are 0 to %d",
-                        versionId, this.getClass().getSimpleName(), ApiKeys.CREATE_ACLS.latestVersion()));
+                throw new IllegalArgumentException(
+                        String.format("Version %d is not valid. Valid versions for %s are 0 to %d",
+                                versionId,
+                                this.getClass().getSimpleName(),
+                                ApiKeys.CREATE_ACLS.latestVersion()));
         }
+    }
+
+    public CreateAclsRequestData data() {
+        return data;
+    }
+
+    public List<AclBinding> aclBindings() {
+        List<AclBinding> bindings = new ArrayList<>();
+        for (CreatableAcl acl : data.creations()) {
+            ResourcePattern pattern = new ResourcePattern(
+                    ResourceType.fromCode(acl.resourceType()),
+                    acl.resourceName(),
+                    PatternType.fromCode(acl.resourceType()));
+            AccessControlEntry entry = new AccessControlEntry(
+                    acl.principal(),
+                    acl.host(),
+                    AclOperation.fromCode(acl.operation()),
+                    AclPermissionType.fromCode(acl.permissionType()));
+            AclBinding binding = new AclBinding(pattern, entry);
+            bindings.add(binding);
+        }
+        return bindings;
     }
 
     public static CreateAclsRequest parse(ByteBuffer buffer, short version) {
         return new CreateAclsRequest(ApiKeys.CREATE_ACLS.parseRequest(version, buffer), version);
     }
 
-    private void validate(List<AclCreation> aclCreations) {
+    private void validate() {
+        List<AclBinding> bindings = aclBindings();
         if (version() == 0) {
-            final boolean unsupported = aclCreations.stream()
-                .map(AclCreation::acl)
-                .map(AclBinding::pattern)
-                .map(ResourcePattern::patternType)
-                .anyMatch(patternType -> patternType != PatternType.LITERAL);
+            final boolean unsupported = bindings.stream().map(AclBinding::pattern)
+                    .map(ResourcePattern::patternType)
+                    .anyMatch(patternType -> patternType != PatternType.LITERAL);
             if (unsupported) {
                 throw new UnsupportedVersionException("Version 0 only supports literal resource pattern types");
             }
         }
 
-        final boolean unknown = aclCreations.stream()
-            .map(AclCreation::acl)
-            .anyMatch(AclBinding::isUnknown);
+        final boolean unknown = bindings.stream().anyMatch(AclBinding::isUnknown);
         if (unknown) {
             throw new IllegalArgumentException("You can not create ACL bindings with unknown elements");
         }
     }
+
 }

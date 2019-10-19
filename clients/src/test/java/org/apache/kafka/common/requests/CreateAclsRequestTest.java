@@ -17,23 +17,22 @@
 
 package org.apache.kafka.common.requests;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
+import java.util.List;
+
 import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclOperation;
 import org.apache.kafka.common.acl.AclPermissionType;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.message.CreateAclsRequestData.CreatableAcl;
 import org.apache.kafka.common.protocol.types.Struct;
-import org.apache.kafka.common.requests.CreateAclsRequest.AclCreation;
 import org.apache.kafka.common.resource.PatternType;
 import org.apache.kafka.common.resource.ResourcePattern;
 import org.apache.kafka.common.resource.ResourceType;
 import org.junit.Test;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertEquals;
 
 public class CreateAclsRequestTest {
     private static final short V0 = 0;
@@ -53,17 +52,17 @@ public class CreateAclsRequestTest {
 
     @Test(expected = UnsupportedVersionException.class)
     public void shouldThrowOnV0IfNotLiteral() {
-        new CreateAclsRequest(V0, aclCreations(PREFIXED_ACL1));
+        new CreateAclsRequest.Builder(Arrays.asList(PREFIXED_ACL1)).build(V0);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowOnIfUnknown() {
-        new CreateAclsRequest(V0, aclCreations(UNKNOWN_ACL1));
+        new CreateAclsRequest.Builder(Arrays.asList(UNKNOWN_ACL1)).build(V0);
     }
 
     @Test
     public void shouldRoundTripV0() {
-        final CreateAclsRequest original = new CreateAclsRequest(V0, aclCreations(LITERAL_ACL1, LITERAL_ACL2));
+        final CreateAclsRequest original = new CreateAclsRequest.Builder(Arrays.asList(LITERAL_ACL1, LITERAL_ACL2)).build(V0);
         final Struct struct = original.toStruct();
 
         final CreateAclsRequest result = new CreateAclsRequest(struct, V0);
@@ -73,7 +72,7 @@ public class CreateAclsRequestTest {
 
     @Test
     public void shouldRoundTripV1() {
-        final CreateAclsRequest original = new CreateAclsRequest(V1, aclCreations(LITERAL_ACL1, PREFIXED_ACL1));
+        final CreateAclsRequest original = new CreateAclsRequest.Builder(Arrays.asList(LITERAL_ACL1, PREFIXED_ACL1)).build(V1);
         final Struct struct = original.toStruct();
 
         final CreateAclsRequest result = new CreateAclsRequest(struct, V1);
@@ -82,18 +81,15 @@ public class CreateAclsRequestTest {
     }
 
     private static void assertRequestEquals(final CreateAclsRequest original, final CreateAclsRequest actual) {
-        assertEquals("Number of Acls wrong", original.aclCreations().size(), actual.aclCreations().size());
+        List<CreatableAcl> originalCreations = original.data().creations();
+        List<CreatableAcl> actualCreations = actual.data().creations();
+        assertEquals("Number of Acls wrong", originalCreations.size(), actualCreations.size());
 
-        for (int idx = 0; idx != original.aclCreations().size(); ++idx) {
-            final AclBinding originalBinding = original.aclCreations().get(idx).acl();
-            final AclBinding actualBinding = actual.aclCreations().get(idx).acl();
+        for (int idx = 0; idx != originalCreations.size(); ++idx) {
+            final CreatableAcl originalBinding = originalCreations.get(idx);
+            final CreatableAcl actualBinding = actualCreations.get(idx);
             assertEquals(originalBinding, actualBinding);
         }
     }
 
-    private static List<AclCreation> aclCreations(final AclBinding... acls) {
-        return Arrays.stream(acls)
-            .map(AclCreation::new)
-            .collect(Collectors.toList());
-    }
 }
