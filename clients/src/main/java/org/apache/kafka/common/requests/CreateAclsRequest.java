@@ -70,13 +70,32 @@ public class CreateAclsRequest extends AbstractRequest {
         @Override
         public CreateAclsRequest build(short version) {
             CreateAclsRequest request = new CreateAclsRequest(version, data);
-            request.validate();
+            validate(version);
             return request;
         }
 
         @Override
         public String toString() {
             return data.toString();
+        }
+
+        private void validate(short version) {
+            if (version == 0) {
+                final boolean unsupported =  data.creations().stream()
+                        .anyMatch(creation -> creation.resourcePatternType() != PatternType.LITERAL.code());
+                if (unsupported) {
+                    throw new UnsupportedVersionException("Version 0 only supports literal resource pattern types");
+                }
+            }
+
+            final boolean unknown = data.creations().stream().anyMatch(creation ->
+                    creation.resourceType() == ResourceType.UNKNOWN.code()
+                    || creation.resourcePatternType() == PatternType.UNKNOWN.code()
+                    || creation.operation() == AclOperation.UNKNOWN.code()
+                    || creation.permissionType() == AclPermissionType.UNKNOWN.code());
+            if (unknown) {
+                throw new IllegalArgumentException("You can not create ACL bindings with unknown elements");
+            }
         }
 
     }
@@ -147,23 +166,6 @@ public class CreateAclsRequest extends AbstractRequest {
 
     public static CreateAclsRequest parse(ByteBuffer buffer, short version) {
         return new CreateAclsRequest(ApiKeys.CREATE_ACLS.parseRequest(version, buffer), version);
-    }
-
-    private void validate() {
-        List<AclBinding> bindings = aclBindings();
-        if (version() == 0) {
-            final boolean unsupported = bindings.stream().map(AclBinding::pattern)
-                    .map(ResourcePattern::patternType)
-                    .anyMatch(patternType -> patternType != PatternType.LITERAL);
-            if (unsupported) {
-                throw new UnsupportedVersionException("Version 0 only supports literal resource pattern types");
-            }
-        }
-
-        final boolean unknown = bindings.stream().anyMatch(AclBinding::isUnknown);
-        if (unknown) {
-            throw new IllegalArgumentException("You can not create ACL bindings with unknown elements");
-        }
     }
 
 }

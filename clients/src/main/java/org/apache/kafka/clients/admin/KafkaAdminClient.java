@@ -1719,9 +1719,9 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             AbstractRequest.Builder createRequest(int timeoutMs) {
-                List<CreatableAcl> acls = new ArrayList<>();
-                CreateAclsRequestData data = new CreateAclsRequestData().setCreations(acls);
-                return new CreateAclsRequest.Builder(data);
+                //List<CreatableAcl> acls = new ArrayList<>();
+                //CreateAclsRequestData data = new CreateAclsRequestData().setCreations(acls);
+                return new CreateAclsRequest.Builder(acls);
             }
 
             @Override
