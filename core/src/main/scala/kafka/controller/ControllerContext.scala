@@ -274,6 +274,17 @@ class ControllerContext {
     }
   }
 
+  def partitionsMissingReplicas(brokerId: Int): Map[TopicPartition, Seq[Int]] = {
+    val partitionsMissingReplicas = mutable.Map.empty[TopicPartition, Seq[Int]]
+    for ((topic, partitionAssignments) <- partitionAssignments;
+         (partitionId, assignment) <- partitionAssignments) {
+      if (!assignment.replicas.filter(bId => bId < 0 && bId != brokerId).isEmpty) {
+        partitionsMissingReplicas.put(new TopicPartition(topic, partitionId), assignment.replicas)
+      }
+    }
+    partitionsMissingReplicas
+  }
+
   def resetContext(): Unit = {
     topicsToBeDeleted.clear()
     topicsWithDeletionStarted.clear()

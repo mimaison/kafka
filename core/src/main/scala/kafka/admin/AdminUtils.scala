@@ -103,21 +103,31 @@ object AdminUtils extends Logging {
   def assignReplicasToBrokers(brokerMetadatas: Seq[BrokerMetadata],
                               nPartitions: Int,
                               replicationFactor: Int,
+                              minimumReplicationFactor: Int,
                               fixedStartIndex: Int = -1,
                               startPartitionId: Int = -1): Map[Int, Seq[Int]] = {
     if (nPartitions <= 0)
       throw new InvalidPartitionsException("Number of partitions must be larger than 0.")
     if (replicationFactor <= 0)
       throw new InvalidReplicationFactorException("Replication factor must be larger than 0.")
-    if (replicationFactor > brokerMetadatas.size)
-      throw new InvalidReplicationFactorException(s"Replication factor: $replicationFactor larger than available brokers: ${brokerMetadatas.size}.")
-    if (brokerMetadatas.forall(_.rack.isEmpty))
-      assignReplicasToBrokersRackUnaware(nPartitions, replicationFactor, brokerMetadatas.map(_.id), fixedStartIndex,
+    var brokers = scala.collection.mutable.ArraySeq(brokerMetadatas:_*)
+    val rackUnaware = brokerMetadatas.forall(_.rack.isEmpty)
+    if (minimumReplicationFactor > brokerMetadatas.size) { //TODO error message
+      throw new InvalidReplicationFactorException(s"Replication factor: $minimumReplicationFactor larger than available brokers: ${brokerMetadatas.size}.")
+    } else {
+      val missingBrokers = replicationFactor - brokerMetadatas.size
+      for (bId <- 1 to missingBrokers) {
+        brokers = brokers :+ BrokerMetadata(-bId, if (rackUnaware) None else Option("rack-" + bId))
+      }
+    }
+    println(brokers)
+    if (rackUnaware)
+      assignReplicasToBrokersRackUnaware(nPartitions, replicationFactor, brokers.map(_.id), fixedStartIndex,
         startPartitionId)
     else {
-      if (brokerMetadatas.exists(_.rack.isEmpty))
+      if (brokers.exists(_.rack.isEmpty))
         throw new AdminOperationException("Not all brokers have rack information for replica rack aware assignment.")
-      assignReplicasToBrokersRackAware(nPartitions, replicationFactor, brokerMetadatas, fixedStartIndex,
+      assignReplicasToBrokersRackAware(nPartitions, replicationFactor, brokers, fixedStartIndex,
         startPartitionId)
     }
   }

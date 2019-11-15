@@ -390,6 +390,22 @@ class KafkaController(val config: KafkaConfig,
     replicaStateMachine.handleStateChanges(replicasOnBrokers.toSeq, OnlineReplica)
   }
 
+  private def handlePartitionsMissingReplicas(newBrokers: Seq[Int]): Unit = {
+    for (brokerId <- newBrokers) {
+      val partitionsMissingReplicas = controllerContext.partitionsMissingReplicas(brokerId)
+      println("PartitionsMissingReplicas")
+      println(partitionsMissingReplicas)
+      if (!partitionsMissingReplicas.isEmpty) {
+        for ((tp, replicas) <- partitionsMissingReplicas) {
+          val toRemove = Seq(replicas.filter(id => id < 0).head)
+          val replicaAssignment = ReplicaAssignment(replicas ++ Seq(brokerId).distinct, Seq(brokerId), toRemove)
+          println(replicaAssignment)
+          onPartitionReassignment(tp, replicaAssignment)
+        }
+      }
+    }
+  }
+
   /**
    * This callback is invoked by the replica state machine's broker change listener, with the list of newly started
    * brokers as input. It does the following -
@@ -406,6 +422,7 @@ class KafkaController(val config: KafkaConfig,
    */
   private def onBrokerStartup(newBrokers: Seq[Int]): Unit = {
     info(s"New broker startup callback for ${newBrokers.mkString(",")}")
+    handlePartitionsMissingReplicas(newBrokers)
     newBrokers.foreach(controllerContext.replicasOnOfflineDirs.remove)
     val newBrokersSet = newBrokers.toSet
     val existingBrokers = controllerContext.liveOrShuttingDownBrokerIds -- newBrokers
@@ -867,7 +884,7 @@ class KafkaController(val config: KafkaConfig,
     } else {
       zkClient.getTopicPartitionStates(Seq(partition)).get(partition).exists { leaderIsrAndControllerEpoch =>
         val isr = leaderIsrAndControllerEpoch.leaderAndIsr.isr.toSet
-        val targetReplicas = assignment.targetReplicas.toSet
+        val targetReplicas = assignment.targetReplicas.toSet.filter(replica => replica >= 0)
         targetReplicas.subsetOf(isr)
       }
     }

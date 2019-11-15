@@ -45,6 +45,7 @@ import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 
 import scala.collection.{Map, mutable, _}
 import scala.collection.JavaConverters._
+import org.apache.kafka.common.config.TopicConfig
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -110,9 +111,19 @@ class AdminManager(val config: KafkaConfig,
         val resolvedReplicationFactor = if (topic.replicationFactor == NO_REPLICATION_FACTOR)
           defaultReplicationFactor else topic.replicationFactor
 
+         val minimumReplicationFactor = if (config.enableUnderReplicatedTopicCreation) {
+           val minIsr: Int = if (configs.contains(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG)) {
+              Integer.parseInt(configs.getProperty(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
+            } else {
+              config.minInSyncReplicas
+            }
+            Math.min(minIsr, resolvedReplicationFactor)
+          } else {
+            resolvedReplicationFactor
+          }
         val assignments = if (topic.assignments().isEmpty) {
           AdminUtils.assignReplicasToBrokers(
-            brokers, resolvedNumPartitions, resolvedReplicationFactor)
+            brokers, resolvedNumPartitions, resolvedReplicationFactor, minimumReplicationFactor)
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
           // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
