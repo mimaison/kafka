@@ -33,7 +33,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     assertEquals(List(0, 3, 1, 5, 4, 2), newList)
     val anotherList = AdminUtils.getRackAlternatedBrokerList(rackMap - 5)
     assertEquals(List(0, 3, 1, 4, 2), anotherList)
-    val assignment = AdminUtils.assignReplicasToBrokers(toBrokerMetadata(rackMap), 7, 3, false, 0, 0)
+    val assignment = AdminUtils.assignReplicasToBrokers(toBrokerMetadata(rackMap), 7, 3, 0, 0)
     val expected = Map(0 -> List(0, 3, 1),
                        1 -> List(3, 1, 5),
                        2 -> List(1, 5, 4),
@@ -50,7 +50,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 6
     val replicationFactor = 3
     val assignment = AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor, false, 2, 0)
+      replicationFactor, 2, 0)
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor)
   }
@@ -72,7 +72,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
     val numPartitions = 13
     val replicationFactor = 3
     val assignment = AdminUtils.assignReplicasToBrokers(toBrokerMetadata(brokerRackMapping), numPartitions,
-      replicationFactor, false, 0, 0)
+      replicationFactor, 0, 0)
     checkReplicaDistribution(assignment, brokerRackMapping, brokerRackMapping.size, numPartitions,
       replicationFactor, verifyLeaderDistribution = false, verifyReplicasDistribution = false)
   }
@@ -222,7 +222,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
         8 -> List(3, 0, 1),
         9 -> List(4, 1, 2))
 
-    val actualAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, false, 0)
+    val actualAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, 0)
     assertEquals(expectedAssignment, actualAssignment)
   }
 }

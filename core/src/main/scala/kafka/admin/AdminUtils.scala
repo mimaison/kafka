@@ -103,15 +103,18 @@ object AdminUtils extends Logging {
   def assignReplicasToBrokers(brokerMetadatas: Seq[BrokerMetadata],
                               nPartitions: Int,
                               replicationFactor: Int,
-                              minimumReplicationFactor: Int,
+                              minimumReplicationFactorArg: Int = -1,
                               fixedStartIndex: Int = -1,
                               startPartitionId: Int = -1): Map[Int, Seq[Int]] = {
     if (nPartitions <= 0)
       throw new InvalidPartitionsException("Number of partitions must be larger than 0.")
     if (replicationFactor <= 0)
       throw new InvalidReplicationFactorException("Replication factor must be larger than 0.")
+    val minimumReplicationFactor = if (minimumReplicationFactorArg == -1) replicationFactor else minimumReplicationFactorArg
+
     var brokers = scala.collection.mutable.ArraySeq(brokerMetadatas:_*)
     val rackUnaware = brokerMetadatas.forall(_.rack.isEmpty)
+
     if (minimumReplicationFactor > brokerMetadatas.size) { //TODO error message
       throw new InvalidReplicationFactorException(s"Replication factor: $minimumReplicationFactor larger than available brokers: ${brokerMetadatas.size}.")
     } else {
