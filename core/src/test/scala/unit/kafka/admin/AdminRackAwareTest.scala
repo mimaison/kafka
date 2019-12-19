@@ -222,7 +222,7 @@ class AdminRackAwareTest extends RackAwareTest with Logging {
         8 -> List(3, 0, 1),
         9 -> List(4, 1, 2))
 
-    val actualAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, 0)
+    val actualAssignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, 10, 3, -1, 0)
     assertEquals(expectedAssignment, actualAssignment)
   }
 }
