@@ -111,16 +111,7 @@ class AdminManager(val config: KafkaConfig,
         val resolvedReplicationFactor = if (topic.replicationFactor == NO_REPLICATION_FACTOR)
           defaultReplicationFactor else topic.replicationFactor
 
-         val minimumReplicationFactor = if (config.enableUnderReplicatedTopicCreation) {
-           val minIsr: Int = if (configs.contains(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG)) {
-              Integer.parseInt(configs.getProperty(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
-            } else {
-              config.minInSyncReplicas
-            }
-            Math.min(minIsr, resolvedReplicationFactor)
-          } else {
-            resolvedReplicationFactor
-          }
+        val minimumReplicationFactor = computeMinimumReplicationFactor(configs, resolvedReplicationFactor)
         val assignments = if (topic.assignments().isEmpty) {
           AdminUtils.assignReplicasToBrokers(
             brokers, resolvedNumPartitions, resolvedReplicationFactor, minimumReplicationFactor)
@@ -290,7 +281,10 @@ class AdminManager(val config: KafkaConfig,
         }
         if (existingAssignment.isEmpty)
           throw new UnknownTopicOrPartitionException(s"The topic '$topic' does not exist.")
-
+        
+        val topicConfigs = adminZkClient.fetchEntityConfig(ConfigType.Topic, topic)
+        val replicationFactor = existingAssignment.head._2.replicas.size
+        val minimumReplicationFactor = computeMinimumReplicationFactor(topicConfigs, replicationFactor)
         val oldNumPartitions = existingAssignment.size
         val newNumPartitions = newPartition.totalCount
         val numPartitionsIncrement = newNumPartitions - oldNumPartitions
@@ -318,7 +312,7 @@ class AdminManager(val config: KafkaConfig,
         }
 
         val updatedReplicaAssignment = adminZkClient.addPartitions(topic, existingAssignment, allBrokers,
-          newPartition.totalCount, newPartitionsAssignment, validateOnly = validateOnly)
+          newPartition.totalCount, newPartitionsAssignment, validateOnly = validateOnly, minimumReplicationFactor)
         CreatePartitionsMetadata(topic, updatedReplicaAssignment, ApiError.NONE)
       } catch {
         case e: AdminOperationException =>
@@ -346,6 +340,20 @@ class AdminManager(val config: KafkaConfig,
       // try to complete the request immediately, otherwise put it into the purgatory
       topicPurgatory.tryCompleteElseWatch(delayedCreate, delayedCreateKeys)
     }
+  }
+
+  def computeMinimumReplicationFactor(topicConfigs: Properties, requestedReplicationFactor: Int): Int = {
+    val minimumReplicationFactor = if (config.enableUnderReplicatedTopicCreation) {
+      val minIsr: Int = if (topicConfigs.contains(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG)) {
+        Integer.parseInt(topicConfigs.getProperty(TopicConfig.MIN_IN_SYNC_REPLICAS_CONFIG))
+      } else {
+        config.minInSyncReplicas
+      }
+      Math.min(minIsr, requestedReplicationFactor)
+    } else {
+      requestedReplicationFactor
+    }
+    minimumReplicationFactor
   }
 
   def describeConfigs(resourceToConfigNames: Map[ConfigResource, Option[Set[String]]], includeSynonyms: Boolean): Map[ConfigResource, DescribeConfigsResponse.Config] = {

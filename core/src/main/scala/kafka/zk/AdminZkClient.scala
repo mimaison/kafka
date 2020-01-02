@@ -185,7 +185,8 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
                     allBrokers: Seq[BrokerMetadata],
                     numPartitions: Int = 1,
                     replicaAssignment: Option[Map[Int, Seq[Int]]] = None,
-                    validateOnly: Boolean = false): Map[Int, Seq[Int]] = {
+                    validateOnly: Boolean = false,
+                    minimumReplicationFactor: Int = -1): Map[Int, Seq[Int]] = {
     val existingAssignmentPartition0 = existingAssignment.getOrElse(0,
       throw new AdminOperationException(
         s"Unexpected existing replica assignment for topic '$topic', partition id 0 is missing. " +
@@ -206,7 +207,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
     val proposedAssignmentForNewPartitions = replicaAssignment.getOrElse {
       val startIndex = math.max(0, allBrokers.indexWhere(_.id >= existingAssignmentPartition0.head))
       AdminUtils.assignReplicasToBrokers(allBrokers, partitionsToAdd, existingAssignmentPartition0.size,
-        existingAssignmentPartition0.size, startIndex, existingAssignment.size)
+        minimumReplicationFactor, startIndex, existingAssignment.size)
     }
 
     val proposedAssignment = existingAssignment ++ proposedAssignmentForNewPartitions.map { case (tp, replicas) =>

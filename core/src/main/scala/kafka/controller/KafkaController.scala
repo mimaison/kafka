@@ -390,22 +390,6 @@ class KafkaController(val config: KafkaConfig,
     replicaStateMachine.handleStateChanges(replicasOnBrokers.toSeq, OnlineReplica)
   }
 
-  private def handlePartitionsMissingReplicas(newBrokers: Seq[Int]): Unit = {
-    for (brokerId <- newBrokers) {
-      val partitionsMissingReplicas = controllerContext.partitionsMissingReplicas(brokerId)
-      println("PartitionsMissingReplicas")
-      println(partitionsMissingReplicas)
-      if (!partitionsMissingReplicas.isEmpty) {
-        for ((tp, replicas) <- partitionsMissingReplicas) {
-          val toRemove = Seq(replicas.filter(id => id < 0).head)
-          val replicaAssignment = ReplicaAssignment(replicas ++ Seq(brokerId).distinct, Seq(brokerId), toRemove)
-          println(replicaAssignment)
-          onPartitionReassignment(tp, replicaAssignment)
-        }
-      }
-    }
-  }
-
   /**
    * This callback is invoked by the replica state machine's broker change listener, with the list of newly started
    * brokers as input. It does the following -
@@ -422,6 +406,7 @@ class KafkaController(val config: KafkaConfig,
    */
   private def onBrokerStartup(newBrokers: Seq[Int]): Unit = {
     info(s"New broker startup callback for ${newBrokers.mkString(",")}")
+    // check if this broker can replace a placeholder
     handlePartitionsMissingReplicas(newBrokers)
     newBrokers.foreach(controllerContext.replicasOnOfflineDirs.remove)
     val newBrokersSet = newBrokers.toSet
@@ -454,6 +439,23 @@ class KafkaController(val config: KafkaConfig,
       topicDeletionManager.resumeDeletionForTopics(replicasForTopicsToBeDeleted.map(_.topic))
     }
     registerBrokerModificationsHandler(newBrokers)
+  }
+
+  /**
+   * This method checks if a broker can be assigned partitions missing replicas. If so it triggers a reassignment
+   * replacing a placeholder broker with this new broker.
+   */
+  private def handlePartitionsMissingReplicas(newBrokers: Seq[Int]): Unit = {
+    for (brokerId <- newBrokers) {
+      val partitionsMissingReplicas = controllerContext.partitionsMissingReplicas(brokerId)
+      if (!partitionsMissingReplicas.isEmpty) {
+        for ((tp, replicas) <- partitionsMissingReplicas) {
+          val toRemove = Seq(replicas.filter(id => ReplicaAssignment.isPlaceholder(id)).head)
+          val replicaAssignment = ReplicaAssignment(replicas ++ Seq(brokerId).distinct, Seq(brokerId), toRemove)
+          onPartitionReassignment(tp, replicaAssignment)
+        }
+      }
+    }
   }
 
   private def maybeResumeReassignments(shouldResume: (TopicPartition, ReplicaAssignment) => Boolean): Unit = {

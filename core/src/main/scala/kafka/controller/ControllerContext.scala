@@ -35,6 +35,10 @@ object ReplicaAssignment {
   def apply(replicas: Seq[Int]): ReplicaAssignment = {
     apply(replicas, Seq.empty, Seq.empty)
   }
+
+  def isPlaceholder(brokerId: Int): Boolean = {
+    return brokerId < 0
+  }
 }
 
 case class ReplicaAssignment(replicas: Seq[Int],
@@ -278,7 +282,7 @@ class ControllerContext {
     val partitionsMissingReplicas = mutable.Map.empty[TopicPartition, Seq[Int]]
     for ((topic, partitionAssignments) <- partitionAssignments;
          (partitionId, assignment) <- partitionAssignments) {
-      if (!assignment.replicas.filter(bId => bId < 0 && bId != brokerId).isEmpty) {
+      if (!assignment.replicas.filter(bId => ReplicaAssignment.isPlaceholder(bId) && bId != brokerId).isEmpty) {
         partitionsMissingReplicas.put(new TopicPartition(topic, partitionId), assignment.replicas)
       }
     }

@@ -116,14 +116,14 @@ object AdminUtils extends Logging {
     val rackUnaware = brokerMetadatas.forall(_.rack.isEmpty)
 
     if (minimumReplicationFactor > brokerMetadatas.size) { //TODO error message
-      throw new InvalidReplicationFactorException(s"Replication factor: $minimumReplicationFactor larger than available brokers: ${brokerMetadatas.size}.")
+      throw new InvalidReplicationFactorException(s"Replication factor: ${minimumReplicationFactor} larger than available brokers: ${brokerMetadatas.size}.")
     } else {
       val missingBrokers = replicationFactor - brokerMetadatas.size
       for (bId <- 1 to missingBrokers) {
-        brokers = brokers :+ BrokerMetadata(-bId, if (rackUnaware) None else Option("rack-" + bId))
+        // insert placeholder brokers (with negative id) for missing replicas
+        brokers = brokers :+ BrokerMetadata(-bId, if (rackUnaware) None else Option(s"rack-${bId}"))
       }
     }
-    println(brokers)
     if (rackUnaware)
       assignReplicasToBrokersRackUnaware(nPartitions, replicationFactor, brokers.map(_.id), fixedStartIndex,
         startPartitionId)

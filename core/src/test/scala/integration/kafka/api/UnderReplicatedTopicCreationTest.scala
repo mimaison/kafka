@@ -36,11 +36,13 @@ import org.junit.runners.Parameterized
 import org.junit.runners.Parameterized.Parameters
 
 import scala.collection.JavaConverters._
+import org.apache.kafka.clients.admin.CreatePartitionsResult
+import org.apache.kafka.clients.admin.NewPartitions
 
 
 @RunWith(value = classOf[Parameterized])
 class UnderReplicatedTopicCreationTest(enableUnderReplicatedTopicCreation: JBoolean) extends IntegrationTestHarness with Logging {
-  override protected def brokerCount: Int = 2
+  override protected def brokerCount: Int = 3
 
   val topic = "topic_1"
   var adminClient: Admin = _
@@ -53,18 +55,20 @@ class UnderReplicatedTopicCreationTest(enableUnderReplicatedTopicCreation: JBool
   override def setUp(): Unit = {
     super.setUp()
     waitUntilBrokerMetadataIsPropagated(servers)
-    killBroker(1)
     adminClient = createAdminClient()
   }
 
   @Test
   def testTopicCreationMissingReplicas(): Unit = {
+    killBroker(1)
+    killBroker(2)
     try {
       createTopic(topic).all.get
       assertTrue(enableUnderReplicatedTopicCreation)
       val replicas = topicReplicas(topic)
       assertTrue(replicas.contains(0))
       assertTrue(replicas.contains(-1))
+      assertTrue(replicas.contains(-2))
     } catch {
       case e: Throwable => {
         assertTrue(e.getCause.isInstanceOf[InvalidReplicationFactorException])
@@ -80,15 +84,50 @@ class UnderReplicatedTopicCreationTest(enableUnderReplicatedTopicCreation: JBool
     val replicas = topicReplicas(topic)
     assertTrue(replicas.contains(0))
     assertTrue(replicas.contains(1))
+    assertTrue(replicas.contains(2))
   }
 
-  def topicReplicas(topic: String): Set[Int] = {
-    val descriptions = adminClient.describeTopics(Seq(topic).asJava).all().get
-    return descriptions.get(topic).partitions().get(0).replicas().asScala.map(n => n.id).toSet
+  @Test
+  def testPartitionCreationMissingReplicas(): Unit = {
+    createTopic(topic).all.get
+    killBroker(1)
+    killBroker(2)
+    try {
+      createPartitions(topic, 2).all.get
+      assertTrue(enableUnderReplicatedTopicCreation)
+      val replicas = topicReplicas(topic, 1)
+      assertTrue(replicas.contains(0))
+      assertTrue(replicas.contains(-1))
+      assertTrue(replicas.contains(-2))
+    } catch {
+      case e: Throwable => {
+        assertTrue(e.getCause.isInstanceOf[InvalidReplicationFactorException])
+        assertFalse(enableUnderReplicatedTopicCreation)
+      }
+    }
+
+    restartDeadBrokers()
+    waitUntilBrokerMetadataIsPropagated(servers)
+    if (!enableUnderReplicatedTopicCreation) {
+      createPartitions(topic, 2).all.get
+    }
+    val replicas = topicReplicas(topic, 1)
+    assertTrue(replicas.contains(0))
+    assertTrue(replicas.contains(1))
+    assertTrue(replicas.contains(2))
+  }
+
+  def topicReplicas(topic: String, partition: Short = 0): Set[Int] = {
+    val descriptions = adminClient.describeTopics(Seq(topic).asJava).all.get
+    return descriptions.get(topic).partitions.get(partition).replicas.asScala.map(n => n.id).toSet
   }
 
   def createTopic(topic: String): CreateTopicsResult = {
-    adminClient.createTopics(Collections.singleton(new NewTopic(topic, 1, 2.toShort)))
+    adminClient.createTopics(Collections.singleton(new NewTopic(topic, 1, 3.toShort)))
+  }
+
+  def createPartitions(topic: String, count: Int): CreatePartitionsResult = {
+    adminClient.createPartitions(Collections.singletonMap(topic, NewPartitions.increaseTo(count)))
   }
 
 }
