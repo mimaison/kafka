@@ -91,7 +91,7 @@ public abstract class AbstractResponse implements AbstractRequestResponse {
             case FETCH:
                 return FetchResponse.parse(struct);
             case LIST_OFFSETS:
-                return new ListOffsetResponse(struct);
+                return new ListOffsetResponse(struct, version);
             case METADATA:
                 return new MetadataResponse(struct, version);
             case OFFSET_COMMIT:

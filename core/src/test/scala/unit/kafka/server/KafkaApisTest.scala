@@ -78,6 +78,8 @@ import org.junit.{After, Test}
 
 import scala.jdk.CollectionConverters._
 import scala.collection.{Map, Seq, mutable}
+import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetTopic
+import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetPartition
 
 class KafkaApisTest {
 
@@ -971,19 +973,25 @@ class KafkaApisTest {
     val capturedResponse = expectNoThrottling()
     EasyMock.replay(replicaManager, clientRequestQuotaManager, requestChannel)
 
-    val targetTimes = Map(tp -> new ListOffsetRequest.PartitionData(ListOffsetRequest.EARLIEST_TIMESTAMP,
-      currentLeaderEpoch))
+    val targetTimes = List(new ListOffsetTopic()
+      .setName(tp.topic)
+      .setPartitions(List(new ListOffsetPartition()
+        .setPartitionIndex(tp.partition)
+        .setTimestamp(ListOffsetRequest.EARLIEST_TIMESTAMP)
+        .setCurrentLeaderEpoch(currentLeaderEpoch.get)).asJava)).asJava
     val listOffsetRequest = ListOffsetRequest.Builder.forConsumer(true, isolationLevel)
-      .setTargetTimes(targetTimes.asJava).build()
+      .setTargetTimes(targetTimes).build()
     val request = buildRequest(listOffsetRequest)
     createKafkaApis().handleListOffsetRequest(request)
 
     val response = readResponse(ApiKeys.LIST_OFFSETS, listOffsetRequest, capturedResponse)
       .asInstanceOf[ListOffsetResponse]
-    assertTrue(response.responseData.containsKey(tp))
+    val partitionDataOptional = response.responseData.asScala.find(_.name == tp.topic).get
+      .partitions.asScala.find(_.partitionIndex == tp.partition)
+    assertTrue(partitionDataOptional.isDefined)
 
-    val partitionData = response.responseData.get(tp)
-    assertEquals(error, partitionData.error)
+    val partitionData = partitionDataOptional.get
+    assertEquals(error.code, partitionData.errorCode)
     assertEquals(ListOffsetResponse.UNKNOWN_OFFSET, partitionData.offset)
     assertEquals(ListOffsetResponse.UNKNOWN_TIMESTAMP, partitionData.timestamp)
   }
@@ -1974,18 +1982,23 @@ class KafkaApisTest {
     val capturedResponse = expectNoThrottling()
     EasyMock.replay(replicaManager, clientRequestQuotaManager, requestChannel)
 
-    val targetTimes = Map(tp -> new ListOffsetRequest.PartitionData(ListOffsetRequest.LATEST_TIMESTAMP,
-      currentLeaderEpoch))
+    val targetTimes = List(new ListOffsetTopic()
+      .setName(tp.topic)
+      .setPartitions(List(new ListOffsetPartition()
+        .setPartitionIndex(tp.partition)
+        .setTimestamp(ListOffsetRequest.LATEST_TIMESTAMP)).asJava)).asJava
     val listOffsetRequest = ListOffsetRequest.Builder.forConsumer(true, isolationLevel)
-      .setTargetTimes(targetTimes.asJava).build()
+      .setTargetTimes(targetTimes).build()
     val request = buildRequest(listOffsetRequest)
     createKafkaApis().handleListOffsetRequest(request)
 
     val response = readResponse(ApiKeys.LIST_OFFSETS, listOffsetRequest, capturedResponse).asInstanceOf[ListOffsetResponse]
-    assertTrue(response.responseData.containsKey(tp))
+    val partitionDataOptional = response.responseData.asScala.find(_.name == tp.topic).get
+      .partitions.asScala.find(_.partitionIndex == tp.partition)
+    assertTrue(partitionDataOptional.isDefined)
 
-    val partitionData = response.responseData.get(tp)
-    assertEquals(Errors.NONE, partitionData.error)
+    val partitionData = partitionDataOptional.get
+    assertEquals(Errors.NONE.code, partitionData.errorCode)
     assertEquals(latestOffset, partitionData.offset)
     assertEquals(ListOffsetResponse.UNKNOWN_TIMESTAMP, partitionData.timestamp)
   }

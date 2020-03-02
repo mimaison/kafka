@@ -50,6 +50,8 @@ import org.junit.{After, Before, Test}
 
 import scala.jdk.CollectionConverters._
 import scala.collection.mutable.ListBuffer
+import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetTopic
+import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetPartition
 
 class RequestQuotaTest extends BaseRequestTest {
 
@@ -224,9 +226,14 @@ class RequestQuotaTest extends BaseRequestTest {
           new MetadataRequest.Builder(List(topic).asJava, true)
 
         case ApiKeys.LIST_OFFSETS =>
+          val topic = new ListOffsetTopic()
+            .setName(tp.topic)
+            .setPartitions(List(new ListOffsetPartition()
+              .setPartitionIndex(tp.partition)
+              .setTimestamp(0L)
+              .setCurrentLeaderEpoch(15)).asJava)
           ListOffsetRequest.Builder.forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
-            .setTargetTimes(Map(tp -> new ListOffsetRequest.PartitionData(
-              0L, Optional.of[Integer](15))).asJava)
+            .setTargetTimes(List(topic).asJava)
 
         case ApiKeys.LEADER_AND_ISR =>
           new LeaderAndIsrRequest.Builder(ApiKeys.LEADER_AND_ISR.latestVersion, brokerId, Int.MaxValue, Long.MaxValue,
