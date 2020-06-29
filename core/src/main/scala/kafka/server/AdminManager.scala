@@ -49,9 +49,14 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
+
 import org.apache.kafka.server.ReplicaAssignor
-import kafka.admin.DefaultReplicaAssignor
 import org.apache.kafka.common.requests.RequestContext
+import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
+import org.apache.kafka.common.security.auth.KafkaPrincipal
+import java.util.{Map => JMap}
+import java.util.{List => JList}
+
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -70,7 +75,7 @@ class AdminManager(val config: KafkaConfig,
     Option(config.getConfiguredInstance(KafkaConfig.AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
 
   private val replicaAssignor = {
-    val replicaAssignor = config.getConfiguredInstance("replica.assignor.class.name", classOf[ReplicaAssignor])
+    val replicaAssignor = config.getConfiguredInstance(KafkaConfig.ReplicaAssignorClassNameProp, classOf[ReplicaAssignor])
     if (replicaAssignor == null) new DefaultReplicaAssignor() else replicaAssignor 
   }
 
@@ -101,6 +106,9 @@ class AdminManager(val config: KafkaConfig,
 
     // 1. map over topics creating assignment and calling zookeeper
     val brokers = metadataCache.getAliveBrokers.map { b => kafka.admin.BrokerMetadata(b.id, b.rack) }
+    
+    var cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
+
     val metadata = toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
@@ -128,12 +136,8 @@ class AdminManager(val config: KafkaConfig,
           defaultReplicationFactor else topic.replicationFactor
 
         val assignments = if (topic.assignments().isEmpty) {
-          
           replicaAssignor.assignReplicasToBrokers(topic.name, resolvedNumPartitions, resolvedReplicationFactor, 
-              metadataCache.getClusterMetadata(clusterId, requestContext.listenerName), requestContext.principal);
-          
-          AdminUtils.assignReplicasToBrokers(
-            brokers, resolvedNumPartitions, resolvedReplicationFactor)
+              cluster, requestContext.principal).asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
           // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
@@ -175,6 +179,7 @@ class AdminManager(val config: KafkaConfig,
             else
               adminZkClient.createTopicWithAssignment(topic.name, configs, assignments)
         }
+        cluster = updateCluster(cluster, topic.name, assignments)
 
         // For responses with DescribeConfigs permission, populate metadata and configs
         includeConfigsAndMetatadata.get(topic.name).foreach { result =>
@@ -228,6 +233,24 @@ class AdminManager(val config: KafkaConfig,
       // try to complete the request immediately, otherwise put it into the purgatory
       topicPurgatory.tryCompleteElseWatch(delayedCreate, delayedCreateKeys)
     }
+  }
+
+  private def updateCluster(cluster: Cluster, topic: String, assignments: Map[Int, Seq[Int]]) : Cluster = {
+    var partitions = new java.util.ArrayList[PartitionInfo];
+
+    cluster.topics.asScala.foreach{ t => 
+      partitions.addAll(cluster.partitionsForTopic(t))
+    }
+
+    assignments.foreach{ case (k,v) => 
+      val leader = cluster.nodeById(v.head)
+      val replicas = v.map(i => cluster.nodeById(i)).toArray[Node]
+      val partitionInfo = new PartitionInfo(topic, k, leader, replicas, replicas, new Array[Node](0))
+      partitions.add(partitionInfo)
+    }
+
+    new Cluster(cluster.clusterResource.clusterId, cluster.nodes(), partitions, 
+        cluster.unauthorizedTopics, cluster.internalTopics)
   }
 
   /**
@@ -959,5 +982,14 @@ class AdminManager(val config: KafkaConfig,
       }
       entry.entity -> apiError
     }.toMap
+  }
+}
+
+class DefaultReplicaAssignor extends ReplicaAssignor {
+
+  def assignReplicasToBrokers(
+            topicName: String, numPartitions: Integer, replicationFactor: Integer, cluster: Cluster, principal: KafkaPrincipal) : JMap[Integer, JList[Integer]] = {
+    val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) };
+    AdminUtils.assignReplicasToBrokers(brokerMetadatas, numPartitions, replicationFactor).map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }.asJava
   }
 }
