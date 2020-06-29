@@ -18,11 +18,16 @@
 package kafka.admin
 
 import java.util.Random
+import java.util.{Map => JMap}
+import java.util.{List => JList}
 
 import kafka.utils.Logging
 import org.apache.kafka.common.errors.{InvalidPartitionsException, InvalidReplicationFactorException}
 
 import collection.{Map, mutable, _}
+import org.apache.kafka.server.ReplicaAssignor
+import org.apache.kafka.common.Cluster
+import org.apache.kafka.common.security.auth.KafkaPrincipal
 
 object AdminUtils extends Logging {
   val rand = new Random
@@ -236,4 +241,12 @@ object AdminUtils extends Logging {
     (firstReplicaIndex + shift) % nBrokers
   }
 
+}
+
+class DefaultReplicaAssignor extends ReplicaAssignor {
+
+  def assignReplicasToBrokers(
+            topicName: String, numPartitions: Integer, replicationFactor: Integer, cluster: Cluster, principal: KafkaPrincipal) : JMap[Integer, JList[Integer]] = {
+    return null;
+  }
 }

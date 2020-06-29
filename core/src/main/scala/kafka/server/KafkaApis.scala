@@ -1751,7 +1751,8 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
         sendResponseCallback(results)
       }
-      adminManager.createTopics(createTopicsRequest.data.timeoutMs,
+      adminManager.createTopics(request.context, clusterId,
+          createTopicsRequest.data.timeoutMs,
           createTopicsRequest.data.validateOnly,
           toCreate,
           authorizedForDescribeConfigs,

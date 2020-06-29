@@ -49,6 +49,9 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
+import org.apache.kafka.server.ReplicaAssignor
+import kafka.admin.DefaultReplicaAssignor
+import org.apache.kafka.common.requests.RequestContext
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -65,6 +68,11 @@ class AdminManager(val config: KafkaConfig,
 
   private val alterConfigPolicy =
     Option(config.getConfiguredInstance(KafkaConfig.AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
+
+  private val replicaAssignor = {
+    val replicaAssignor = config.getConfiguredInstance("replica.assignor.class.name", classOf[ReplicaAssignor])
+    if (replicaAssignor == null) new DefaultReplicaAssignor() else replicaAssignor 
+  }
 
   def hasDelayedTopicOperations = topicPurgatory.numDelayed != 0
 
@@ -84,7 +92,8 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(timeout: Int,
+  def createTopics(requestContext: RequestContext, clusterId : String,
+                   timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
                    includeConfigsAndMetatadata: Map[String, CreatableTopicResult],
@@ -119,6 +128,10 @@ class AdminManager(val config: KafkaConfig,
           defaultReplicationFactor else topic.replicationFactor
 
         val assignments = if (topic.assignments().isEmpty) {
+          
+          replicaAssignor.assignReplicasToBrokers(topic.name, resolvedNumPartitions, resolvedReplicationFactor, 
+              metadataCache.getClusterMetadata(clusterId, requestContext.listenerName), requestContext.principal);
+          
           AdminUtils.assignReplicasToBrokers(
             brokers, resolvedNumPartitions, resolvedReplicationFactor)
         } else {

@@ -88,7 +88,7 @@ class CogroupedStreamAggregateBuilder<K, VOut> {
         final Collection<StreamsGraphNode> processors = new ArrayList<>();
         boolean stateCreated = false;
         int counter = 0;
-        for (final Entry<KGroupedStreamImpl<K, ?>, Aggregator<? super K, Object, VOut>> kGroupedStream : groupPatterns.entrySet()) {
+        for (final Entry<KGroupedStreamImpl<K, ?>, Aggregator<? super K, ? super Object, VOut>> kGroupedStream : groupPatterns.entrySet()) {
             final StatefulProcessorNode<K, ?> statefulProcessorNode = getStatefulProcessorNode(
                 kGroupedStream.getValue(),
                 initializer,
