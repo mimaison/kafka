@@ -84,7 +84,7 @@ class AddPartitionsTest extends BaseRequestTest {
 
   @Test
   def testIncrementPartitions(): Unit = {
-    adminZkClient.addPartitions(topic1, topic1Assignment, adminZkClient.getBrokerMetadatas(), 3)
+    adminZkClient.addPartitions(topic1, topic1Assignment, adminZkClient.getBrokerMetadatas(), 3, None)
     // wait until leader is elected
     val leader1 = waitUntilLeaderIsElectedOrChanged(zkClient, topic1, 1)
     val leader2 = waitUntilLeaderIsElectedOrChanged(zkClient, topic1, 2)
@@ -145,7 +145,7 @@ class AddPartitionsTest extends BaseRequestTest {
 
   @Test
   def testReplicaPlacementAllServers(): Unit = {
-    adminZkClient.addPartitions(topic3, topic3Assignment, adminZkClient.getBrokerMetadatas(), 7)
+    adminZkClient.addPartitions(topic3, topic3Assignment, adminZkClient.getBrokerMetadatas(), 7, None)
 
     // read metadata from a broker and verify the new topic partitions exist
     TestUtils.waitUntilMetadataIsPropagated(servers, topic3, 1)
@@ -170,7 +170,7 @@ class AddPartitionsTest extends BaseRequestTest {
 
   @Test
   def testReplicaPlacementPartialServers(): Unit = {
-    adminZkClient.addPartitions(topic2, topic2Assignment, adminZkClient.getBrokerMetadatas(), 3)
+    adminZkClient.addPartitions(topic2, topic2Assignment, adminZkClient.getBrokerMetadatas(), 3, None)
 
     // read metadata from a broker and verify the new topic partitions exist
     TestUtils.waitUntilMetadataIsPropagated(servers, topic2, 1)

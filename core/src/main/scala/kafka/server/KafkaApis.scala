@@ -1824,13 +1824,13 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
         sendResponseCallback(results)
       }
-      adminManager.createTopics(
-        createTopicsRequest.data.timeoutMs,
-        createTopicsRequest.data.validateOnly,
-        toCreate,
-        authorizedForDescribeConfigs,
-        controllerMutationQuota,
-        handleCreateTopicsResults)
+      adminManager.createTopics(request.context, clusterId,
+          createTopicsRequest.data.timeoutMs,
+          createTopicsRequest.data.validateOnly,
+          toCreate,
+          authorizedForDescribeConfigs,
+          controllerMutationQuota,
+          handleCreateTopicsResults)
     }
   }
 
@@ -1879,8 +1879,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         unauthorized.map(_.name -> new ApiError(Errors.TOPIC_AUTHORIZATION_FAILED, "The topic authorization is failed.")) ++
         queuedForDeletion.map(_.name -> new ApiError(Errors.INVALID_TOPIC_EXCEPTION, "The topic is queued for deletion."))
 
-      adminManager.createPartitions(
-        createPartitionsRequest.data.timeoutMs,
+      adminManager.createPartitions(request.context, clusterId, createPartitionsRequest.data.timeoutMs,
         valid,
         createPartitionsRequest.data.validateOnly,
         controllerMutationQuota,
