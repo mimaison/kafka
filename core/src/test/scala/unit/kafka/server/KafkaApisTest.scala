@@ -736,6 +736,8 @@ class KafkaApisTest {
     val capturedCallback = EasyMock.newCapture[Map[String, ApiError] => Unit]()
 
     EasyMock.expect(adminManager.createTopics(
+      anyObject(),
+      anyObject(),
       EasyMock.eq(timeout),
       EasyMock.eq(false),
       EasyMock.eq(Map(authorizedTopic -> topicToCreate)),

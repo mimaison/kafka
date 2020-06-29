@@ -19,7 +19,7 @@ package kafka.server
 import java.util
 import java.util.{Collections, Properties}
 
-import kafka.admin.{AdminOperationException, AdminUtils}
+import kafka.admin.AdminOperationException
 import kafka.common.TopicAlreadyMarkedForDeletionException
 import kafka.log.LogConfig
 import kafka.utils.Log4jController
@@ -44,6 +44,8 @@ import org.apache.kafka.common.message.DescribeConfigsRequestData.DescribeConfig
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData.CredentialInfo
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.security.scram.internals.{ScramMechanism => InternalScramMechanism}
+import org.apache.kafka.common.requests.RequestContext
+import org.apache.kafka.server.ReplicaAssignor
 import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
 import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 import org.apache.kafka.common.protocol.Errors
@@ -56,6 +58,7 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
+
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -72,6 +75,11 @@ class AdminManager(val config: KafkaConfig,
 
   private val alterConfigPolicy =
     Option(config.getConfiguredInstance(KafkaConfig.AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
+
+  private val replicaAssignor = {
+    val replicaAssignor = config.getConfiguredInstance(KafkaConfig.ReplicaAssignorClassNameProp, classOf[ReplicaAssignor])
+    if (replicaAssignor == null) new DefaultReplicaAssignor() else replicaAssignor 
+  }
 
   def hasDelayedTopicOperations = topicPurgatory.numDelayed != 0
 
@@ -137,15 +145,17 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(timeout: Int,
+  def createTopics(requestContext: RequestContext, clusterId : String,
+                   timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
                    includeConfigsAndMetadata: Map[String, CreatableTopicResult],
                    controllerMutationQuota: ControllerMutationQuota,
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
 
+    val cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
+
     // 1. map over topics creating assignment and calling zookeeper
-    val brokers = metadataCache.getAliveBrokers.map { b => kafka.admin.BrokerMetadata(b.id, b.rack) }
     val metadata = toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
@@ -167,8 +177,9 @@ class AdminManager(val config: KafkaConfig,
           defaultReplicationFactor else topic.replicationFactor
 
         val assignments = if (topic.assignments.isEmpty) {
-          AdminUtils.assignReplicasToBrokers(
-            brokers, resolvedNumPartitions, resolvedReplicationFactor)
+          val partitions = List.range(0, resolvedNumPartitions).map(Integer.valueOf)
+          replicaAssignor.assignReplicasToBrokers(topic.name, partitions.asJava, resolvedReplicationFactor,
+              cluster, requestContext.principal).asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
           // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
@@ -197,6 +208,8 @@ class AdminManager(val config: KafkaConfig,
           adminZkClient.createTopicWithAssignment(topic.name, configs, assignments, validate = false)
           CreatePartitionsMetadata(topic.name, assignments.keySet)
         }
+        //TODO
+        //cluster = updateCluster(cluster, topic.name, assignments)
       } catch {
         // Log client errors at a lower level than unexpected exceptions
         case e: TopicExistsException =>
@@ -236,6 +249,25 @@ class AdminManager(val config: KafkaConfig,
       topicPurgatory.tryCompleteElseWatch(delayedCreate, delayedCreateKeys)
     }
   }
+
+  // TODO
+//  private def updateCluster(cluster: Cluster, topic: String, assignments: Map[Int, Seq[Int]]) : Cluster = {
+//    val partitions = new java.util.ArrayList[PartitionInfo]
+//
+//    cluster.topics.asScala.foreach { t =>
+//      partitions.addAll(cluster.partitionsForTopic(t))
+//    }
+//
+//    assignments.foreach{ case (k,v) =>
+//      val leader = cluster.nodeById(v.head)
+//      val replicas = v.map(i => cluster.nodeById(i)).toArray[Node]
+//      val partitionInfo = new PartitionInfo(topic, k, leader, replicas, replicas, new Array[Node](0))
+//      partitions.add(partitionInfo)
+//    }
+//
+//    new Cluster(cluster.clusterResource.clusterId, cluster.nodes(), partitions, 
+//        cluster.unauthorizedTopics, cluster.internalTopics)
+//  }
 
   /**
     * Delete topics and wait until the topics have been completely deleted.
@@ -284,13 +316,14 @@ class AdminManager(val config: KafkaConfig,
     }
   }
 
-  def createPartitions(timeout: Int,
+  def createPartitions(requestContext: RequestContext, clusterId: String, timeout: Int,
                        newPartitions: Seq[CreatePartitionsTopic],
                        validateOnly: Boolean,
                        controllerMutationQuota: ControllerMutationQuota,
                        callback: Map[String, ApiError] => Unit): Unit = {
     val allBrokers = adminZkClient.getBrokerMetadatas()
     val allBrokerIds = allBrokers.map(_.id)
+    val cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling AdminUtils
     val metadata = newPartitions.map { newPartition =>
@@ -338,7 +371,9 @@ class AdminManager(val config: KafkaConfig,
           }.toMap
         }
 
+        //TODO call replicaAssingor
         val assignmentForNewPartitions = adminZkClient.createNewPartitionsAssignment(
+          replicaAssignor, cluster, requestContext.principal,
           topic, existingAssignment, allBrokers, newPartition.count, newPartitionsAssignment)
 
         if (validateOnly) {
@@ -349,6 +384,9 @@ class AdminManager(val config: KafkaConfig,
             topic, existingAssignment, assignmentForNewPartitions)
           CreatePartitionsMetadata(topic, updatedReplicaAssignment.keySet)
         }
+
+        //TODO
+        //cluster = updateCluster(cluster, topic, assignmentForNewPartitions)
       } catch {
         case e: AdminOperationException =>
           CreatePartitionsMetadata(topic, e)

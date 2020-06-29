@@ -1898,7 +1898,10 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
         sendResponseCallback(results)
       }
+
       adminManager.createTopics(
+        request.context,
+        clusterId,
         createTopicsRequest.data.timeoutMs,
         createTopicsRequest.data.validateOnly,
         toCreate,
@@ -1954,6 +1957,8 @@ class KafkaApis(val requestChannel: RequestChannel,
         queuedForDeletion.map(_.name -> new ApiError(Errors.INVALID_TOPIC_EXCEPTION, "The topic is queued for deletion."))
 
       adminManager.createPartitions(
+        request.context,
+        clusterId,
         createPartitionsRequest.data.timeoutMs,
         valid,
         createPartitionsRequest.data.validateOnly,
