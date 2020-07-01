@@ -30,6 +30,9 @@ import org.apache.kafka.common.internals.Topic
 import org.apache.zookeeper.KeeperException.NodeExistsException
 
 import scala.collection.{Map, Seq}
+import org.apache.kafka.server.ReplicaAssignor
+import org.apache.kafka.common.Cluster
+import org.apache.kafka.common.security.auth.KafkaPrincipal
 
 /**
  * Provides admin related methods for interacting with ZooKeeper.
@@ -181,7 +184,8 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
   * @param validateOnly If true, validate the parameters without actually adding the partitions
   * @return the updated replica assignment
   */
-  def addPartitions(topic: String,
+  def addPartitions(replicaAssignor: ReplicaAssignor, cluster: Cluster, principal: KafkaPrincipal,
+                    topic: String,
                     existingAssignment: Map[Int, ReplicaAssignment],
                     allBrokers: Seq[BrokerMetadata],
                     numPartitions: Int = 1,
@@ -205,6 +209,8 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
     }
 
     val proposedAssignmentForNewPartitions = replicaAssignment.getOrElse {
+      replicaAssignor.assignReplicasToBrokers(topic, partitionsToAdd, existingAssignmentPartition0.size, existingAssignment.size, cluster, principal)
+      //TODO
       val startIndex = math.max(0, allBrokers.indexWhere(_.id >= existingAssignmentPartition0.head))
       AdminUtils.assignReplicasToBrokers(allBrokers, partitionsToAdd, existingAssignmentPartition0.size,
         startIndex, existingAssignment.size)

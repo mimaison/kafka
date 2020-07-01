@@ -25,7 +25,7 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 public interface ReplicaAssignor {
 
     public Map<Integer, List<Integer>> assignReplicasToBrokers(
-            String topicName, Integer numPartitions, Integer replicationFactor, 
-            Cluster cluster, KafkaPrincipal principal);
+            String topicName, Integer numPartitions, Integer replicationFactor,
+            Integer startPartitionId, Cluster cluster, KafkaPrincipal principal);
 
 }
