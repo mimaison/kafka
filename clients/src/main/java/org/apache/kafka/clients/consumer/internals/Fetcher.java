@@ -1030,7 +1030,7 @@ public class Fetcher<K, V> implements Closeable {
         Set<TopicPartition> partitionsToRetry = new HashSet<>();
         Set<String> unauthorizedTopics = new HashSet<>();
 
-        Map<TopicPartition, ListOffsetPartitionResponse> partitionsData = byTopicPartitions(listOffsetResponse.responseData());
+        Map<TopicPartition, ListOffsetPartitionResponse> partitionsData = byTopicPartitions(listOffsetResponse.topics());
         for (Map.Entry<TopicPartition, ListOffsetPartition> entry : timestampsToSearch.entrySet()) {
             TopicPartition topicPartition = entry.getKey();
             ListOffsetPartitionResponse partitionData = partitionsData.get(topicPartition);

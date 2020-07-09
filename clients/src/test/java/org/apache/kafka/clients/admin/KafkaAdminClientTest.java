@@ -3060,30 +3060,9 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
 
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(123L)
-                            .setLeaderEpoch(321)));
-            ListOffsetTopicResponse t1 = new ListOffsetTopicResponse()
-                    .setName(tp1.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp1.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(234L)
-                            .setLeaderEpoch(432)));
-            ListOffsetTopicResponse t2 = new ListOffsetTopicResponse()
-                    .setName(tp2.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp2.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(123456789L)
-                            .setOffset(345L)
-                            .setLeaderEpoch(543)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -1L, 123L, 321);
+            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 234L, 432);
+            ListOffsetTopicResponse t2 = prepareListOffsetTopicResponse(tp2, Errors.NONE, 123456789L, 345L, 543);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0, t1, t2));
@@ -3143,35 +3122,14 @@ public class KafkaAdminClientTest {
             env.kafkaClient().setNodeApiVersions(NodeApiVersions.create());
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
             // listoffsets response from broker 0
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.LEADER_NOT_AVAILABLE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(123L)
-                            .setLeaderEpoch(321)));
-            ListOffsetTopicResponse t2 = new ListOffsetTopicResponse()
-                    .setName(tp2.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp2.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(987L)
-                            .setLeaderEpoch(789)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.LEADER_NOT_AVAILABLE, -1L, 123L, 321);
+            ListOffsetTopicResponse t2 = prepareListOffsetTopicResponse(tp2, Errors.NONE, -1L, 987L, 789);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0, t2));
             env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
             // listoffsets response from broker 1
-            ListOffsetTopicResponse t1 = new ListOffsetTopicResponse()
-                    .setName(tp1.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp1.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(456L)
-                            .setLeaderEpoch(654)));
+            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 456L, 654);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t1));
@@ -3180,14 +3138,7 @@ public class KafkaAdminClientTest {
             // metadata refresh because of LEADER_NOT_AVAILABLE
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
             // listoffsets response from broker 0
-            t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(345)
-                            .setLeaderEpoch(543)));
+            t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -1L, 345L, 543);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
@@ -3237,13 +3188,7 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
 
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code())
-                            .setTimestamp(-1L)
-                            .setOffset(-1L)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.TOPIC_AUTHORIZATION_FAILED, -1L, -1L, -1);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
@@ -3286,27 +3231,13 @@ public class KafkaAdminClientTest {
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
 
             // listoffsets response from broker 0
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(345L)
-                            .setLeaderEpoch(543)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -1L, 345L, 543);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
             env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
             // listoffsets response from broker 1
-            ListOffsetTopicResponse t1 = new ListOffsetTopicResponse()
-                    .setName(tp1.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp1.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(789L)
-                            .setLeaderEpoch(987)));
+            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 789L, 987);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t1));
@@ -3351,22 +3282,8 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(oldCluster, Errors.NONE));
 
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NOT_LEADER_FOR_PARTITION.code())
-                            .setTimestamp(-1L)
-                            .setOffset(345L)
-                            .setLeaderEpoch(543)));
-            ListOffsetTopicResponse t1 = new ListOffsetTopicResponse()
-                    .setName(tp1.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp1.partition())
-                            .setErrorCode(Errors.LEADER_NOT_AVAILABLE.code())
-                            .setTimestamp(-2L)
-                            .setOffset(123L)
-                            .setLeaderEpoch(456)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.NOT_LEADER_FOR_PARTITION, -1L, 345L, 543);
+            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.LEADER_NOT_AVAILABLE, -2L, 123L, 456);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0, t1));
@@ -3383,27 +3300,13 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(newCluster, Errors.NONE));
 
-            t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-1L)
-                            .setOffset(345L)
-                            .setLeaderEpoch(543)));
+            t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -1L, 345L, 543);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
             env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node1);
 
-            t1 = new ListOffsetTopicResponse()
-                    .setName(tp1.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp1.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-2L)
-                            .setOffset(123L)
-                            .setLeaderEpoch(456)));
+            t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -2L, 123L, 456);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t1));
@@ -3443,14 +3346,7 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(oldCluster, Errors.NONE));
 
-            ListOffsetTopicResponse t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NOT_LEADER_FOR_PARTITION.code())
-                            .setTimestamp(-1L)
-                            .setOffset(345L)
-                            .setLeaderEpoch(543)));
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.NOT_LEADER_FOR_PARTITION, -1L, 345L, 543);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
@@ -3464,14 +3360,7 @@ public class KafkaAdminClientTest {
 
             env.kafkaClient().prepareResponse(prepareMetadataResponse(newCluster, Errors.NONE));
 
-            t0 = new ListOffsetTopicResponse()
-                    .setName(tp0.topic())
-                    .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
-                            .setPartitionIndex(tp0.partition())
-                            .setErrorCode(Errors.NONE.code())
-                            .setTimestamp(-2L)
-                            .setOffset(123L)
-                            .setLeaderEpoch(456)));
+            t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -2L, 123L, 456);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
@@ -3520,6 +3409,58 @@ public class KafkaAdminClientTest {
             TestUtils.assertFutureError(result.all(), TopicAuthorizationException.class);
         }
     }
+
+    @Test
+    public void testListOffsetsPartialResponse() throws Exception {
+        Node node0 = new Node(0, "localhost", 8120);
+        Node node1 = new Node(1, "localhost", 8121);
+        List<Node> nodes = Arrays.asList(node0, node1);
+        List<PartitionInfo> pInfos = new ArrayList<>();
+        pInfos.add(new PartitionInfo("foo", 0, node0, new Node[]{node0, node1}, new Node[]{node0, node1}));
+        pInfos.add(new PartitionInfo("foo", 1, node0, new Node[]{node0, node1}, new Node[]{node0, node1}));
+        final Cluster cluster =
+            new Cluster(
+                "mockClusterId",
+                nodes,
+                pInfos,
+                Collections.<String>emptySet(),
+                Collections.<String>emptySet(),
+                node0);
+
+        final TopicPartition tp0 = new TopicPartition("foo", 0);
+        final TopicPartition tp1 = new TopicPartition("foo", 1);
+
+        try (AdminClientUnitTestEnv env = new AdminClientUnitTestEnv(cluster)) {
+            env.kafkaClient().setNodeApiVersions(NodeApiVersions.create());
+
+            env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
+
+            ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.NONE, -2L, 123L, 456);
+            ListOffsetResponseData data = new ListOffsetResponseData()
+                    .setThrottleTimeMs(0)
+                    .setTopics(Arrays.asList(t0));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(data), node0);
+
+            Map<TopicPartition, OffsetSpec> partitions = new HashMap<>();
+            partitions.put(tp0, OffsetSpec.latest());
+            partitions.put(tp1, OffsetSpec.latest());
+            ListOffsetsResult result = env.adminClient().listOffsets(partitions);
+            assertNotNull(result.partitionResult(tp0).get());
+            assertNull(result.all().get().get(tp1));
+            TestUtils.assertFutureThrows(result.partitionResult(tp1), ApiException.class);
+        }
+    }
+
+    private static ListOffsetTopicResponse prepareListOffsetTopicResponse(TopicPartition tp, Errors error, long timestamp, long offset, int epoch) {
+        return new ListOffsetTopicResponse()
+                 .setName(tp.topic())
+                 .setPartitions(Collections.singletonList(new ListOffsetPartitionResponse()
+                         .setPartitionIndex(tp.partition())
+                         .setErrorCode(error.code())
+                         .setTimestamp(timestamp)
+                         .setOffset(offset)
+                         .setLeaderEpoch(epoch)));
+     }
 
     @Test
     public void testGetSubLevelError() {

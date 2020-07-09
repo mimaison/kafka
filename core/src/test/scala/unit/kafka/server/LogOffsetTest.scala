@@ -61,7 +61,7 @@ class LogOffsetTest extends BaseRequestTest {
     val request = ListOffsetRequest.Builder.forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
       .setTargetTimes(buildTargetTimes(topicPartition, ListOffsetRequest.LATEST_TIMESTAMP, 10).asJava).build(0)
     val response = sendListOffsetsRequest(request)
-    assertEquals(Errors.UNKNOWN_TOPIC_OR_PARTITION.code, findPartition(response.responseData.asScala, topicPartition).errorCode)
+    assertEquals(Errors.UNKNOWN_TOPIC_OR_PARTITION.code, findPartition(response.topics.asScala, topicPartition).errorCode)
   }
 
   @deprecated("ListOffsetsRequest V0", since = "")
@@ -92,7 +92,7 @@ class LogOffsetTest extends BaseRequestTest {
       "Leader should be elected")
     val request = ListOffsetRequest.Builder.forReplica(0, 0)
       .setTargetTimes(buildTargetTimes(topicPartition, ListOffsetRequest.LATEST_TIMESTAMP, 15).asJava).build()
-    val consumerOffsets = findPartition(sendListOffsetsRequest(request).responseData.asScala, topicPartition).oldStyleOffsets.asScala
+    val consumerOffsets = findPartition(sendListOffsetsRequest(request).topics.asScala, topicPartition).oldStyleOffsets.asScala
     assertEquals(Seq(20L, 18L, 16L, 14L, 12L, 10L, 8L, 6L, 4L, 3L), consumerOffsets)
   }
 
@@ -119,7 +119,7 @@ class LogOffsetTest extends BaseRequestTest {
       "Leader should be elected")
     val request = ListOffsetRequest.Builder.forReplica(0, 0)
       .setTargetTimes(buildTargetTimes(topicPartition, ListOffsetRequest.LATEST_TIMESTAMP, 15).asJava).build()
-    val consumerOffsets = findPartition(sendListOffsetsRequest(request).responseData.asScala, topicPartition).oldStyleOffsets.asScala
+    val consumerOffsets = findPartition(sendListOffsetsRequest(request).topics.asScala, topicPartition).oldStyleOffsets.asScala
     assertEquals(Seq(20L, 18L, 16L, 14L, 12L, 10L, 8L, 6L, 4L, 2L, 0L), consumerOffsets)
 
     // try to fetch using latest offset
@@ -146,7 +146,7 @@ class LogOffsetTest extends BaseRequestTest {
       val topicPartition = new TopicPartition(topic, 0)
       val request = ListOffsetRequest.Builder.forReplica(0, 0)
         .setTargetTimes(buildTargetTimes(topicPartition, ListOffsetRequest.EARLIEST_TIMESTAMP, 1).asJava).build()
-      val consumerOffsets = findPartition(sendListOffsetsRequest(request).responseData.asScala, topicPartition).oldStyleOffsets.asScala
+      val consumerOffsets = findPartition(sendListOffsetsRequest(request).topics.asScala, topicPartition).oldStyleOffsets.asScala
       if (consumerOffsets.head == 1)
         offsetChanged = true
     }
@@ -178,7 +178,7 @@ class LogOffsetTest extends BaseRequestTest {
       "Leader should be elected")
     val request = ListOffsetRequest.Builder.forReplica(0, 0)
       .setTargetTimes(buildTargetTimes(topicPartition, now, 15).asJava).build()
-    val consumerOffsets = findPartition(sendListOffsetsRequest(request).responseData.asScala, topicPartition).oldStyleOffsets.asScala
+    val consumerOffsets = findPartition(sendListOffsetsRequest(request).topics.asScala, topicPartition).oldStyleOffsets.asScala
     assertEquals(Seq(20L, 18L, 16L, 14L, 12L, 10L, 8L, 6L, 4L, 2L, 0L), consumerOffsets)
   }
 
@@ -205,7 +205,7 @@ class LogOffsetTest extends BaseRequestTest {
       "Leader should be elected")
     val request = ListOffsetRequest.Builder.forReplica(0, 0)
       .setTargetTimes(buildTargetTimes(topicPartition, ListOffsetRequest.EARLIEST_TIMESTAMP, 10).asJava).build()
-    val consumerOffsets = findPartition(sendListOffsetsRequest(request).responseData.asScala, topicPartition).oldStyleOffsets.asScala
+    val consumerOffsets = findPartition(sendListOffsetsRequest(request).topics.asScala, topicPartition).oldStyleOffsets.asScala
     assertEquals(Seq(0L), consumerOffsets)
   }
 

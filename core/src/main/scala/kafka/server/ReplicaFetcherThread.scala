@@ -241,7 +241,7 @@ class ReplicaFetcherThread(name: String,
 
     val clientResponse = leaderEndpoint.sendRequest(requestBuilder)
     val response = clientResponse.responseBody.asInstanceOf[ListOffsetResponse]
-    val responsePartition = response.responseData.asScala.find(_.name == topicPartition.topic).get
+    val responsePartition = response.topics.asScala.find(_.name == topicPartition.topic).get
       .partitions.asScala.find(_.partitionIndex == topicPartition.partition).get
 
      Errors.forCode(responsePartition.errorCode) match {

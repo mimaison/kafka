@@ -61,6 +61,7 @@ import org.apache.kafka.common.message.DeleteRecordsResponseData.{DeleteRecordsP
 import org.apache.kafka.common.message.ElectLeadersResponseData.PartitionResult
 import org.apache.kafka.common.message.ElectLeadersResponseData.ReplicaElectionResult
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse
+import org.apache.kafka.common.message.ListOffsetRequestData.ListOffsetPartition
 import org.apache.kafka.common.message.ListOffsetResponseData
 import org.apache.kafka.common.message.ListOffsetResponseData.{ListOffsetPartitionResponse, ListOffsetTopicResponse}
 import org.apache.kafka.common.metrics.Metrics
@@ -909,7 +910,8 @@ class KafkaApis(val requestChannel: RequestChannel,
     val clientId = request.header.clientId
     val offsetRequest = request.body[ListOffsetRequest]
 
-    val (authorizedRequestInfo, unauthorizedRequestInfo) = partitionSeqByAuthorized(request.context, DESCRIBE, TOPIC, offsetRequest.topics.asScala.toSeq)(_.name)
+    val (authorizedRequestInfo, unauthorizedRequestInfo) = partitionSeqByAuthorized(request.context,
+        DESCRIBE, TOPIC, offsetRequest.topics.asScala.toSeq)(_.name)
 
     val unauthorizedResponseStatus = unauthorizedRequestInfo.map(topic =>
       new ListOffsetTopicResponse()
@@ -917,8 +919,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         .setPartitions(topic.partitions.asScala.map(partition =>
           new ListOffsetPartitionResponse()
             .setPartitionIndex(partition.partitionIndex)
-            .setErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code)
-            .setOldStyleOffsets(Seq.empty[JLong].asJava)).asJava)
+            .setErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code)).asJava)
     )
 
     val responseTopics = authorizedRequestInfo.map { topic =>
@@ -946,13 +947,11 @@ class KafkaApis(val requestChannel: RequestChannel,
             new ListOffsetPartitionResponse()
               .setPartitionIndex(partition.partitionIndex)
               .setErrorCode(Errors.forException(e).code)
-              .setOldStyleOffsets(List[JLong]().asJava)
           case e: Throwable =>
             error("Error while responding to offset request", e)
             new ListOffsetPartitionResponse()
               .setPartitionIndex(partition.partitionIndex)
               .setErrorCode(Errors.forException(e).code)
-              .setOldStyleOffsets(List[JLong]().asJava)
         }
       }
       new ListOffsetTopicResponse().setName(topic.name).setPartitions(responsePartitions.asJava)
@@ -965,17 +964,22 @@ class KafkaApis(val requestChannel: RequestChannel,
     val clientId = request.header.clientId
     val offsetRequest = request.body[ListOffsetRequest]
 
-    val (authorizedRequestInfo, unauthorizedRequestInfo) = partitionSeqByAuthorized(request.context, DESCRIBE, TOPIC, offsetRequest.topics.asScala.toSeq)(_.name)
+    def buildErrorResponse(e: Errors, partition: ListOffsetPartition): ListOffsetPartitionResponse = {
+            new ListOffsetPartitionResponse()
+              .setPartitionIndex(partition.partitionIndex)
+              .setErrorCode(e.code)
+              .setTimestamp(ListOffsetResponse.UNKNOWN_TIMESTAMP)
+              .setOffset(ListOffsetResponse.UNKNOWN_OFFSET)
+          }
+
+    val (authorizedRequestInfo, unauthorizedRequestInfo) = partitionSeqByAuthorized(request.context,
+        DESCRIBE, TOPIC, offsetRequest.topics.asScala.toSeq)(_.name)
 
     val unauthorizedResponseStatus = unauthorizedRequestInfo.map(topic =>
       new ListOffsetTopicResponse()
         .setName(topic.name)
         .setPartitions(topic.partitions.asScala.map(partition =>
-          new ListOffsetPartitionResponse()
-            .setPartitionIndex(partition.partitionIndex)
-            .setErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code)
-            .setTimestamp(ListOffsetResponse.UNKNOWN_TIMESTAMP)
-            .setOffset(ListOffsetResponse.UNKNOWN_OFFSET)).asJava)
+          buildErrorResponse(Errors.TOPIC_AUTHORIZATION_FAILED, partition)).asJava)
     )
 
     val responseTopics = authorizedRequestInfo.map { topic =>
@@ -984,20 +988,8 @@ class KafkaApis(val requestChannel: RequestChannel,
         if (offsetRequest.duplicatePartitions.contains(topicPartition)) {
           debug(s"OffsetRequest with correlation id $correlationId from client $clientId on partition $topicPartition " +
               s"failed because the partition is duplicated in the request.")
-          new ListOffsetPartitionResponse()
-            .setPartitionIndex(partition.partitionIndex)
-            .setErrorCode(Errors.INVALID_REQUEST.code)
-            .setTimestamp(ListOffsetResponse.UNKNOWN_TIMESTAMP)
-            .setOffset(ListOffsetResponse.UNKNOWN_OFFSET)
+          buildErrorResponse(Errors.INVALID_REQUEST, partition)
         } else {
-  
-          def buildErrorResponse(e: Errors): ListOffsetPartitionResponse = {
-            new ListOffsetPartitionResponse()
-              .setPartitionIndex(partition.partitionIndex)
-              .setErrorCode(e.code)
-              .setTimestamp(ListOffsetResponse.UNKNOWN_TIMESTAMP)
-              .setOffset(ListOffsetResponse.UNKNOWN_OFFSET)
-          }
   
           try {
             val fetchOnlyFromLeader = offsetRequest.replicaId != ListOffsetRequest.DEBUGGING_REPLICA_ID
@@ -1025,11 +1017,7 @@ class KafkaApis(val requestChannel: RequestChannel,
                 partitionResponse
               }
               case None =>
-                new ListOffsetPartitionResponse()
-                  .setPartitionIndex(partition.partitionIndex)
-                  .setErrorCode(Errors.NONE.code)
-                  .setTimestamp(ListOffsetResponse.UNKNOWN_TIMESTAMP)
-                  .setOffset(ListOffsetResponse.UNKNOWN_OFFSET)
+                buildErrorResponse(Errors.NONE, partition)
             }
             response
           } catch {
@@ -1044,19 +1032,19 @@ class KafkaApis(val requestChannel: RequestChannel,
               e.printStackTrace()
               debug(s"Offset request with correlation id $correlationId from client $clientId on " +
                   s"partition $topicPartition failed due to ${e.getMessage}")
-              buildErrorResponse(Errors.forException(e))
+              buildErrorResponse(Errors.forException(e), partition)
   
             // Only V5 and newer ListOffset calls should get OFFSET_NOT_AVAILABLE
             case e: OffsetNotAvailableException =>
               if (request.header.apiVersion >= 5) {
-                buildErrorResponse(Errors.forException(e))
+                buildErrorResponse(Errors.forException(e), partition)
               } else {
-                buildErrorResponse(Errors.LEADER_NOT_AVAILABLE)
+                buildErrorResponse(Errors.LEADER_NOT_AVAILABLE, partition)
               }
   
             case e: Throwable =>
               error("Error while responding to offset request", e)
-              buildErrorResponse(Errors.forException(e))
+              buildErrorResponse(Errors.forException(e), partition)
           }
         }
       }

@@ -145,7 +145,7 @@ class ListOffsetsRequestTest extends BaseRequestTest {
         .build()
 
       val response = sendRequest(serverId, request)
-      val partitionData = response.responseData.asScala.find(_.name == topic).get
+      val partitionData = response.topics.asScala.find(_.name == topic).get
         .partitions.asScala.find(_.partitionIndex == topicPartition.partition).get
 
       (partitionData.offset, partitionData.leaderEpoch)
@@ -170,8 +170,8 @@ class ListOffsetsRequestTest extends BaseRequestTest {
 
   private def assertResponseError(error: Errors, brokerId: Int, request: ListOffsetRequest): Unit = {
     val response = sendRequest(brokerId, request)
-    assertEquals(request.topics.size, response.responseData.size)
-    response.responseData.asScala.foreach { topic =>
+    assertEquals(request.topics.size, response.topics.size)
+    response.topics.asScala.foreach { topic =>
       topic.partitions.asScala.foreach { partition =>
         assertEquals(error.code, partition.errorCode)
       }

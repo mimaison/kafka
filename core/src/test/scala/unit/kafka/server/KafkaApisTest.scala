@@ -986,7 +986,7 @@ class KafkaApisTest {
 
     val response = readResponse(ApiKeys.LIST_OFFSETS, listOffsetRequest, capturedResponse)
       .asInstanceOf[ListOffsetResponse]
-    val partitionDataOptional = response.responseData.asScala.find(_.name == tp.topic).get
+    val partitionDataOptional = response.topics.asScala.find(_.name == tp.topic).get
       .partitions.asScala.find(_.partitionIndex == tp.partition)
     assertTrue(partitionDataOptional.isDefined)
 
@@ -1993,7 +1993,7 @@ class KafkaApisTest {
     createKafkaApis().handleListOffsetRequest(request)
 
     val response = readResponse(ApiKeys.LIST_OFFSETS, listOffsetRequest, capturedResponse).asInstanceOf[ListOffsetResponse]
-    val partitionDataOptional = response.responseData.asScala.find(_.name == tp.topic).get
+    val partitionDataOptional = response.topics.asScala.find(_.name == tp.topic).get
       .partitions.asScala.find(_.partitionIndex == tp.partition)
     assertTrue(partitionDataOptional.isDefined)
 

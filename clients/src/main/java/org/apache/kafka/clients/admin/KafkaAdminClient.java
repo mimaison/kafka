@@ -3886,18 +3886,18 @@ public class KafkaAdminClient extends AdminClient {
                     ListOffsetResponse response = (ListOffsetResponse) abstractResponse;
                     Map<TopicPartition, OffsetSpec> retryTopicPartitionOffsets = new HashMap<>();
 
-                    for (ListOffsetTopicResponse topic : response.responseData()) {
+                    for (ListOffsetTopicResponse topic : response.topics()) {
                         for (ListOffsetPartitionResponse partition : topic.partitions()) {
                             TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
                             KafkaFutureImpl<ListOffsetsResultInfo> future = futures.get(tp);
                             Errors error = Errors.forCode(partition.errorCode());
                             OffsetSpec offsetRequestSpec = topicPartitionOffsets.get(tp);
                             if (offsetRequestSpec == null) {
-                                future.completeExceptionally(new KafkaException("Unexpected topic partition " + tp + " in broker response!"));
+                                log.warn("Server response mentioned unknown topic partition {}", tp);
                             } else if (MetadataOperationContext.shouldRefreshMetadata(error)) {
                                 retryTopicPartitionOffsets.put(tp, offsetRequestSpec);
                             } else if (error == Errors.NONE) {
-                                Optional<Integer> leaderEpoch = (partition.leaderEpoch() == ListOffsetResponse.UNKNOWN_EPOCH) 
+                                Optional<Integer> leaderEpoch = (partition.leaderEpoch() == ListOffsetResponse.UNKNOWN_EPOCH)
                                         ? Optional.empty() 
                                         : Optional.of(partition.leaderEpoch());
                                 future.complete(new ListOffsetsResultInfo(partition.offset(), partition.timestamp(), leaderEpoch));
@@ -3907,7 +3907,19 @@ public class KafkaAdminClient extends AdminClient {
                         }
                     }
 
-                    if (!retryTopicPartitionOffsets.isEmpty()) {
+                    if (retryTopicPartitionOffsets.isEmpty()) {
+                        // The server should send back a response for every topic partition. But do a sanity check anyway.
+                        Set<TopicPartition> tpsOnBroker = new HashSet<>();
+                        for (ListOffsetTopic topic : partitionsToQuery) {
+                            for (ListOffsetPartition partition : topic.partitions()) {
+                                tpsOnBroker.add(new TopicPartition(topic.name(), partition.partitionIndex()));
+                            }
+                        }
+                        completeUnrealizedFutures(
+                            futures.entrySet().stream().filter(entry -> tpsOnBroker.contains(entry.getKey())),
+                            tp -> "The response from broker " + brokerId +
+                                " did not contain a result for topic partition " + tp);
+                    } else {
                         Set<String> retryTopics = retryTopicPartitionOffsets.keySet().stream().map(
                             TopicPartition::topic).collect(Collectors.toSet());
                         MetadataOperationContext<ListOffsetsResultInfo, ListOffsetsOptions> retryContext =

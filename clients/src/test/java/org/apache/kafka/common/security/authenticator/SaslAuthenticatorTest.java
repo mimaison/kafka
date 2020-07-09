@@ -1593,8 +1593,6 @@ public class SaslAuthenticatorTest {
                                 .setOffset(0)
                                 .setTimestamp(0)))));
         ListOffsetResponse response = new ListOffsetResponse(data);
-//        ListOffsetResponse response = new ListOffsetResponse(0, Collections.singletonMap(new TopicPartition("topic", 0),
-//            new ListOffsetResponse.PartitionData(Errors.NONE, 0, 0, Optional.empty())));
         ByteBuffer buffer = response.serialize(ApiKeys.LIST_OFFSETS, LIST_OFFSETS.latestVersion(), 0);
         final RequestHeader header0 = new RequestHeader(LIST_OFFSETS, LIST_OFFSETS.latestVersion(), "id", SaslClientAuthenticator.MIN_RESERVED_CORRELATION_ID);
         Assert.assertThrows(SchemaException.class, () -> NetworkClient.parseResponse(buffer.duplicate(), header0));

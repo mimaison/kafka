@@ -68,14 +68,14 @@ public class ListOffsetResponse extends AbstractResponse {
         return data;
     }
 
-    public List<ListOffsetTopicResponse> responseData() {
+    public List<ListOffsetTopicResponse> topics() {
         return data.topics();
     }
 
     @Override
     public Map<Errors, Integer> errorCounts() {
         Map<Errors, Integer> errorCounts = new HashMap<>();
-        responseData().forEach(topic ->
+        topics().forEach(topic ->
             topic.partitions().forEach(partition ->
                 updateErrorCounts(errorCounts, Errors.forCode(partition.errorCode()))
             )
