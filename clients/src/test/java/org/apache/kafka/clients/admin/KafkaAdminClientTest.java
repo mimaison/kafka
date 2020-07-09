@@ -201,7 +201,7 @@ public class KafkaAdminClientTest {
     private static final Logger log = LoggerFactory.getLogger(KafkaAdminClientTest.class);
 
     @Rule
-    final public Timeout globalTimeout = Timeout.millis(120000);
+    final public Timeout globalTimeout = Timeout.millis(120000000);
 
     @Test
     public void testDefaultApiTimeoutAndRequestTimeoutConflicts() {
@@ -3123,17 +3123,17 @@ public class KafkaAdminClientTest {
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
             // listoffsets response from broker 0
             ListOffsetTopicResponse t0 = prepareListOffsetTopicResponse(tp0, Errors.LEADER_NOT_AVAILABLE, -1L, 123L, 321);
-            ListOffsetTopicResponse t2 = prepareListOffsetTopicResponse(tp2, Errors.NONE, -1L, 987L, 789);
+            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 987L, 789);
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
-                    .setTopics(Arrays.asList(t0, t2));
-            env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
+                    .setTopics(Arrays.asList(t0, t1));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node0);
             // listoffsets response from broker 1
-            ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 456L, 654);
+            ListOffsetTopicResponse t2 = prepareListOffsetTopicResponse(tp2, Errors.NONE, -1L, 456L, 654);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
-                    .setTopics(Arrays.asList(t1));
-            env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
+                    .setTopics(Arrays.asList(t2));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node1);
 
             // metadata refresh because of LEADER_NOT_AVAILABLE
             env.kafkaClient().prepareResponse(prepareMetadataResponse(cluster, Errors.NONE));
@@ -3142,7 +3142,7 @@ public class KafkaAdminClientTest {
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
-            env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node0);
 
             Map<TopicPartition, OffsetSpec> partitions = new HashMap<>();
             partitions.put(tp0, OffsetSpec.latest());
@@ -3155,11 +3155,11 @@ public class KafkaAdminClientTest {
             assertEquals(345L, offsets.get(tp0).offset());
             assertEquals(543, offsets.get(tp0).leaderEpoch().get().intValue());
             assertEquals(-1L, offsets.get(tp0).timestamp());
-            assertEquals(456, offsets.get(tp1).offset());
-            assertEquals(654, offsets.get(tp1).leaderEpoch().get().intValue());
+            assertEquals(987L, offsets.get(tp1).offset());
+            assertEquals(789, offsets.get(tp1).leaderEpoch().get().intValue());
             assertEquals(-1L, offsets.get(tp1).timestamp());
-            assertEquals(987, offsets.get(tp2).offset());
-            assertEquals(789, offsets.get(tp2).leaderEpoch().get().intValue());
+            assertEquals(456L, offsets.get(tp2).offset());
+            assertEquals(654, offsets.get(tp2).leaderEpoch().get().intValue());
             assertEquals(-1L, offsets.get(tp2).timestamp());
         }
     }
@@ -3235,13 +3235,13 @@ public class KafkaAdminClientTest {
             ListOffsetResponseData responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t0));
-            env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node0);
             // listoffsets response from broker 1
             ListOffsetTopicResponse t1 = prepareListOffsetTopicResponse(tp1, Errors.NONE, -1L, 789L, 987);
             responseData = new ListOffsetResponseData()
                     .setThrottleTimeMs(0)
                     .setTopics(Arrays.asList(t1));
-            env.kafkaClient().prepareResponse(new ListOffsetResponse(responseData));
+            env.kafkaClient().prepareResponseFrom(new ListOffsetResponse(responseData), node1);
 
             Map<TopicPartition, OffsetSpec> partitions = new HashMap<>();
             partitions.put(tp0, OffsetSpec.latest());
@@ -3446,8 +3446,8 @@ public class KafkaAdminClientTest {
             partitions.put(tp1, OffsetSpec.latest());
             ListOffsetsResult result = env.adminClient().listOffsets(partitions);
             assertNotNull(result.partitionResult(tp0).get());
-            assertNull(result.all().get().get(tp1));
             TestUtils.assertFutureThrows(result.partitionResult(tp1), ApiException.class);
+            TestUtils.assertFutureThrows(result.all(), ApiException.class);
         }
     }
 

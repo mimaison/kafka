@@ -3870,9 +3870,10 @@ public class KafkaAdminClient extends AdminClient {
 
         for (final Map.Entry<Node, Map<String, ListOffsetTopic>> entry: leaders.entrySet()) {
             final int brokerId = entry.getKey().id();
-            final List<ListOffsetTopic> partitionsToQuery = new ArrayList<>(entry.getValue().values());
 
             calls.add(new Call("listOffsets on broker " + brokerId, context.deadline(), new ConstantNodeIdProvider(brokerId)) {
+
+                final List<ListOffsetTopic> partitionsToQuery = new ArrayList<>(entry.getValue().values());
 
                 @Override
                 ListOffsetRequest.Builder createRequest(int timeoutMs) {
