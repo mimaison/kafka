@@ -17,7 +17,6 @@
 package kafka.server
 
 import java.io.File
-import java.util.Optional
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.locks.Lock
@@ -61,6 +60,7 @@ import org.apache.kafka.common.utils.Time
 import scala.jdk.CollectionConverters._
 import scala.collection.{Map, Seq, Set, mutable}
 import scala.compat.java8.OptionConverters._
+import java.util.Optional
 
 /*
  * Result metadata of a log append operation on the log
@@ -920,7 +920,7 @@ class ReplicaManager(val config: KafkaConfig,
   def fetchOffsetForTimestamp(topicPartition: TopicPartition,
                               timestamp: Long,
                               isolationLevel: Option[IsolationLevel],
-                              currentLeaderEpoch: Optional[Integer],
+                              currentLeaderEpoch: Option[Int],
                               fetchOnlyFromLeader: Boolean): Option[TimestampAndOffset] = {
     val partition = getPartitionOrException(topicPartition, expectLeader = fetchOnlyFromLeader)
     partition.fetchOffsetForTimestamp(timestamp, isolationLevel, currentLeaderEpoch, fetchOnlyFromLeader)
@@ -1063,7 +1063,7 @@ class ReplicaManager(val config: KafkaConfig,
               s"${preferredReadReplica.get} for $clientMetadata")
           }
           // If a preferred read-replica is set, skip the read
-          val offsetSnapshot = partition.fetchOffsetSnapshot(fetchInfo.currentLeaderEpoch, fetchOnlyFromLeader = false)
+          val offsetSnapshot = partition.fetchOffsetSnapshot(toScalaOption(fetchInfo.currentLeaderEpoch), fetchOnlyFromLeader = false)
           LogReadResult(info = FetchDataInfo(LogOffsetMetadata.UnknownOffsetMetadata, MemoryRecords.EMPTY),
             highWatermark = offsetSnapshot.highWatermark.messageOffset,
             leaderLogStartOffset = offsetSnapshot.logStartOffset,
@@ -1077,7 +1077,7 @@ class ReplicaManager(val config: KafkaConfig,
           // Try the read first, this tells us whether we need all of adjustedFetchSize for this partition
           val readInfo: LogReadInfo = partition.readRecords(
             fetchOffset = fetchInfo.fetchOffset,
-            currentLeaderEpoch = fetchInfo.currentLeaderEpoch,
+            currentLeaderEpoch = toScalaOption(fetchInfo.currentLeaderEpoch),
             maxBytes = adjustedMaxBytes,
             fetchIsolation = fetchIsolation,
             fetchOnlyFromLeader = fetchOnlyFromLeader,
@@ -1776,7 +1776,7 @@ class ReplicaManager(val config: KafkaConfig,
     requestedEpochInfo.map { case (tp, partitionData) =>
       val epochEndOffset = getPartition(tp) match {
         case HostedPartition.Online(partition) =>
-          partition.lastOffsetForLeaderEpoch(partitionData.currentLeaderEpoch, partitionData.leaderEpoch,
+          partition.lastOffsetForLeaderEpoch(toScalaOption(partitionData.currentLeaderEpoch), partitionData.leaderEpoch,
             fetchOnlyFromLeader = true)
 
         case HostedPartition.Offline =>
@@ -1832,5 +1832,9 @@ class ReplicaManager(val config: KafkaConfig,
     }
 
     controller.electLeaders(partitions, electionType, electionCallback)
+  }
+  
+  private def toScalaOption(joi : Optional[Integer]): Option[Int] = {
+    if (joi.isPresent) Some(joi.get.intValue()) else None
   }
 }

@@ -17,7 +17,7 @@
 package kafka.cluster
 
 import java.nio.ByteBuffer
-import java.util.{Optional, Properties}
+import java.util.Properties
 import java.util.concurrent.{CountDownLatch, Executors, Semaphore, TimeUnit, TimeoutException}
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -68,7 +68,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch = leaderEpoch, isLeader = true, log = log)
     assertEquals(Some(4), partition.leaderLogIfLocal.map(_.logEndOffset))
 
-    val epochEndOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpoch = Optional.of[Integer](leaderEpoch),
+    val epochEndOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpoch = Option[Int](leaderEpoch),
       leaderEpoch = leaderEpoch, fetchOnlyFromLeader = true)
     assertEquals(4, epochEndOffset.endOffset)
     assertEquals(leaderEpoch, epochEndOffset.leaderEpoch)
@@ -97,7 +97,7 @@ class PartitionTest extends AbstractPartitionTest {
     assertEquals(Some(4), partition.leaderLogIfLocal.map(_.logEndOffset))
     assertEquals(None, log.latestEpoch)
 
-    val epochEndOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpoch = Optional.of[Integer](leaderEpoch),
+    val epochEndOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpoch = Option[Int](leaderEpoch),
       leaderEpoch = leaderEpoch, fetchOnlyFromLeader = true)
     assertEquals(EpochEndOffset.UNDEFINED_EPOCH_OFFSET, epochEndOffset.endOffset)
     assertEquals(EpochEndOffset.UNDEFINED_EPOCH, epochEndOffset.leaderEpoch)
@@ -235,7 +235,7 @@ class PartitionTest extends AbstractPartitionTest {
     val leaderEpoch = 5
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = true)
 
-    def assertSnapshotError(expectedError: Errors, currentLeaderEpoch: Optional[Integer]): Unit = {
+    def assertSnapshotError(expectedError: Errors, currentLeaderEpoch: Option[Int]): Unit = {
       try {
         partition.fetchOffsetSnapshot(currentLeaderEpoch, fetchOnlyFromLeader = true)
         assertEquals(Errors.NONE, expectedError)
@@ -244,10 +244,10 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1))
-    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1))
-    assertSnapshotError(Errors.NONE, Optional.of(leaderEpoch))
-    assertSnapshotError(Errors.NONE, Optional.empty())
+    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1))
+    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1))
+    assertSnapshotError(Errors.NONE, Option(leaderEpoch))
+    assertSnapshotError(Errors.NONE, Option.empty)
   }
 
   @Test
@@ -256,7 +256,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = false)
 
     def assertSnapshotError(expectedError: Errors,
-                            currentLeaderEpoch: Optional[Integer],
+                            currentLeaderEpoch: Option[Int],
                             fetchOnlyLeader: Boolean): Unit = {
       try {
         partition.fetchOffsetSnapshot(currentLeaderEpoch, fetchOnlyFromLeader = fetchOnlyLeader)
@@ -266,15 +266,15 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertSnapshotError(Errors.NONE, Optional.of(leaderEpoch), fetchOnlyLeader = false)
-    assertSnapshotError(Errors.NONE, Optional.empty(), fetchOnlyLeader = false)
-    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = false)
-    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = false)
+    assertSnapshotError(Errors.NONE, Option(leaderEpoch), fetchOnlyLeader = false)
+    assertSnapshotError(Errors.NONE, Option.empty, fetchOnlyLeader = false)
+    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = false)
+    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = false)
 
-    assertSnapshotError(Errors.NOT_LEADER_FOR_PARTITION, Optional.of(leaderEpoch), fetchOnlyLeader = true)
-    assertSnapshotError(Errors.NOT_LEADER_FOR_PARTITION, Optional.empty(), fetchOnlyLeader = true)
-    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = true)
-    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = true)
+    assertSnapshotError(Errors.NOT_LEADER_FOR_PARTITION, Option(leaderEpoch), fetchOnlyLeader = true)
+    assertSnapshotError(Errors.NOT_LEADER_FOR_PARTITION, Option.empty, fetchOnlyLeader = true)
+    assertSnapshotError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = true)
+    assertSnapshotError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = true)
   }
 
   @Test
@@ -282,16 +282,16 @@ class PartitionTest extends AbstractPartitionTest {
     val leaderEpoch = 5
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = true)
 
-    def assertLastOffsetForLeaderError(error: Errors, currentLeaderEpochOpt: Optional[Integer]): Unit = {
+    def assertLastOffsetForLeaderError(error: Errors, currentLeaderEpochOpt: Option[Int]): Unit = {
       val endOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpochOpt, 0,
         fetchOnlyFromLeader = true)
       assertEquals(error, endOffset.error)
     }
 
-    assertLastOffsetForLeaderError(Errors.NONE, Optional.empty())
-    assertLastOffsetForLeaderError(Errors.NONE, Optional.of(leaderEpoch))
-    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1))
-    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1))
+    assertLastOffsetForLeaderError(Errors.NONE, Option.empty)
+    assertLastOffsetForLeaderError(Errors.NONE, Option(leaderEpoch))
+    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1))
+    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1))
   }
 
   @Test
@@ -300,22 +300,22 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = false)
 
     def assertLastOffsetForLeaderError(error: Errors,
-                                       currentLeaderEpochOpt: Optional[Integer],
+                                       currentLeaderEpochOpt: Option[Int],
                                        fetchOnlyLeader: Boolean): Unit = {
       val endOffset = partition.lastOffsetForLeaderEpoch(currentLeaderEpochOpt, 0,
         fetchOnlyFromLeader = fetchOnlyLeader)
       assertEquals(error, endOffset.error)
     }
 
-    assertLastOffsetForLeaderError(Errors.NONE, Optional.empty(), fetchOnlyLeader = false)
-    assertLastOffsetForLeaderError(Errors.NONE, Optional.of(leaderEpoch), fetchOnlyLeader = false)
-    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = false)
-    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = false)
+    assertLastOffsetForLeaderError(Errors.NONE, Option.empty, fetchOnlyLeader = false)
+    assertLastOffsetForLeaderError(Errors.NONE, Option(leaderEpoch), fetchOnlyLeader = false)
+    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = false)
+    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = false)
 
-    assertLastOffsetForLeaderError(Errors.NOT_LEADER_FOR_PARTITION, Optional.empty(), fetchOnlyLeader = true)
-    assertLastOffsetForLeaderError(Errors.NOT_LEADER_FOR_PARTITION, Optional.of(leaderEpoch), fetchOnlyLeader = true)
-    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = true)
-    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = true)
+    assertLastOffsetForLeaderError(Errors.NOT_LEADER_FOR_PARTITION, Option.empty, fetchOnlyLeader = true)
+    assertLastOffsetForLeaderError(Errors.NOT_LEADER_FOR_PARTITION, Option(leaderEpoch), fetchOnlyLeader = true)
+    assertLastOffsetForLeaderError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = true)
+    assertLastOffsetForLeaderError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = true)
   }
 
   @Test
@@ -324,7 +324,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = true)
 
     def assertReadRecordsError(error: Errors,
-                               currentLeaderEpochOpt: Optional[Integer]): Unit = {
+                               currentLeaderEpochOpt: Option[Int]): Unit = {
       try {
         partition.readRecords(0L, currentLeaderEpochOpt,
           maxBytes = 1024,
@@ -339,10 +339,10 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertReadRecordsError(Errors.NONE, Optional.empty())
-    assertReadRecordsError(Errors.NONE, Optional.of(leaderEpoch))
-    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1))
-    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1))
+    assertReadRecordsError(Errors.NONE, Option.empty)
+    assertReadRecordsError(Errors.NONE, Option(leaderEpoch))
+    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1))
+    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1))
   }
 
   @Test
@@ -351,7 +351,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = false)
 
     def assertReadRecordsError(error: Errors,
-                                       currentLeaderEpochOpt: Optional[Integer],
+                                       currentLeaderEpochOpt: Option[Int],
                                        fetchOnlyLeader: Boolean): Unit = {
       try {
         partition.readRecords(0L, currentLeaderEpochOpt,
@@ -367,15 +367,15 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertReadRecordsError(Errors.NONE, Optional.empty(), fetchOnlyLeader = false)
-    assertReadRecordsError(Errors.NONE, Optional.of(leaderEpoch), fetchOnlyLeader = false)
-    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = false)
-    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = false)
+    assertReadRecordsError(Errors.NONE, Option.empty, fetchOnlyLeader = false)
+    assertReadRecordsError(Errors.NONE, Option(leaderEpoch), fetchOnlyLeader = false)
+    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = false)
+    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = false)
 
-    assertReadRecordsError(Errors.NOT_LEADER_FOR_PARTITION, Optional.empty(), fetchOnlyLeader = true)
-    assertReadRecordsError(Errors.NOT_LEADER_FOR_PARTITION, Optional.of(leaderEpoch), fetchOnlyLeader = true)
-    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = true)
-    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = true)
+    assertReadRecordsError(Errors.NOT_LEADER_FOR_PARTITION, Option.empty, fetchOnlyLeader = true)
+    assertReadRecordsError(Errors.NOT_LEADER_FOR_PARTITION, Option(leaderEpoch), fetchOnlyLeader = true)
+    assertReadRecordsError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = true)
+    assertReadRecordsError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = true)
   }
 
   @Test
@@ -384,7 +384,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = true)
 
     def assertFetchOffsetError(error: Errors,
-                               currentLeaderEpochOpt: Optional[Integer]): Unit = {
+                               currentLeaderEpochOpt: Option[Int]): Unit = {
       try {
         partition.fetchOffsetForTimestamp(0L,
           isolationLevel = None,
@@ -398,10 +398,10 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertFetchOffsetError(Errors.NONE, Optional.empty())
-    assertFetchOffsetError(Errors.NONE, Optional.of(leaderEpoch))
-    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1))
-    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1))
+    assertFetchOffsetError(Errors.NONE, Option.empty)
+    assertFetchOffsetError(Errors.NONE, Option(leaderEpoch))
+    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1))
+    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1))
   }
 
   @Test
@@ -410,7 +410,7 @@ class PartitionTest extends AbstractPartitionTest {
     val partition = setupPartitionWithMocks(leaderEpoch, isLeader = false)
 
     def assertFetchOffsetError(error: Errors,
-                               currentLeaderEpochOpt: Optional[Integer],
+                               currentLeaderEpochOpt: Option[Int],
                                fetchOnlyLeader: Boolean): Unit = {
       try {
         partition.fetchOffsetForTimestamp(0L,
@@ -425,15 +425,15 @@ class PartitionTest extends AbstractPartitionTest {
       }
     }
 
-    assertFetchOffsetError(Errors.NONE, Optional.empty(), fetchOnlyLeader = false)
-    assertFetchOffsetError(Errors.NONE, Optional.of(leaderEpoch), fetchOnlyLeader = false)
-    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = false)
-    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = false)
+    assertFetchOffsetError(Errors.NONE, Option.empty, fetchOnlyLeader = false)
+    assertFetchOffsetError(Errors.NONE, Option(leaderEpoch), fetchOnlyLeader = false)
+    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = false)
+    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = false)
 
-    assertFetchOffsetError(Errors.NOT_LEADER_FOR_PARTITION, Optional.empty(), fetchOnlyLeader = true)
-    assertFetchOffsetError(Errors.NOT_LEADER_FOR_PARTITION, Optional.of(leaderEpoch), fetchOnlyLeader = true)
-    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Optional.of(leaderEpoch - 1), fetchOnlyLeader = true)
-    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Optional.of(leaderEpoch + 1), fetchOnlyLeader = true)
+    assertFetchOffsetError(Errors.NOT_LEADER_FOR_PARTITION, Option.empty, fetchOnlyLeader = true)
+    assertFetchOffsetError(Errors.NOT_LEADER_FOR_PARTITION, Option(leaderEpoch), fetchOnlyLeader = true)
+    assertFetchOffsetError(Errors.FENCED_LEADER_EPOCH, Option(leaderEpoch - 1), fetchOnlyLeader = true)
+    assertFetchOffsetError(Errors.UNKNOWN_LEADER_EPOCH, Option(leaderEpoch + 1), fetchOnlyLeader = true)
   }
 
   @Test
@@ -443,13 +443,13 @@ class PartitionTest extends AbstractPartitionTest {
 
     val timestampAndOffsetOpt = partition.fetchOffsetForTimestamp(ListOffsetRequest.LATEST_TIMESTAMP,
       isolationLevel = None,
-      currentLeaderEpoch = Optional.empty(),
+      currentLeaderEpoch = Option.empty,
       fetchOnlyFromLeader = true)
 
     assertTrue(timestampAndOffsetOpt.isDefined)
 
     val timestampAndOffset = timestampAndOffsetOpt.get
-    assertEquals(Optional.of(leaderEpoch), timestampAndOffset.leaderEpoch)
+    assertEquals(Option(leaderEpoch), timestampAndOffset.leaderEpoch)
   }
 
   /**
@@ -511,7 +511,7 @@ class PartitionTest extends AbstractPartitionTest {
         Right(partition.fetchOffsetForTimestamp(
           timestamp = timestamp,
           isolationLevel = isolation,
-          currentLeaderEpoch = Optional.of(partition.getLeaderEpoch),
+          currentLeaderEpoch = Option(partition.getLeaderEpoch),
           fetchOnlyFromLeader = true
         ))
       } catch {
@@ -750,7 +750,7 @@ class PartitionTest extends AbstractPartitionTest {
     def fetchLatestOffset(isolationLevel: Option[IsolationLevel]): TimestampAndOffset = {
       val res = partition.fetchOffsetForTimestamp(ListOffsetRequest.LATEST_TIMESTAMP,
         isolationLevel = isolationLevel,
-        currentLeaderEpoch = Optional.empty(),
+        currentLeaderEpoch = Option.empty,
         fetchOnlyFromLeader = true)
       assertTrue(res.isDefined)
       res.get
@@ -759,7 +759,7 @@ class PartitionTest extends AbstractPartitionTest {
     def fetchEarliestOffset(isolationLevel: Option[IsolationLevel]): TimestampAndOffset = {
       val res = partition.fetchOffsetForTimestamp(ListOffsetRequest.EARLIEST_TIMESTAMP,
         isolationLevel = isolationLevel,
-        currentLeaderEpoch = Optional.empty(),
+        currentLeaderEpoch = Option.empty,
         fetchOnlyFromLeader = true)
       assertTrue(res.isDefined)
       res.get
@@ -959,7 +959,7 @@ class PartitionTest extends AbstractPartitionTest {
           // Acquire leaderIsrUpdate read lock of a different partition when completing delayed fetch
           val anotherPartition = (tp.partition + 1) % topicPartitions.size
           val partition = partitions(anotherPartition)
-          partition.fetchOffsetSnapshot(Optional.of(leaderEpoch), fetchOnlyFromLeader = true)
+          partition.fetchOffsetSnapshot(Option(leaderEpoch), fetchOnlyFromLeader = true)
         })
 
       partition.setLog(log, isFutureLog = false)

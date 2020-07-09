@@ -96,7 +96,7 @@ class ReplicaAlterLogDirsThreadTest {
 
     when(quotaManager.isQuotaExceeded).thenReturn(false)
 
-    when(partition.lastOffsetForLeaderEpoch(Optional.empty(), leaderEpoch, fetchOnlyFromLeader = false))
+    when(partition.lastOffsetForLeaderEpoch(Option.empty, leaderEpoch, fetchOnlyFromLeader = false))
       .thenReturn(new EpochEndOffset(leaderEpoch, logEndOffset))
     when(partition.futureLocalLogOrException).thenReturn(futureLog)
     doNothing().when(partition).truncateTo(offset = 0, isFuture = true)
@@ -185,7 +185,7 @@ class ReplicaAlterLogDirsThreadTest {
 
     when(quotaManager.isQuotaExceeded).thenReturn(false)
 
-    when(partition.lastOffsetForLeaderEpoch(Optional.empty(), leaderEpoch, fetchOnlyFromLeader = false))
+    when(partition.lastOffsetForLeaderEpoch(Option.empty, leaderEpoch, fetchOnlyFromLeader = false))
       .thenReturn(new EpochEndOffset(leaderEpoch, logEndOffset))
     when(partition.futureLocalLogOrException).thenReturn(futureLog)
     doNothing().when(partition).truncateTo(offset = 0, isFuture = true)
@@ -268,13 +268,13 @@ class ReplicaAlterLogDirsThreadTest {
     //Stubs
     expect(replicaManager.getPartitionOrException(t1p0, expectLeader = false))
       .andStubReturn(partitionT1p0)
-    expect(partitionT1p0.lastOffsetForLeaderEpoch(Optional.empty(), leaderEpochT1p0, fetchOnlyFromLeader = false))
+    expect(partitionT1p0.lastOffsetForLeaderEpoch(Option.empty, leaderEpochT1p0, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpochT1p0, leoT1p0))
       .anyTimes()
 
     expect(replicaManager.getPartitionOrException(t1p1, expectLeader = false))
       .andStubReturn(partitionT1p1)
-    expect(partitionT1p1.lastOffsetForLeaderEpoch(Optional.empty(), leaderEpochT1p1, fetchOnlyFromLeader = false))
+    expect(partitionT1p1.lastOffsetForLeaderEpoch(Option.empty, leaderEpochT1p1, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpochT1p1, leoT1p1))
       .anyTimes()
 
@@ -317,7 +317,7 @@ class ReplicaAlterLogDirsThreadTest {
     //Stubs
     expect(replicaManager.getPartitionOrException(t1p0, expectLeader = false))
       .andStubReturn(partitionT1p0)
-    expect(partitionT1p0.lastOffsetForLeaderEpoch(Optional.empty(), leaderEpoch, fetchOnlyFromLeader = false))
+    expect(partitionT1p0.lastOffsetForLeaderEpoch(Option.empty, leaderEpoch, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpoch, leo))
       .anyTimes()
 
@@ -392,14 +392,14 @@ class ReplicaAlterLogDirsThreadTest {
     expect(futureLogT1p0.latestEpoch).andReturn(Some(leaderEpoch)).anyTimes()
     expect(futureLogT1p0.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(futureReplicaLEO, leaderEpoch))).anyTimes()
-    expect(partitionT1p0.lastOffsetForLeaderEpoch(Optional.of(1), leaderEpoch, fetchOnlyFromLeader = false))
+    expect(partitionT1p0.lastOffsetForLeaderEpoch(Option(1), leaderEpoch, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpoch, replicaT1p0LEO))
       .anyTimes()
 
     expect(futureLogT1p1.latestEpoch).andReturn(Some(leaderEpoch)).anyTimes()
     expect(futureLogT1p1.endOffsetForEpoch(leaderEpoch)).andReturn(
       Some(OffsetAndEpoch(futureReplicaLEO, leaderEpoch))).anyTimes()
-    expect(partitionT1p1.lastOffsetForLeaderEpoch(Optional.of(1), leaderEpoch, fetchOnlyFromLeader = false))
+    expect(partitionT1p1.lastOffsetForLeaderEpoch(Option(1), leaderEpoch, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpoch, replicaT1p1LEO))
       .anyTimes()
 
@@ -463,14 +463,14 @@ class ReplicaAlterLogDirsThreadTest {
     expect(futureLog.latestEpoch).andReturn(Some(leaderEpoch - 2)).once()
 
     // leader replica truncated and fetched new offsets with new leader epoch
-    expect(partition.lastOffsetForLeaderEpoch(Optional.of(1), leaderEpoch, fetchOnlyFromLeader = false))
+    expect(partition.lastOffsetForLeaderEpoch(Option(1), leaderEpoch, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpoch - 1, replicaLEO))
       .anyTimes()
     // but future replica does not know about this leader epoch, so returns a smaller leader epoch
     expect(futureLog.endOffsetForEpoch(leaderEpoch - 1)).andReturn(
       Some(OffsetAndEpoch(futureReplicaLEO, leaderEpoch - 2))).anyTimes()
     // finally, the leader replica knows about the leader epoch and returns end offset
-    expect(partition.lastOffsetForLeaderEpoch(Optional.of(1), leaderEpoch - 2, fetchOnlyFromLeader = false))
+    expect(partition.lastOffsetForLeaderEpoch(Option(1), leaderEpoch - 2, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(leaderEpoch - 2, replicaEpochEndOffset))
       .anyTimes()
     expect(futureLog.endOffsetForEpoch(leaderEpoch - 2)).andReturn(
@@ -590,7 +590,7 @@ class ReplicaAlterLogDirsThreadTest {
     expect(replicaManager.localLog(t1p0)).andReturn(Some(log)).anyTimes()
 
     // this will cause fetchEpochsFromLeader return an error with undefined offset
-    expect(partition.lastOffsetForLeaderEpoch(Optional.of(1), futureReplicaLeaderEpoch, fetchOnlyFromLeader = false))
+    expect(partition.lastOffsetForLeaderEpoch(Option(1), futureReplicaLeaderEpoch, fetchOnlyFromLeader = false))
       .andReturn(new EpochEndOffset(Errors.REPLICA_NOT_AVAILABLE, UNDEFINED_EPOCH, UNDEFINED_EPOCH_OFFSET))
       .times(3)
       .andReturn(new EpochEndOffset(futureReplicaLeaderEpoch, replicaLEO))
@@ -657,7 +657,7 @@ class ReplicaAlterLogDirsThreadTest {
 
     expect(replicaManager.getPartitionOrException(t1p0, expectLeader = false))
         .andStubReturn(partition)
-    expect(partition.lastOffsetForLeaderEpoch(Optional.of(1), leaderEpoch, fetchOnlyFromLeader = false))
+    expect(partition.lastOffsetForLeaderEpoch(Option(1), leaderEpoch, fetchOnlyFromLeader = false))
         .andReturn(new EpochEndOffset(leaderEpoch, replicaLEO))
     expect(partition.truncateTo(futureReplicaLEO, isFuture = true)).once()
 

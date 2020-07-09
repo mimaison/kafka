@@ -1002,7 +1002,7 @@ class KafkaApis(val requestChannel: RequestChannel,
             val foundOpt = replicaManager.fetchOffsetForTimestamp(topicPartition,
               partition.timestamp,
               isolationLevelOpt,
-              if (partition.currentLeaderEpoch == ListOffsetResponse.UNKNOWN_EPOCH) Optional.empty() else Optional.of(partition.currentLeaderEpoch),
+              if (partition.currentLeaderEpoch == ListOffsetResponse.UNKNOWN_EPOCH) Option.empty else Option(partition.currentLeaderEpoch),
               fetchOnlyFromLeader)
   
             val response = foundOpt match {

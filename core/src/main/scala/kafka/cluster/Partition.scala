@@ -334,8 +334,8 @@ class Partition(val topicPartition: TopicPartition,
     throw new ReplicaNotAvailableException(s"Replica with id $replicaId is not available on broker $localBrokerId")
   }
 
-  private def checkCurrentLeaderEpoch(remoteLeaderEpochOpt: Optional[Integer]): Errors = {
-    if (!remoteLeaderEpochOpt.isPresent) {
+  private def checkCurrentLeaderEpoch(remoteLeaderEpochOpt: Option[Int]): Errors = {
+    if (remoteLeaderEpochOpt.isEmpty) {
       Errors.NONE
     } else {
       val remoteLeaderEpoch = remoteLeaderEpochOpt.get
@@ -349,7 +349,7 @@ class Partition(val topicPartition: TopicPartition,
     }
   }
 
-  private def getLocalLog(currentLeaderEpoch: Optional[Integer],
+  private def getLocalLog(currentLeaderEpoch: Option[Int],
                           requireLeader: Boolean): Either[Log, Errors] = {
     checkCurrentLeaderEpoch(currentLeaderEpoch) match {
       case Errors.NONE =>
@@ -390,7 +390,7 @@ class Partition(val topicPartition: TopicPartition,
    */
   def isLeader: Boolean = leaderReplicaIdOpt.contains(localBrokerId)
 
-  private def localLogWithEpochOrException(currentLeaderEpoch: Optional[Integer],
+  private def localLogWithEpochOrException(currentLeaderEpoch: Option[Int],
                                            requireLeader: Boolean): Log = {
     getLocalLog(currentLeaderEpoch, requireLeader) match {
       case Left(localLog) => localLog
@@ -1004,7 +1004,7 @@ class Partition(val topicPartition: TopicPartition,
   }
 
   def readRecords(fetchOffset: Long,
-                  currentLeaderEpoch: Optional[Integer],
+                  currentLeaderEpoch: Option[Int],
                   maxBytes: Int,
                   fetchIsolation: FetchIsolation,
                   fetchOnlyFromLeader: Boolean,
@@ -1030,7 +1030,7 @@ class Partition(val topicPartition: TopicPartition,
 
   def fetchOffsetForTimestamp(timestamp: Long,
                               isolationLevel: Option[IsolationLevel],
-                              currentLeaderEpoch: Optional[Integer],
+                              currentLeaderEpoch: Option[Int],
                               fetchOnlyFromLeader: Boolean): Option[TimestampAndOffset] = inReadLock(leaderIsrUpdateLock) {
     // decide whether to only fetch from leader
     val localLog = localLogWithEpochOrException(currentLeaderEpoch, fetchOnlyFromLeader)
@@ -1041,7 +1041,7 @@ class Partition(val topicPartition: TopicPartition,
       case None => localLog.logEndOffset
     }
 
-    val epochLogString = if(currentLeaderEpoch.isPresent) {
+    val epochLogString = if(currentLeaderEpoch.isDefined) {
       s"epoch ${currentLeaderEpoch.get}"
     } else {
       "unknown epoch"
@@ -1074,7 +1074,7 @@ class Partition(val topicPartition: TopicPartition,
     }
   }
 
-  def fetchOffsetSnapshot(currentLeaderEpoch: Optional[Integer],
+  def fetchOffsetSnapshot(currentLeaderEpoch: Option[Int],
                           fetchOnlyFromLeader: Boolean): LogOffsetSnapshot = inReadLock(leaderIsrUpdateLock) {
     // decide whether to only fetch from leader
     val localLog = localLogWithEpochOrException(currentLeaderEpoch, fetchOnlyFromLeader)
@@ -1085,7 +1085,7 @@ class Partition(val topicPartition: TopicPartition,
                                      maxNumOffsets: Int,
                                      isFromConsumer: Boolean,
                                      fetchOnlyFromLeader: Boolean): Seq[Long] = inReadLock(leaderIsrUpdateLock) {
-    val localLog = localLogWithEpochOrException(Optional.empty(), fetchOnlyFromLeader)
+    val localLog = localLogWithEpochOrException(Option.empty, fetchOnlyFromLeader)
     val allOffsets = localLog.legacyFetchOffsetsBefore(timestamp, maxNumOffsets)
 
     if (!isFromConsumer) {
@@ -1175,7 +1175,7 @@ class Partition(val topicPartition: TopicPartition,
    *         offset of the first leader epoch larger than the leader epoch, or else the log end
    *         offset if the leader epoch is the latest leader epoch.
    */
-  def lastOffsetForLeaderEpoch(currentLeaderEpoch: Optional[Integer],
+  def lastOffsetForLeaderEpoch(currentLeaderEpoch: Option[Int],
                                leaderEpoch: Int,
                                fetchOnlyFromLeader: Boolean): EpochEndOffset = {
     inReadLock(leaderIsrUpdateLock) {

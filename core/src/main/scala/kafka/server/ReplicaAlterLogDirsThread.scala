@@ -168,7 +168,7 @@ class ReplicaAlterLogDirsThread(name: String,
         } else {
           val partition = replicaMgr.getPartitionOrException(tp, expectLeader = false)
           partition.lastOffsetForLeaderEpoch(
-            currentLeaderEpoch = epochData.currentLeaderEpoch,
+            currentLeaderEpoch = if (epochData.currentLeaderEpoch.isPresent) Some(epochData.currentLeaderEpoch.get.intValue()) else None,
             leaderEpoch = epochData.leaderEpoch,
             fetchOnlyFromLeader = false)
         }

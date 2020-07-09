@@ -161,7 +161,7 @@ class ReplicaManagerQuotasTest {
         logEndOffset = endOffsetMetadata,
         highWatermark = endOffsetMetadata,
         lastStableOffset = endOffsetMetadata)
-      EasyMock.expect(partition.fetchOffsetSnapshot(Optional.empty(), fetchOnlyFromLeader = true))
+      EasyMock.expect(partition.fetchOffsetSnapshot(Option.empty, fetchOnlyFromLeader = true))
           .andReturn(offsetSnapshot)
 
       val replicaManager: ReplicaManager = EasyMock.createMock(classOf[ReplicaManager])

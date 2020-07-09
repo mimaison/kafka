@@ -3460,7 +3460,7 @@ public class KafkaAdminClientTest {
                          .setTimestamp(timestamp)
                          .setOffset(offset)
                          .setLeaderEpoch(epoch)));
-     }
+    }
 
     @Test
     public void testGetSubLevelError() {
