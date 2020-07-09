@@ -975,16 +975,6 @@ public class Fetcher<K, V> implements Closeable {
         return new ArrayList<ListOffsetTopic>(topics.values());
     }
 
-    private static Map<TopicPartition, ListOffsetPartitionResponse> byTopicPartitions(List<ListOffsetTopicResponse> topics) {
-        Map<TopicPartition, ListOffsetPartitionResponse> partitionsData = new HashMap<>();
-        for (ListOffsetTopicResponse topic : topics) {
-            for (ListOffsetPartitionResponse partition : topic.partitions()) {
-                partitionsData.put(new TopicPartition(topic.name(), partition.partitionIndex()), partition);
-            }
-        }
-        return partitionsData;
-    }
-
     /**
      * Send the ListOffsetRequest to a specific broker for the partitions and target timestamps.
      *
@@ -1007,14 +997,13 @@ public class Fetcher<K, V> implements Closeable {
                     public void onSuccess(ClientResponse response, RequestFuture<ListOffsetResult> future) {
                         ListOffsetResponse lor = (ListOffsetResponse) response.responseBody();
                         log.trace("Received ListOffsetResponse {} from broker {}", lor, node);
-                        handleListOffsetResponse(timestampsToSearch, lor, future);
+                        handleListOffsetResponse(lor, future);
                     }
                 });
     }
 
     /**
      * Callback for the response of the list offset call above.
-     * @param timestampsToSearch The mapping from partitions to target timestamps
      * @param listOffsetResponse The response from the server.
      * @param future The future to be completed when the response returns. Note that any partition-level errors will
      *               generally fail the entire future result. The one exception is UNSUPPORTED_FOR_MESSAGE_FORMAT,
@@ -1023,79 +1012,78 @@ public class Fetcher<K, V> implements Closeable {
      *               value of each partition may be null only for v0. In v1 and later the ListOffset API would not
      *               return a null timestamp (-1 is returned instead when necessary).
      */
-    private void handleListOffsetResponse(Map<TopicPartition, ListOffsetPartition> timestampsToSearch,
-                                          ListOffsetResponse listOffsetResponse,
+    private void handleListOffsetResponse(ListOffsetResponse listOffsetResponse,
                                           RequestFuture<ListOffsetResult> future) {
         Map<TopicPartition, ListOffsetData> fetchedOffsets = new HashMap<>();
         Set<TopicPartition> partitionsToRetry = new HashSet<>();
         Set<String> unauthorizedTopics = new HashSet<>();
 
-        Map<TopicPartition, ListOffsetPartitionResponse> partitionsData = byTopicPartitions(listOffsetResponse.topics());
-        for (Map.Entry<TopicPartition, ListOffsetPartition> entry : timestampsToSearch.entrySet()) {
-            TopicPartition topicPartition = entry.getKey();
-            ListOffsetPartitionResponse partitionData = partitionsData.get(topicPartition);
-            Errors error = Errors.forCode(partitionData.errorCode());
-            switch (error) {
-                case NONE:
-                    if (!partitionData.oldStyleOffsets().isEmpty()) {
-                        // Handle v0 response with offsets
-                        long offset;
-                        if (partitionData.oldStyleOffsets().size() > 1) {
-                            future.raise(new IllegalStateException("Unexpected partitionData response of length " +
-                                                                       partitionData.oldStyleOffsets().size()));
-                            return;
+        for (ListOffsetTopicResponse topic : listOffsetResponse.topics()) {
+            for (ListOffsetPartitionResponse partitionData : topic.partitions()) {
+                TopicPartition topicPartition = new TopicPartition(topic.name(), partitionData.partitionIndex());
+                Errors error = Errors.forCode(partitionData.errorCode());
+                switch (error) {
+                    case NONE:
+                        if (!partitionData.oldStyleOffsets().isEmpty()) {
+                            // Handle v0 response with offsets
+                            long offset;
+                            if (partitionData.oldStyleOffsets().size() > 1) {
+                                future.raise(new IllegalStateException("Unexpected partitionData response of length " +
+                                                                           partitionData.oldStyleOffsets().size()));
+                                return;
+                            } else {
+                                offset = partitionData.oldStyleOffsets().get(0);
+                            }
+                            log.debug("Handling v0 ListOffsetResponse response for {}. Fetched offset {}",
+                                topicPartition, offset);
+                            if (offset != ListOffsetResponse.UNKNOWN_OFFSET) {
+                                ListOffsetData offsetData = new ListOffsetData(offset, null, Optional.empty());
+                                fetchedOffsets.put(topicPartition, offsetData);
+                            }
                         } else {
-                            offset = partitionData.oldStyleOffsets().get(0);
+                            // Handle v1 and later response or v0 without offsets
+                            log.debug("Handling ListOffsetResponse response for {}. Fetched offset {}, timestamp {}",
+                                topicPartition, partitionData.offset(), partitionData.timestamp());
+                            if (partitionData.offset() != ListOffsetResponse.UNKNOWN_OFFSET) {
+                                Optional<Integer> leaderEpoch = (partitionData.leaderEpoch() == ListOffsetResponse.UNKNOWN_EPOCH)
+                                        ? Optional.empty()
+                                        : Optional.of(partitionData.leaderEpoch());
+                                ListOffsetData offsetData = new ListOffsetData(partitionData.offset(), partitionData.timestamp(),
+                                    leaderEpoch);
+                                fetchedOffsets.put(topicPartition, offsetData);
+                            }
                         }
-                        log.debug("Handling v0 ListOffsetResponse response for {}. Fetched offset {}",
-                            topicPartition, offset);
-                        if (offset != ListOffsetResponse.UNKNOWN_OFFSET) {
-                            ListOffsetData offsetData = new ListOffsetData(offset, null, Optional.empty());
-                            fetchedOffsets.put(topicPartition, offsetData);
-                        }
-                    } else {
-                        // Handle v1 and later response or v0 without offsets
-                        log.debug("Handling ListOffsetResponse response for {}. Fetched offset {}, timestamp {}",
-                            topicPartition, partitionData.offset(), partitionData.timestamp());
-                        if (partitionData.offset() != ListOffsetResponse.UNKNOWN_OFFSET) {
-                            Optional<Integer> leaderEpoch = (partitionData.leaderEpoch() == ListOffsetResponse.UNKNOWN_EPOCH)
-                                    ? Optional.empty()
-                                    : Optional.of(partitionData.leaderEpoch());
-                            ListOffsetData offsetData = new ListOffsetData(partitionData.offset(), partitionData.timestamp(),
-                                leaderEpoch);
-                            fetchedOffsets.put(topicPartition, offsetData);
-                        }
-                    }
-                    break;
-                case UNSUPPORTED_FOR_MESSAGE_FORMAT:
-                    // The message format on the broker side is before 0.10.0, which means it does not
-                    // support timestamps. We treat this case the same as if we weren't able to find an
-                    // offset corresponding to the requested timestamp and leave it out of the result.
-                    log.debug("Cannot search by timestamp for partition {} because the message format version " +
-                                  "is before 0.10.0", topicPartition);
-                    break;
-                case NOT_LEADER_FOR_PARTITION:
-                case REPLICA_NOT_AVAILABLE:
-                case KAFKA_STORAGE_ERROR:
-                case OFFSET_NOT_AVAILABLE:
-                case LEADER_NOT_AVAILABLE:
-                case FENCED_LEADER_EPOCH:
-                case UNKNOWN_LEADER_EPOCH:
-                    log.debug("Attempt to fetch offsets for partition {} failed due to {}, retrying.",
-                        topicPartition, error);
-                    partitionsToRetry.add(topicPartition);
-                    break;
-                case UNKNOWN_TOPIC_OR_PARTITION:
-                    log.warn("Received unknown topic or partition error in ListOffset request for partition {}", topicPartition);
-                    partitionsToRetry.add(topicPartition);
-                    break;
-                case TOPIC_AUTHORIZATION_FAILED:
-                    unauthorizedTopics.add(topicPartition.topic());
-                    break;
-                default:
-                    log.warn("Attempt to fetch offsets for partition {} failed due to unexpected exception: {}, retrying.",
-                        topicPartition, error.message());
-                    partitionsToRetry.add(topicPartition);
+                        break;
+                    case UNSUPPORTED_FOR_MESSAGE_FORMAT:
+                        // The message format on the broker side is before 0.10.0, which means it does not
+                        // support timestamps. We treat this case the same as if we weren't able to find an
+                        // offset corresponding to the requested timestamp and leave it out of the result.
+                        log.debug("Cannot search by timestamp for partition {} because the message format version " +
+                                      "is before 0.10.0", topicPartition);
+                        break;
+                    case NOT_LEADER_FOR_PARTITION:
+                    case REPLICA_NOT_AVAILABLE:
+                    case KAFKA_STORAGE_ERROR:
+                    case OFFSET_NOT_AVAILABLE:
+                    case LEADER_NOT_AVAILABLE:
+                    case FENCED_LEADER_EPOCH:
+                    case UNKNOWN_LEADER_EPOCH:
+                        log.debug("Attempt to fetch offsets for partition {} failed due to {}, retrying.",
+                            topicPartition, error);
+                        partitionsToRetry.add(topicPartition);
+                        break;
+                    case UNKNOWN_TOPIC_OR_PARTITION:
+                        log.warn("Received unknown topic or partition error in ListOffset request for partition {}", topicPartition);
+                        partitionsToRetry.add(topicPartition);
+                        break;
+                    case TOPIC_AUTHORIZATION_FAILED:
+                        unauthorizedTopics.add(topicPartition.topic());
+                        break;
+                    default:
+                        log.warn("Attempt to fetch offsets for partition {} failed due to unexpected exception: {}, retrying.",
+                            topicPartition, error.message());
+                        partitionsToRetry.add(topicPartition);
+                }
             }
         }
 
