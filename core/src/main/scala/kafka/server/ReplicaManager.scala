@@ -17,6 +17,7 @@
 package kafka.server
 
 import java.io.File
+import java.util.Optional
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong}
 import java.util.concurrent.locks.Lock
@@ -60,7 +61,6 @@ import org.apache.kafka.common.utils.Time
 import scala.jdk.CollectionConverters._
 import scala.collection.{Map, Seq, Set, mutable}
 import scala.compat.java8.OptionConverters._
-import java.util.Optional
 
 /*
  * Result metadata of a log append operation on the log
