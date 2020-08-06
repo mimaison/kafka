@@ -119,7 +119,7 @@ class SocketServer(val config: KafkaConfig,
     this.synchronized {
       connectionQuotas = new ConnectionQuotas(config, time)
       createControlPlaneAcceptorAndProcessor(config.controlPlaneListener)
-      createDataPlaneAcceptorsAndProcessors(config.numNetworkThreads, config.dataPlaneListeners)
+      createDataPlaneAcceptorsAndProcessors(config, config.dataPlaneListeners)
       if (startProcessingRequests) {
         this.startProcessingRequests()
       }
@@ -243,12 +243,13 @@ class SocketServer(val config: KafkaConfig,
 
   private def endpoints = config.listeners.map(l => l.listenerName -> l).toMap
 
-  private def createDataPlaneAcceptorsAndProcessors(dataProcessorsPerListener: Int,
+  private def createDataPlaneAcceptorsAndProcessors(config: KafkaConfig,
                                                     endpoints: Seq[EndPoint]): Unit = {
     endpoints.foreach { endpoint =>
+      val parsedConfigs = config.valuesWithPrefixOverride(endpoint.listenerName.configPrefix)
       connectionQuotas.addListener(config, endpoint.listenerName)
       val dataPlaneAcceptor = createAcceptor(endpoint, DataPlaneMetricPrefix)
-      addDataPlaneProcessors(dataPlaneAcceptor, endpoint, dataProcessorsPerListener)
+      addDataPlaneProcessors(dataPlaneAcceptor, endpoint, parsedConfigs.get(KafkaConfig.NumNetworkThreadsProp).asInstanceOf[Int])
       dataPlaneAcceptors.put(endpoint, dataPlaneAcceptor)
       info(s"Created data-plane acceptor and processors for endpoint : ${endpoint.listenerName}")
     }
@@ -308,14 +309,30 @@ class SocketServer(val config: KafkaConfig,
     info("Stopped socket server request processors")
   }
 
-  def resizeThreadPool(oldNumNetworkThreads: Int, newNumNetworkThreads: Int): Unit = synchronized {
-    info(s"Resizing network thread pool size for each data-plane listener from $oldNumNetworkThreads to $newNumNetworkThreads")
-    if (newNumNetworkThreads > oldNumNetworkThreads) {
-      dataPlaneAcceptors.forEach { (endpoint, acceptor) =>
+//  def resizeThreadPool(oldNumNetworkThreads: Int, newNumNetworkThreads: Int): Unit = synchronized {
+//    info(s"Resizing network thread pool size for each data-plane listener from $oldNumNetworkThreads to $newNumNetworkThreads")
+//    if (newNumNetworkThreads > oldNumNetworkThreads) {
+//      dataPlaneAcceptors.forEach { (endpoint, acceptor) =>
+//        addDataPlaneProcessors(acceptor, endpoint, newNumNetworkThreads - oldNumNetworkThreads)
+//      }
+//    } else if (newNumNetworkThreads < oldNumNetworkThreads)
+//      dataPlaneAcceptors.asScala.values.foreach(_.removeProcessors(oldNumNetworkThreads - newNumNetworkThreads, dataPlaneRequestChannel))
+//  }
+
+  def resizeThreadPool(oldConfig: KafkaConfig, newConfig: KafkaConfig): Unit = synchronized {
+    dataPlaneAcceptors.forEach { (endpoint, acceptor) =>
+      val parsedOldConfig = oldConfig.valuesWithPrefixOverride(endpoint.listenerName.configPrefix)
+      val parsedNewConfig = newConfig.valuesWithPrefixOverride(endpoint.listenerName.configPrefix)
+      val oldNumNetworkThreads = parsedOldConfig.get(KafkaConfig.NumNetworkThreadsProp).asInstanceOf[Int]
+      val newNumNetworkThreads = parsedNewConfig.get(KafkaConfig.NumNetworkThreadsProp).asInstanceOf[Int]
+
+      info(s"Resizing network thread pool size for each data-plane listener from $oldNumNetworkThreads to $newNumNetworkThreads")
+      if (newNumNetworkThreads > oldNumNetworkThreads) {
         addDataPlaneProcessors(acceptor, endpoint, newNumNetworkThreads - oldNumNetworkThreads)
+      } else if (newNumNetworkThreads < oldNumNetworkThreads) {
+        acceptor.removeProcessors(oldNumNetworkThreads - newNumNetworkThreads, dataPlaneRequestChannel)
       }
-    } else if (newNumNetworkThreads < oldNumNetworkThreads)
-      dataPlaneAcceptors.asScala.values.foreach(_.removeProcessors(oldNumNetworkThreads - newNumNetworkThreads, dataPlaneRequestChannel))
+    }
   }
 
   /**
@@ -349,7 +366,7 @@ class SocketServer(val config: KafkaConfig,
 
   def addListeners(listenersAdded: Seq[EndPoint]): Unit = synchronized {
     info(s"Adding data-plane listeners for endpoints $listenersAdded")
-    createDataPlaneAcceptorsAndProcessors(config.numNetworkThreads, listenersAdded)
+    createDataPlaneAcceptorsAndProcessors(config, listenersAdded)
     listenersAdded.foreach { endpoint =>
       val acceptor = dataPlaneAcceptors.get(endpoint)
       startAcceptorAndProcessors(DataPlaneThreadPrefix, endpoint, acceptor)
