@@ -32,7 +32,7 @@ public class MMAssignorTest {
     public void testAssignReplicasToBrokersEmptyCluster() {
         List<Node> nodes = buildNodes(1);
         Cluster cluster = buildCluster(nodes, Collections.emptyList());
-        Map<Integer, List<Integer>> assignment = assignor.assignReplicasToBrokers("topic", 1, 3, cluster, principal);
+        Map<Integer, List<Integer>> assignment = assignor.assignReplicasToBrokers("topic", 1, 3, 0, cluster, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.get(0);
         assertNotNull(replicas);
