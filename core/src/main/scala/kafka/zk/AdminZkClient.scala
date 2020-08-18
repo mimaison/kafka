@@ -30,6 +30,7 @@ import org.apache.kafka.common.internals.Topic
 import org.apache.zookeeper.KeeperException.NodeExistsException
 
 import scala.collection.{Map, Seq}
+import scala.jdk.CollectionConverters._
 import org.apache.kafka.server.ReplicaAssignor
 import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.security.auth.KafkaPrincipal
@@ -209,11 +210,9 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
     }
 
     val proposedAssignmentForNewPartitions = replicaAssignment.getOrElse {
-      replicaAssignor.assignReplicasToBrokers(topic, partitionsToAdd, existingAssignmentPartition0.size, existingAssignment.size, cluster, principal)
-      //TODO
-      val startIndex = math.max(0, allBrokers.indexWhere(_.id >= existingAssignmentPartition0.head))
-      AdminUtils.assignReplicasToBrokers(allBrokers, partitionsToAdd, existingAssignmentPartition0.size,
-        startIndex, existingAssignment.size)
+      val partitions = List.range(existingAssignment.size, partitionsToAdd).map(Integer.valueOf)
+      val assignment = replicaAssignor.assignReplicasToBrokers(topic, partitions.asJava, existingAssignmentPartition0.size, cluster, principal)
+      assignment.asScala.map { case (k, v) => (k.toInt, v.asScala.map(i => i.toInt)) }
     }
 
     val proposedAssignment = existingAssignment ++ proposedAssignmentForNewPartitions.map { case (tp, replicas) =>

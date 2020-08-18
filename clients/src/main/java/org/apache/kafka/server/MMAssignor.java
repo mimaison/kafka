@@ -14,8 +14,8 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 public class MMAssignor implements ReplicaAssignor {
 
     @Override
-    public Map<Integer, List<Integer>> assignReplicasToBrokers(String topicName, Integer numPartitions,
-            Integer replicationFactor, Integer startPartitionIndex, Cluster cluster, KafkaPrincipal principal) {
+    public Map<Integer, List<Integer>> assignReplicasToBrokers(String topicName, List<Integer> partitions,
+            int replicationFactor, Cluster cluster, KafkaPrincipal principal) {
 
         Map<Integer, List<Integer>> assignment = new HashMap<>();
         Map<Integer, Integer> partitionsByBroker = new HashMap<>();
@@ -31,8 +31,8 @@ public class MMAssignor implements ReplicaAssignor {
                 for (Node replica : pInfo.replicas()) {
                     if (replica.id() == node.id()) continue;
                     partitionsByBroker.putIfAbsent(replica.id(), 0);
-                    int partitions = partitionsByBroker.get(replica.id());
-                    partitionsByBroker.put(replica.id(), partitions + 1);
+                    int partition = partitionsByBroker.get(replica.id());
+                    partitionsByBroker.put(replica.id(), partition + 1);
                 }
             }
         }
@@ -42,7 +42,7 @@ public class MMAssignor implements ReplicaAssignor {
             throw new RuntimeException("Number of racks is different than requested replication factor");
         }
 
-        for (int i = 0; i < numPartitions; i++) {
+        for (Integer pId : partitions) {
             List<Integer> replicas = new ArrayList<>();
             for (int j = 0; j < replicationFactor; j++) {
                 String rack = racks.get(j);
@@ -51,7 +51,7 @@ public class MMAssignor implements ReplicaAssignor {
                 replicas.add(leastLoadedBroker);
                 partitionsByBroker.put(leastLoadedBroker, partitionsByBroker.get(leastLoadedBroker) + 1);
             }
-            assignment.put(i, ensureBrokerWithLeastLeadersIsLeader(replicas, leadersByBroker));
+            assignment.put(pId, ensureBrokerWithLeastLeadersIsLeader(replicas, leadersByBroker));
         }
 
         return assignment;

@@ -136,7 +136,8 @@ class AdminManager(val config: KafkaConfig,
           defaultReplicationFactor else topic.replicationFactor
 
         val assignments = if (topic.assignments().isEmpty) {
-          replicaAssignor.assignReplicasToBrokers(topic.name, resolvedNumPartitions, resolvedReplicationFactor, 0,
+          val partitions = List.range(0, resolvedNumPartitions).map(Integer.valueOf)
+          replicaAssignor.assignReplicasToBrokers(topic.name, partitions.asJava, resolvedReplicationFactor,
               cluster, requestContext.principal).asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
@@ -988,18 +989,18 @@ class AdminManager(val config: KafkaConfig,
 
 class DefaultReplicaAssignor extends ReplicaAssignor {
 
-  def assignReplicasToBrokers(topicName: String, numPartitions: Integer, replicationFactor: Integer, startPartitionIndex: Integer,
+  def assignReplicasToBrokers(topicName: String, partitions: java.util.List[Integer], replicationFactor: Int,
                               cluster: Cluster, principal: KafkaPrincipal): JMap[Integer, JList[Integer]] = {
     val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) };
-    val startPartitionId = if (startPartitionIndex == 0) -1 else startPartitionIndex
+    val startPartitionId = if (partitions.size == 0) -1 else partitions.size
     val fixedStartIndex =
-      if (startPartitionIndex == 0)
+      if (partitions.get(0) == 0)
         -1 
       else {
         val assignment = cluster.partitionsForTopic(topicName)
         val existingAssignmentPartition0 = assignment.asScala.find(p => p.partition == 0).get.replicas
         math.max(0, brokerMetadatas.indexWhere(_.id >= existingAssignmentPartition0.head.id))
       }
-    AdminUtils.assignReplicasToBrokers(brokerMetadatas, numPartitions, replicationFactor).map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }.asJava
+    AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions.size, replicationFactor).map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }.asJava
   }
 }
