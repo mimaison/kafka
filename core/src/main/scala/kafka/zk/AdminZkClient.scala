@@ -34,6 +34,7 @@ import scala.jdk.CollectionConverters._
 import org.apache.kafka.server.ReplicaAssignor
 import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.security.auth.KafkaPrincipal
+import kafka.server.DefaultReplicaAssignor
 
 /**
  * Provides admin related methods for interacting with ZooKeeper.
@@ -172,6 +173,14 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
     } else {
       throw new UnknownTopicOrPartitionException(s"Topic `$topic` to delete does not exist")
     }
+  }
+
+  def addPartitions(topic: String,
+                    existingAssignment: Map[Int, ReplicaAssignment],
+                    allBrokers: Seq[BrokerMetadata],
+                    numPartitions: Int,
+                    replicaAssignment: Option[Map[Int, Seq[Int]]]): Map[Int, Seq[Int]] = {
+    return addPartitions(new DefaultReplicaAssignor(), Cluster.empty, null, topic, existingAssignment, allBrokers, numPartitions, replicaAssignment, false)
   }
 
   /**

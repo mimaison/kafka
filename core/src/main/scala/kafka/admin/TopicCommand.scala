@@ -43,6 +43,8 @@ import scala.collection._
 import scala.compat.java8.OptionConverters._
 import scala.concurrent.ExecutionException
 import scala.io.StdIn
+import kafka.server.DefaultReplicaAssignor
+import org.apache.kafka.common.Cluster
 
 object TopicCommand extends Logging {
 
@@ -418,7 +420,7 @@ object TopicCommand extends Logging {
           val newAssignment = tp.replicaAssignment.getOrElse(Map()).drop(existingAssignment.size)
           val allBrokers = adminZkClient.getBrokerMetadatas()
           val partitions: Integer = tp.partitions.getOrElse(1)
-          adminZkClient.addPartitions(topic, existingAssignment, allBrokers, partitions, Option(newAssignment).filter(_.nonEmpty))
+          adminZkClient.addPartitions(new DefaultReplicaAssignor, Cluster.empty(), null, topic, existingAssignment, allBrokers, partitions, Option(newAssignment).filter(_.nonEmpty))
           println("Adding partitions succeeded!")
         }
       }

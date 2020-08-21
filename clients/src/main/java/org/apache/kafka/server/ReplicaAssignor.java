@@ -24,8 +24,17 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 
 public interface ReplicaAssignor {
 
+    /**
+     * Assigns the specified partitions to brokers
+     * @param topicName The name of the topic
+     * @param partitions The list of partitionIds that need an assignment
+     * @param replicationFactor The replication factor of the topic
+     * @param cluster The cluster metadata
+     * @param principal The principal of the user initiating the request
+     * @return A map of partitionId to list of assigned brokers
+     */
     public Map<Integer, List<Integer>> assignReplicasToBrokers(
-            String topicName, List<Integer> Partitions, int replicationFactor,
+            String topicName, List<Integer> partitions, int replicationFactor,
             Cluster cluster, KafkaPrincipal principal);
 
 }

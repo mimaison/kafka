@@ -18,7 +18,7 @@ package kafka.server
 
 import java.util.{Collections, Properties}
 
-import kafka.admin.{AdminOperationException, AdminUtils}
+import kafka.admin.AdminOperationException
 import kafka.common.TopicAlreadyMarkedForDeletionException
 import kafka.log.LogConfig
 import kafka.utils.Log4jController
@@ -27,6 +27,7 @@ import kafka.utils._
 import kafka.zk.{AdminZkClient, KafkaZkClient}
 import org.apache.kafka.clients.admin.AlterConfigOp
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType
+import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
 import org.apache.kafka.common.config.ConfigDef.ConfigKey
 import org.apache.kafka.common.config.{AbstractConfig, ConfigDef, ConfigException, ConfigResource, LogLevelConfig}
 import org.apache.kafka.common.errors.{ApiException, InvalidConfigurationException, InvalidPartitionsException, InvalidReplicaAssignmentException, InvalidRequestException, ReassignmentInProgressException, TopicExistsException, UnknownTopicOrPartitionException, UnsupportedVersionException}
@@ -38,6 +39,8 @@ import org.apache.kafka.common.message.DescribeConfigsResponseData
 import org.apache.kafka.common.message.DescribeConfigsRequestData.DescribeConfigsResource
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.network.ListenerName
+import org.apache.kafka.common.requests.RequestContext
+import org.apache.kafka.server.ReplicaAssignor
 import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
 import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 import org.apache.kafka.common.protocol.Errors
@@ -49,13 +52,6 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
-
-import org.apache.kafka.server.ReplicaAssignor
-import org.apache.kafka.common.requests.RequestContext
-import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
-import org.apache.kafka.common.security.auth.KafkaPrincipal
-import java.util.{Map => JMap}
-import java.util.{List => JList}
 
 
 class AdminManager(val config: KafkaConfig,
@@ -104,11 +100,9 @@ class AdminManager(val config: KafkaConfig,
                    includeConfigsAndMetatadata: Map[String, CreatableTopicResult],
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
 
-    // 1. map over topics creating assignment and calling zookeeper
-    val brokers = metadataCache.getAliveBrokers.map { b => kafka.admin.BrokerMetadata(b.id, b.rack) }
-    
     var cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
 
+    // 1. map over topics creating assignment and calling zookeeper
     val metadata = toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
@@ -237,13 +231,13 @@ class AdminManager(val config: KafkaConfig,
   }
 
   private def updateCluster(cluster: Cluster, topic: String, assignments: Map[Int, Seq[Int]]) : Cluster = {
-    var partitions = new java.util.ArrayList[PartitionInfo];
+    val partitions = new java.util.ArrayList[PartitionInfo]
 
-    cluster.topics.asScala.foreach{ t => 
+    cluster.topics.asScala.foreach { t =>
       partitions.addAll(cluster.partitionsForTopic(t))
     }
 
-    assignments.foreach{ case (k,v) => 
+    assignments.foreach{ case (k,v) =>
       val leader = cluster.nodeById(v.head)
       val replicas = v.map(i => cluster.nodeById(i)).toArray[Node]
       val partitionInfo = new PartitionInfo(topic, k, leader, replicas, replicas, new Array[Node](0))
@@ -355,6 +349,7 @@ class AdminManager(val config: KafkaConfig,
 
         val updatedReplicaAssignment = adminZkClient.addPartitions(replicaAssignor, cluster, requestContext.principal, topic, existingAssignment, allBrokers,
           newPartition.count, newPartitionsAssignment, validateOnly = validateOnly)
+        cluster = updateCluster(cluster, topic, updatedReplicaAssignment)
         CreatePartitionsMetadata(topic, updatedReplicaAssignment.keySet, ApiError.NONE)
       } catch {
         case e: AdminOperationException =>
@@ -984,23 +979,5 @@ class AdminManager(val config: KafkaConfig,
       }
       entry.entity -> apiError
     }.toMap
-  }
-}
-
-class DefaultReplicaAssignor extends ReplicaAssignor {
-
-  def assignReplicasToBrokers(topicName: String, partitions: java.util.List[Integer], replicationFactor: Int,
-                              cluster: Cluster, principal: KafkaPrincipal): JMap[Integer, JList[Integer]] = {
-    val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) };
-    val startPartitionId = if (partitions.size == 0) -1 else partitions.size
-    val fixedStartIndex =
-      if (partitions.get(0) == 0)
-        -1 
-      else {
-        val assignment = cluster.partitionsForTopic(topicName)
-        val existingAssignmentPartition0 = assignment.asScala.find(p => p.partition == 0).get.replicas
-        math.max(0, brokerMetadatas.indexWhere(_.id >= existingAssignmentPartition0.head.id))
-      }
-    AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions.size, replicationFactor).map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }.asJava
   }
 }
