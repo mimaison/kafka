@@ -18,7 +18,7 @@ package kafka.server
 
 import kafka.admin.AdminUtils
 
-import org.apache.kafka.server.ReplicaAssignor
+import org.apache.kafka.server.assignor.ReplicaAssignor
 import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.security.auth.KafkaPrincipal
 

@@ -31,6 +31,7 @@ import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
+import org.apache.kafka.server.assignor.ReplicaAssignor;
 import org.junit.Before;
 import org.junit.Test;
 

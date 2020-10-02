@@ -40,7 +40,8 @@ import org.apache.kafka.common.message.DescribeConfigsRequestData.DescribeConfig
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.requests.RequestContext
-import org.apache.kafka.server.ReplicaAssignor
+import org.apache.kafka.server.assignor.ReplicaAssignor
+import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignmentImpl
 import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
 import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 import org.apache.kafka.common.protocol.Errors
@@ -52,6 +53,11 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
+import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignment
+import java.util.HashMap
+import java.util.ArrayList
+import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignmentImpl
+import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignment
 
 
 class AdminManager(val config: KafkaConfig,
@@ -103,7 +109,9 @@ class AdminManager(val config: KafkaConfig,
     var cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling zookeeper
-    val metadata = toCreate.values.map(topic =>
+    val requestedAssignments = mutable.Map[String, RequestedAssignment]()
+    val assignments = mutable.Map[String, ComputedAssignment]()
+    toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
           throw new TopicExistsException(s"Topic '${topic.name}' already exists.")
@@ -123,36 +131,48 @@ class AdminManager(val config: KafkaConfig,
           throw new InvalidRequestException("Both numPartitions or replicationFactor and replicasAssignments were set. " +
             "Both cannot be used at the same time.")
         }
-
-        val resolvedNumPartitions = if (topic.numPartitions == NO_NUM_PARTITIONS)
-          defaultNumPartitions else topic.numPartitions
-        val resolvedReplicationFactor = if (topic.replicationFactor == NO_REPLICATION_FACTOR)
-          defaultReplicationFactor else topic.replicationFactor
-
-        val assignments = if (topic.assignments().isEmpty) {
-          val partitions = List.range(0, resolvedNumPartitions).map(Integer.valueOf)
-          replicaAssignor.assignReplicasToBrokers(topic.name, partitions.asJava, resolvedReplicationFactor,
-              cluster, requestContext.principal).asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
+        if (topic.numPartitions != NO_NUM_PARTITIONS && topic.replicationFactor != NO_REPLICATION_FACTOR) {
+          val map = new HashMap[String, String]()
+          configs.forEach((key, value) => map.put(key.toString, value.toString))
+          val partitions = new ArrayList[Integer]()
+          val assignment = new RequestedAssignmentImpl(
+              topic.name,
+              partitions,
+              topic.replicationFactor,
+              map)
+          requestedAssignments.put(topic.name, assignment)
         } else {
-          val assignments = new mutable.HashMap[Int, Seq[Int]]
-          // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
-          // this follows the existing logic in TopicCommand
-          topic.assignments.forEach { assignment =>
-            assignments(assignment.partitionIndex) = assignment.brokerIds.asScala.map(a => a: Int)
-          }
-          assignments
+          val assignment = new ComputedAssignmentImpl(topic.name, null)
+          assignments.put(topic.name, assignment)
         }
-        trace(s"Assignments for topic $topic are $assignments ")
 
+      } catch {
+        case e: Throwable => println(e)
+      }
+    )
+    
+    val computedAssignments = replicaAssignor.assignReplicasToBrokers(null, null, null)
+    computedAssignments.forEach((k, v) => assignments.put(k, v))
+
+    val metadata = assignments.map((topic, assignment) =>
+      try{
+        trace(s"Assignments for topic ${topic} are ${assignment} ")
+
+        val partitionReplicaAssignment = Map[Int, Seq[Int]]() //TODO from assignment
+        val configs = new Properties()
+        toCreate.get(topic).get.configs.forEach { entry =>
+          configs.setProperty(entry.name, entry.value)
+        }
         createTopicPolicy match {
           case Some(policy) =>
-            adminZkClient.validateTopicCreate(topic.name, assignments, configs)
+            
+            adminZkClient.validateTopicCreate(topic, partitionReplicaAssignment, configs)
 
             // Use `null` for unset fields in the public API
             val numPartitions: java.lang.Integer =
-              if (topic.assignments().isEmpty) resolvedNumPartitions else null
+              if (toCreate.get(topic).get.assignments.isEmpty) assignment.keySet.size else null
             val replicationFactor: java.lang.Short =
-              if (topic.assignments().isEmpty) resolvedReplicationFactor else null
+              if (toCreate.get(topic).get.assignments().isEmpty) resolvedReplicationFactor else null
             val javaAssignments = if (topic.assignments().isEmpty) {
               null
             } else {
@@ -162,22 +182,22 @@ class AdminManager(val config: KafkaConfig,
             }
             val javaConfigs = new java.util.HashMap[String, String]
             topic.configs.forEach(config => javaConfigs.put(config.name, config.value))
-            policy.validate(new RequestMetadata(topic.name, numPartitions, replicationFactor,
+            policy.validate(new RequestMetadata(topic, numPartitions, replicationFactor,
               javaAssignments, javaConfigs))
 
             if (!validateOnly)
-              adminZkClient.createTopicWithAssignment(topic.name, configs, assignments)
+              adminZkClient.createTopicWithAssignment(topic, configs, partitionReplicaAssignment)
 
           case None =>
             if (validateOnly)
-              adminZkClient.validateTopicCreate(topic.name, assignments, configs)
+              adminZkClient.validateTopicCreate(topic, partitionReplicaAssignment, configs)
             else
-              adminZkClient.createTopicWithAssignment(topic.name, configs, assignments)
+              adminZkClient.createTopicWithAssignment(topic, configs, partitionReplicaAssignment)
         }
-        cluster = updateCluster(cluster, topic.name, assignments)
+        cluster = updateCluster(cluster, topic, partitionReplicaAssignment)
 
         // For responses with DescribeConfigs permission, populate metadata and configs
-        includeConfigsAndMetatadata.get(topic.name).foreach { result =>
+        includeConfigsAndMetatadata.get(topic).foreach { result =>
           val logConfig = LogConfig.fromProps(KafkaServer.copyKafkaConfigToLog(config), configs)
           val createEntry = createTopicConfigEntry(logConfig, configs, includeSynonyms = false, includeDocumentation = false)(_, _)
           val topicConfigs = logConfig.values.asScala.map { case (k, v) =>
@@ -190,24 +210,24 @@ class AdminManager(val config: KafkaConfig,
                 .setConfigSource(entry.configSource)
           }.toList.asJava
           result.setConfigs(topicConfigs)
-          result.setNumPartitions(assignments.size)
-          result.setReplicationFactor(assignments(0).size.toShort)
+          result.setNumPartitions(partitionReplicaAssignment.size)
+          result.setReplicationFactor(partitionReplicaAssignment(0).size.toShort)
         }
-        CreatePartitionsMetadata(topic.name, assignments.keySet, ApiError.NONE)
+        CreatePartitionsMetadata(topic, partitionReplicaAssignment.keySet, ApiError.NONE)
       } catch {
         // Log client errors at a lower level than unexpected exceptions
         case e: TopicExistsException =>
-          debug(s"Topic creation failed since topic '${topic.name}' already exists.", e)
-          CreatePartitionsMetadata(topic.name, Set.empty, ApiError.fromThrowable(e))
+          debug(s"Topic creation failed since topic '$topic' already exists.", e)
+          CreatePartitionsMetadata(topic, Set.empty, ApiError.fromThrowable(e))
         case e: ApiException =>
           info(s"Error processing create topic request $topic", e)
-          CreatePartitionsMetadata(topic.name, Set.empty, ApiError.fromThrowable(e))
+          CreatePartitionsMetadata(topic, Set.empty, ApiError.fromThrowable(e))
         case e: ConfigException =>
           info(s"Error processing create topic request $topic", e)
-          CreatePartitionsMetadata(topic.name, Set.empty, ApiError.fromThrowable(new InvalidConfigurationException(e.getMessage, e.getCause)))
+          CreatePartitionsMetadata(topic, Set.empty, ApiError.fromThrowable(new InvalidConfigurationException(e.getMessage, e.getCause)))
         case e: Throwable =>
           error(s"Error processing create topic request $topic", e)
-          CreatePartitionsMetadata(topic.name, Set.empty, ApiError.fromThrowable(e))
+          CreatePartitionsMetadata(entry.topicName, Set.empty, ApiError.fromThrowable(e))
       }).toBuffer
 
     // 2. if timeout <= 0, validateOnly or no topics can proceed return immediately
