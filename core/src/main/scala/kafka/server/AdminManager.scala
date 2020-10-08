@@ -58,6 +58,14 @@ import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
 import org.apache.kafka.common.requests.RequestContext
 import org.apache.kafka.server.assignor.ReplicaAssignor
+import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignment
+import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignment
+import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignmentImpl
+import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignmentImpl
+import java.util.ArrayList
+import java.util.HashMap
+
+
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -144,7 +152,7 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(context: RequestContext, clusterId : String,
+  def createTopics(requestContext: RequestContext, clusterId : String,
                    timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
@@ -152,9 +160,13 @@ class AdminManager(val config: KafkaConfig,
                    controllerMutationQuota: ControllerMutationQuota,
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
 
+    val cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
+
     // 1. map over topics creating assignment and calling zookeeper
-    val brokers = metadataCache.getAliveBrokers.map { b => kafka.admin.BrokerMetadata(b.id, b.rack) }
-    val metadata = toCreate.values.map(topic =>
+    val requestedAssignments = mutable.Map[String, RequestedAssignment]()
+    val assignments = mutable.Map[String, ComputedAssignment]()
+    
+    toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
           throw new TopicExistsException(s"Topic '${topic.name}' already exists.")
@@ -169,41 +181,61 @@ class AdminManager(val config: KafkaConfig,
             "Both cannot be used at the same time.")
         }
 
+        val configs = new Properties()
+        topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
+
+        if (topic.numPartitions != NO_NUM_PARTITIONS && topic.replicationFactor != NO_REPLICATION_FACTOR) {
+          val map = new HashMap[String, String]()
+          configs.forEach((key, value) => map.put(key.toString, value.toString))
+          val partitions = new ArrayList[Integer]()
+          val assignment = new RequestedAssignmentImpl(
+              topic.name,
+              partitions,
+              topic.replicationFactor,
+              map)
+          requestedAssignments.put(topic.name, assignment)
+        } else {
+          val assignment = new ComputedAssignmentImpl(topic.name, null)
+          assignments.put(topic.name, assignment)
+        }
+
+      } catch {
+        case e: Throwable => println(e)
+      }
+    )
+
+    val computedAssignments = replicaAssignor.assignReplicasToBrokers(requestedAssignments.asJava, cluster, requestContext.principal)
+    computedAssignments.forEach((k, v) => assignments.put(k, v))
+
+    val metadata = assignments.map { case (topicName, assignment) => 
+      val topic = toCreate.get(topicName).get
+      try{
+        trace(s"Assignments for topic ${topicName} are ${assignment} ")
+
+        val partitionReplicaAssignment = Map[Int, Seq[Int]]() //TODO from assignment
+        val configs = new Properties()
+        
+        topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
+    
+        adminZkClient.validateTopicCreate(topic.name, partitionReplicaAssignment, configs)
+        
         val resolvedNumPartitions = if (topic.numPartitions == NO_NUM_PARTITIONS)
           defaultNumPartitions else topic.numPartitions
         val resolvedReplicationFactor = if (topic.replicationFactor == NO_REPLICATION_FACTOR)
           defaultReplicationFactor else topic.replicationFactor
-
-        val assignments = if (topic.assignments.isEmpty) {
-          AdminUtils.assignReplicasToBrokers(
-            brokers, resolvedNumPartitions, resolvedReplicationFactor)
-        } else {
-          val assignments = new mutable.HashMap[Int, Seq[Int]]
-          // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
-          // this follows the existing logic in TopicCommand
-          topic.assignments.forEach { assignment =>
-            assignments(assignment.partitionIndex) = assignment.brokerIds.asScala.map(a => a: Int)
-          }
-          assignments
-        }
-        trace(s"Assignments for topic $topic are $assignments ")
-
-        val configs = new Properties()
-        topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
-        adminZkClient.validateTopicCreate(topic.name, assignments, configs)
-        validateTopicCreatePolicy(topic, resolvedNumPartitions, resolvedReplicationFactor, assignments)
+        validateTopicCreatePolicy(topic, resolvedNumPartitions, resolvedReplicationFactor, partitionReplicaAssignment)
 
         // For responses with DescribeConfigs permission, populate metadata and configs. It is
         // safe to populate it before creating the topic because the values are unset if the
         // creation fails.
-        maybePopulateMetadataAndConfigs(includeConfigsAndMetadata, topic.name, configs, assignments)
+        maybePopulateMetadataAndConfigs(includeConfigsAndMetadata, topic.name, configs, partitionReplicaAssignment)
 
         if (validateOnly) {
-          CreatePartitionsMetadata(topic.name, assignments.keySet)
+          CreatePartitionsMetadata(topic.name, partitionReplicaAssignment.keySet)
         } else {
           controllerMutationQuota.record(assignments.size)
-          adminZkClient.createTopicWithAssignment(topic.name, configs, assignments, validate = false)
-          CreatePartitionsMetadata(topic.name, assignments.keySet)
+          adminZkClient.createTopicWithAssignment(topic.name, configs, partitionReplicaAssignment, validate = false)
+          CreatePartitionsMetadata(topic.name, partitionReplicaAssignment.keySet)
         }
       } catch {
         // Log client errors at a lower level than unexpected exceptions
@@ -222,7 +254,7 @@ class AdminManager(val config: KafkaConfig,
         case e: Throwable =>
           error(s"Error processing create topic request $topic", e)
           CreatePartitionsMetadata(topic.name, e)
-      }).toBuffer
+      }}.toBuffer
 
     // 2. if timeout <= 0, validateOnly or no topics can proceed return immediately
     if (timeout <= 0 || validateOnly || !metadata.exists(_.error.is(Errors.NONE))) {
