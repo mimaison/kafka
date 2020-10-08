@@ -100,10 +100,6 @@ public interface ReplicaAssignor {
      * @param principal The principal of the user initiating the request
      * @return A map of partitionId to list of assigned brokers
      */
-//    public Map<Integer, List<Integer>> assignReplicasToBrokers(
-//            String topicName, List<Integer> partitions, int replicationFactor,
-//            Cluster cluster, KafkaPrincipal principal);
-
     public Map<String, ComputedAssignment> assignReplicasToBrokers(
             Map<String, RequestedAssignment> requestedReplicaAssignment,
             Cluster cluster, KafkaPrincipal principal);

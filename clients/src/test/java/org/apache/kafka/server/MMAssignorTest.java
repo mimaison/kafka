@@ -38,7 +38,8 @@ import org.junit.Test;
 public class MMAssignorTest {
 
     private final KafkaPrincipal principal = new KafkaPrincipal("type", "name");
-    private ReplicaAssignor assignor;
+//    private ReplicaAssignor assignor;
+    private MMAssignor assignor;
 
     @Before
     public void setUp() {

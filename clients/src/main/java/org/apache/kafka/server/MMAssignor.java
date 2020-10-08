@@ -28,9 +28,9 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.server.assignor.ReplicaAssignor;
 
-public class MMAssignor implements ReplicaAssignor {
+public class MMAssignor /*implements ReplicaAssignor*/ {
 
-    @Override
+//    @Override
     public Map<Integer, List<Integer>> assignReplicasToBrokers(String topicName, List<Integer> partitions,
             int replicationFactor, Cluster cluster, KafkaPrincipal principal) {
 

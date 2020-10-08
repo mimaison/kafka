@@ -44,7 +44,7 @@ class LeaderEpochFileCache(topicPartition: TopicPartition,
   this.logIdent = s"[LeaderEpochCache $topicPartition] "
 
   private val lock = new ReentrantReadWriteLock()
-  private val epochs = new util.TreeMap[Int, EpochEntry]()
+  private val epochs = new java.util.TreeMap[Int, EpochEntry]()
 
   inWriteLock(lock) {
     checkpoint.read().foreach(assign)
@@ -120,7 +120,7 @@ class LeaderEpochFileCache(topicPartition: TopicPartition,
   }
 
   private def removeWhileMatching(
-    iterator: util.Iterator[util.Map.Entry[Int, EpochEntry]],
+    iterator: java.util.Iterator[java.util.Map.Entry[Int, EpochEntry]],
     predicate: EpochEntry => Boolean
   ): Seq[EpochEntry] = {
     val removedEpochs = mutable.ListBuffer.empty[EpochEntry]

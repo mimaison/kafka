@@ -19,7 +19,7 @@ package kafka.server
 import java.util
 import java.util.{Collections, Properties}
 
-import kafka.admin.AdminOperationException
+import kafka.admin.{AdminOperationException, AdminUtils}
 import kafka.common.TopicAlreadyMarkedForDeletionException
 import kafka.log.LogConfig
 import kafka.utils.Log4jController
@@ -30,7 +30,6 @@ import kafka.utils.Implicits._
 import kafka.zk.{AdminZkClient, KafkaZkClient}
 import org.apache.kafka.clients.admin.{AlterConfigOp, ScramMechanism}
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType
-import org.apache.kafka.common.{Cluster, Node, PartitionInfo}
 import org.apache.kafka.common.config.ConfigDef.ConfigKey
 import org.apache.kafka.common.config.{AbstractConfig, ConfigDef, ConfigException, ConfigResource, LogLevelConfig}
 import org.apache.kafka.common.errors.ThrottlingQuotaExceededException
@@ -45,10 +44,6 @@ import org.apache.kafka.common.message.DescribeConfigsRequestData.DescribeConfig
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData.CredentialInfo
 import org.apache.kafka.common.metrics.Metrics
 import org.apache.kafka.common.security.scram.internals.{ScramMechanism => InternalScramMechanism}
-import org.apache.kafka.common.network.ListenerName
-import org.apache.kafka.common.requests.RequestContext
-import org.apache.kafka.server.assignor.ReplicaAssignor
-import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignmentImpl
 import org.apache.kafka.server.policy.{AlterConfigPolicy, CreateTopicPolicy}
 import org.apache.kafka.server.policy.CreateTopicPolicy.RequestMetadata
 import org.apache.kafka.common.protocol.Errors
@@ -61,12 +56,8 @@ import org.apache.kafka.common.utils.Sanitizer
 
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
-import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignment
-import java.util.HashMap
-import java.util.ArrayList
-import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignmentImpl
-import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignment
-
+import org.apache.kafka.common.requests.RequestContext
+import org.apache.kafka.server.assignor.ReplicaAssignor
 
 class AdminManager(val config: KafkaConfig,
                    val metrics: Metrics,
@@ -153,7 +144,7 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(requestContext: RequestContext, clusterId : String,
+  def createTopics(context: RequestContext, clusterId : String,
                    timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
@@ -161,12 +152,9 @@ class AdminManager(val config: KafkaConfig,
                    controllerMutationQuota: ControllerMutationQuota,
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
 
-    var cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
-
     // 1. map over topics creating assignment and calling zookeeper
-    val requestedAssignments = mutable.Map[String, RequestedAssignment]()
-    val assignments = mutable.Map[String, ComputedAssignment]()
-    toCreate.values.map(topic =>
+    val brokers = metadataCache.getAliveBrokers.map { b => kafka.admin.BrokerMetadata(b.id, b.rack) }
+    val metadata = toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
           throw new TopicExistsException(s"Topic '${topic.name}' already exists.")
@@ -190,9 +178,15 @@ class AdminManager(val config: KafkaConfig,
           AdminUtils.assignReplicasToBrokers(
             brokers, resolvedNumPartitions, resolvedReplicationFactor)
         } else {
-          val assignment = new ComputedAssignmentImpl(topic.name, null)
-          assignments.put(topic.name, assignment)
+          val assignments = new mutable.HashMap[Int, Seq[Int]]
+          // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,
+          // this follows the existing logic in TopicCommand
+          topic.assignments.forEach { assignment =>
+            assignments(assignment.partitionIndex) = assignment.brokerIds.asScala.map(a => a: Int)
+          }
+          assignments
         }
+        trace(s"Assignments for topic $topic are $assignments ")
 
         val configs = new Properties()
         topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
@@ -251,24 +245,6 @@ class AdminManager(val config: KafkaConfig,
     }
   }
 
-  private def updateCluster(cluster: Cluster, topic: String, assignments: Map[Int, Seq[Int]]) : Cluster = {
-    val partitions = new java.util.ArrayList[PartitionInfo]
-
-    cluster.topics.asScala.foreach { t =>
-      partitions.addAll(cluster.partitionsForTopic(t))
-    }
-
-    assignments.foreach{ case (k,v) =>
-      val leader = cluster.nodeById(v.head)
-      val replicas = v.map(i => cluster.nodeById(i)).toArray[Node]
-      val partitionInfo = new PartitionInfo(topic, k, leader, replicas, replicas, new Array[Node](0))
-      partitions.add(partitionInfo)
-    }
-
-    new Cluster(cluster.clusterResource.clusterId, cluster.nodes(), partitions, 
-        cluster.unauthorizedTopics, cluster.internalTopics)
-  }
-
   /**
     * Delete topics and wait until the topics have been completely deleted.
     * The callback function will be triggered either when timeout, error or the topics are deleted.
@@ -316,14 +292,14 @@ class AdminManager(val config: KafkaConfig,
     }
   }
 
-  def createPartitions(requestContext: RequestContext, clusterId: String, timeout: Int,
+  def createPartitions(context: RequestContext, clusterId : String,
+                       timeout: Int,
                        newPartitions: Seq[CreatePartitionsTopic],
                        validateOnly: Boolean,
                        controllerMutationQuota: ControllerMutationQuota,
                        callback: Map[String, ApiError] => Unit): Unit = {
     val allBrokers = adminZkClient.getBrokerMetadatas()
     val allBrokerIds = allBrokers.map(_.id)
-    var cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling AdminUtils
     val metadata = newPartitions.map { newPartition =>
