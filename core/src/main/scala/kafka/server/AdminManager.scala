@@ -64,6 +64,7 @@ import org.apache.kafka.server.assignor.ReplicaAssignor.ComputedAssignmentImpl
 import org.apache.kafka.server.assignor.ReplicaAssignor.RequestedAssignmentImpl
 import java.util.ArrayList
 import java.util.HashMap
+import scala.collection.mutable.ListBuffer
 
 
 
@@ -165,7 +166,8 @@ class AdminManager(val config: KafkaConfig,
     // 1. map over topics creating assignment and calling zookeeper
     val requestedAssignments = mutable.Map[String, RequestedAssignment]()
     val assignments = mutable.Map[String, ComputedAssignment]()
-    
+
+    val metadata1 = new ListBuffer[CreatePartitionsMetadata]()
     toCreate.values.map(topic =>
       try {
         if (metadataCache.contains(topic.name))
@@ -200,19 +202,22 @@ class AdminManager(val config: KafkaConfig,
         }
 
       } catch {
-        case e: Throwable => println(e) //TODO MMEC a topic error should be added to the results map below
+        case e: Throwable => 
+          println(e) //TODO MMEC a topic error should be added to the results map below
+          metadata1 += CreatePartitionsMetadata(topic.name, e)
+        
       }
     )
 
     val computedAssignments = replicaAssignor.assignReplicasToBrokers(requestedAssignments.asJava, cluster, requestContext.principal)
     computedAssignments.forEach((k, v) => assignments.put(k, v))
 
-    val metadata = assignments.map { case (topicName, assignment) => 
+    val metadata2 = assignments.map { case (topicName, assignment) => 
       val topic = toCreate.get(topicName).get
       try{
         trace(s"Assignments for topic ${topicName} are ${assignment} ")
 
-        val partitionReplicaAssignment = Map[Int, Seq[Int]]() //TODO from assignment
+        val partitionReplicaAssignment = Map[Int, Seq[Int]]() //TODO MMEC from assignment
         val configs = new Properties()
         
         topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
@@ -256,6 +261,7 @@ class AdminManager(val config: KafkaConfig,
           CreatePartitionsMetadata(topic.name, e)
       }}.toBuffer
 
+    val metadata = metadata1 ++ metadata2
     // 2. if timeout <= 0, validateOnly or no topics can proceed return immediately
     if (timeout <= 0 || validateOnly || !metadata.exists(_.error.is(Errors.NONE))) {
       val results = metadata.map { createTopicMetadata =>
