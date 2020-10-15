@@ -327,7 +327,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
       }
       quotas.clientQuotaCallback.foreach { callback =>
-        if (callback.updateClusterMetadata(metadataCache.getClusterMetadata(clusterId, request.context.listenerName))) {
+        if (callback.updateClusterMetadata(metadataCache.getClusterMetadata(request.context.listenerName))) {
           quotas.fetch.updateQuotaMetricConfigs()
           quotas.produce.updateQuotaMetricConfigs()
           quotas.request.updateQuotaMetricConfigs()
@@ -1824,7 +1824,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         }
         sendResponseCallback(results)
       }
-      adminManager.createTopics(request.context, clusterId,
+      adminManager.createTopics(request.context,
           createTopicsRequest.data.timeoutMs,
           createTopicsRequest.data.validateOnly,
           toCreate,
@@ -1879,7 +1879,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         unauthorized.map(_.name -> new ApiError(Errors.TOPIC_AUTHORIZATION_FAILED, "The topic authorization is failed.")) ++
         queuedForDeletion.map(_.name -> new ApiError(Errors.INVALID_TOPIC_EXCEPTION, "The topic is queued for deletion."))
 
-      adminManager.createPartitions(request.context, clusterId, 
+      adminManager.createPartitions(request.context, 
         createPartitionsRequest.data.timeoutMs,
         valid,
         createPartitionsRequest.data.validateOnly,

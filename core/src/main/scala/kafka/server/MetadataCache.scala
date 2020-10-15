@@ -43,7 +43,7 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
  *  A cache for the state (e.g., current leader) of each partition. This cache is updated through
  *  UpdateMetadataRequest from the controller. Every broker maintains the same cache, asynchronously.
  */
-class MetadataCache(brokerId: Int) extends Logging {
+class MetadataCache(brokerId: Int, clusterId: String = "") extends Logging { //TODO MMEC no default clusterId
 
   private val partitionMetadataLock = new ReentrantReadWriteLock()
   //this is the cache state. every MetadataSnapshot instance is immutable, and updates (performed under a lock)
@@ -263,7 +263,7 @@ class MetadataCache(brokerId: Int) extends Logging {
 
   def getControllerId: Option[Int] = metadataSnapshot.controllerId
 
-  def getClusterMetadata(clusterId: String, listenerName: ListenerName): Cluster = {
+  def getClusterMetadata(listenerName: ListenerName): Cluster = {
     val snapshot = metadataSnapshot
     val nodes = snapshot.aliveNodes.map { case (id, nodes) => (id, nodes.get(listenerName).orNull) }
     def node(id: Integer): Node = nodes.get(id.toLong).orNull

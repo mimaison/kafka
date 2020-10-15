@@ -152,7 +152,7 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(requestContext: RequestContext, clusterId : String,
+  def createTopics(requestContext: RequestContext,
                    timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
@@ -160,7 +160,7 @@ class AdminManager(val config: KafkaConfig,
                    controllerMutationQuota: ControllerMutationQuota,
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
 
-    val cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
+    val cluster = metadataCache.getClusterMetadata(requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling zookeeper
     val requestedAssignments = mutable.Map[String, RequestedAssignment]()
@@ -187,7 +187,7 @@ class AdminManager(val config: KafkaConfig,
         if (topic.numPartitions != NO_NUM_PARTITIONS && topic.replicationFactor != NO_REPLICATION_FACTOR) {
           val map = new HashMap[String, String]()
           configs.forEach((key, value) => map.put(key.toString, value.toString))
-          val partitions = new ArrayList[Integer]()
+          val partitions = new ArrayList[Integer]() //TODO MMEC
           val assignment = new RequestedAssignmentImpl(
               topic.name,
               partitions,
@@ -195,12 +195,12 @@ class AdminManager(val config: KafkaConfig,
               map)
           requestedAssignments.put(topic.name, assignment)
         } else {
-          val assignment = new ComputedAssignmentImpl(topic.name, null)
+          val assignment = new ComputedAssignmentImpl(topic.name, null) //TODO MMEC
           assignments.put(topic.name, assignment)
         }
 
       } catch {
-        case e: Throwable => println(e)
+        case e: Throwable => println(e) //TODO MMEC a topic error should be added to the results map below
       }
     )
 
@@ -324,7 +324,7 @@ class AdminManager(val config: KafkaConfig,
     }
   }
 
-  def createPartitions(context: RequestContext, clusterId : String,
+  def createPartitions(context: RequestContext,
                        timeout: Int,
                        newPartitions: Seq[CreatePartitionsTopic],
                        validateOnly: Boolean,
