@@ -189,7 +189,7 @@ class AdminManager(val config: KafkaConfig,
         if (topic.assignments.isEmpty) {
           val topicConfigs = new HashMap[String, String]()
           configs.forEach((key, value) => topicConfigs.put(key.toString, value.toString))
-          val partitions = List.range(0, topic.numPartitions-1).map { i: Int => i : java.lang.Integer }.asJava
+          val partitions = List.range(0, topic.numPartitions-1).map { i => i : java.lang.Integer }.asJava
           val assignment = new RequestedAssignmentImpl(
               topic.name,
               partitions,
@@ -207,7 +207,7 @@ class AdminManager(val config: KafkaConfig,
 
       } catch {
         case e: Throwable => 
-          println(e) //TODO MMEC should we log as in the loop below
+          println(e) //TODO MMEC should we log as in the loop below ?
           metadata1 += CreatePartitionsMetadata(topic.name, e)
         
       }
