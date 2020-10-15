@@ -164,8 +164,8 @@ class AdminManager(val config: KafkaConfig,
     val cluster = metadataCache.getClusterMetadata(requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling zookeeper
-    val requestedAssignments = mutable.Map[String, RequestedAssignment]()
-    val assignments = mutable.Map[String, ComputedAssignment]()
+    val assignmentsToBeComputed = mutable.Map[String, RequestedAssignment]()
+    val assignmentsInRequest = mutable.Map[String, ComputedAssignment]()
 
     val metadata1 = new ListBuffer[CreatePartitionsMetadata]()
     toCreate.values.map(topic =>
@@ -178,7 +178,7 @@ class AdminManager(val config: KafkaConfig,
           throw new InvalidRequestException(s"Null value not supported for topic configs : ${nullConfigs.mkString(",")}")
 
         if ((topic.numPartitions != NO_NUM_PARTITIONS || topic.replicationFactor != NO_REPLICATION_FACTOR)
-            && !topic.assignments().isEmpty) {
+            && !topic.assignments.isEmpty) {
           throw new InvalidRequestException("Both numPartitions or replicationFactor and replicasAssignments were set. " +
             "Both cannot be used at the same time.")
         }
@@ -186,33 +186,38 @@ class AdminManager(val config: KafkaConfig,
         val configs = new Properties()
         topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
 
-        if (topic.numPartitions != NO_NUM_PARTITIONS && topic.replicationFactor != NO_REPLICATION_FACTOR) {
-          val map = new HashMap[String, String]()
-          configs.forEach((key, value) => map.put(key.toString, value.toString))
-          val partitions = new ArrayList[Integer]() //TODO MMEC
+        if (topic.assignments.isEmpty) {
+          val topicConfigs = new HashMap[String, String]()
+          configs.forEach((key, value) => topicConfigs.put(key.toString, value.toString))
+          val partitions = List.range(0, topic.numPartitions-1).map { i: Int => i : java.lang.Integer }.asJava
           val assignment = new RequestedAssignmentImpl(
               topic.name,
               partitions,
               topic.replicationFactor,
-              map)
-          requestedAssignments.put(topic.name, assignment)
+              topicConfigs)
+          assignmentsToBeComputed.put(topic.name, assignment)
         } else {
-          val assignment = new ComputedAssignmentImpl(topic.name, null) //TODO MMEC
-          assignments.put(topic.name, assignment)
+          // assignments specified in the request are treated as computed
+          val assignmentInReq = new java.util.HashMap[java.lang.Integer, java.util.List[java.lang.Integer]]
+          topic.assignments.forEach { creatableReplicaAssignment => 
+            assignmentInReq.put(creatableReplicaAssignment.partitionIndex(), creatableReplicaAssignment.brokerIds())
+          }
+          assignmentsInRequest.put(topic.name, new ComputedAssignmentImpl(topic.name, assignmentInReq))
         }
 
       } catch {
         case e: Throwable => 
-          println(e) //TODO MMEC a topic error should be added to the results map below
+          println(e) //TODO MMEC should we log as in the loop below
           metadata1 += CreatePartitionsMetadata(topic.name, e)
         
       }
     )
 
-    val computedAssignments = replicaAssignor.assignReplicasToBrokers(requestedAssignments.asJava, cluster, requestContext.principal)
-    computedAssignments.forEach((k, v) => assignments.put(k, v))
+    val computedAssignments = replicaAssignor.assignReplicasToBrokers(assignmentsToBeComputed.asJava, cluster, requestContext.principal)
 
-    val metadata2 = assignments.map { case (topicName, assignment) => 
+    val allAssignments = assignmentsInRequest ++ computedAssignments.asScala
+
+    val metadata2 = allAssignments.map { case (topicName, assignment) => 
       val topic = toCreate.get(topicName).get
       try{
         trace(s"Assignments for topic ${topicName} are ${assignment} ")
@@ -221,9 +226,9 @@ class AdminManager(val config: KafkaConfig,
         val configs = new Properties()
         
         topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
-    
+
         adminZkClient.validateTopicCreate(topic.name, partitionReplicaAssignment, configs)
-        
+
         val resolvedNumPartitions = if (topic.numPartitions == NO_NUM_PARTITIONS)
           defaultNumPartitions else topic.numPartitions
         val resolvedReplicationFactor = if (topic.replicationFactor == NO_REPLICATION_FACTOR)
@@ -238,7 +243,7 @@ class AdminManager(val config: KafkaConfig,
         if (validateOnly) {
           CreatePartitionsMetadata(topic.name, partitionReplicaAssignment.keySet)
         } else {
-          controllerMutationQuota.record(assignments.size)
+          controllerMutationQuota.record(allAssignments.size)
           adminZkClient.createTopicWithAssignment(topic.name, configs, partitionReplicaAssignment, validate = false)
           CreatePartitionsMetadata(topic.name, partitionReplicaAssignment.keySet)
         }
