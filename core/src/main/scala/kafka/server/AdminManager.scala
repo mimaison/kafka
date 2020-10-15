@@ -222,9 +222,12 @@ class AdminManager(val config: KafkaConfig,
       try{
         trace(s"Assignments for topic ${topicName} are ${assignment} ")
 
-        val partitionReplicaAssignment = Map[Int, Seq[Int]]() //TODO MMEC from assignment
+        val partitionReplicaAssignment = mutable.Map[Int, Seq[Int]]()
+        assignment.assignment.entrySet.forEach(entry => 
+          partitionReplicaAssignment.put(entry.getKey, entry.getValue.asScala.map{ i => i : Int})
+        )
+
         val configs = new Properties()
-        
         topic.configs.forEach(entry => configs.setProperty(entry.name, entry.value))
 
         adminZkClient.validateTopicCreate(topic.name, partitionReplicaAssignment, configs)
