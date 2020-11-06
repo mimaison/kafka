@@ -31,6 +31,7 @@ import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
+import org.apache.kafka.server.ReplicaAssignor.ReplicaAssignment;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -48,9 +49,10 @@ public class MMAssignorTest {
     public void testAssignReplicasToBrokersEmptyCluster() {
         List<Node> nodes = buildNodes(1);
         Cluster cluster = buildCluster(nodes, Collections.emptyList());
-        Map<Integer, List<Integer>> assignment = assignor.assignReplicasToBrokers("topic", Arrays.asList(0), 3, cluster, principal);
+        ReplicaAssignor.NewTopic topic = new ReplicaAssignor.NewTopicImpl("topic", Arrays.asList(0), (short) 3, Collections.emptyMap());
+        ReplicaAssignment assignment = assignor.computeAssignment(topic, cluster, principal);
         System.out.println(assignment);
-        List<Integer> replicas = assignment.get(0);
+        List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);
         Set<Integer> replicaSet = new HashSet<>(replicas);
         assertEquals(new HashSet<Integer>(Arrays.asList(0, 1, 2)), replicaSet);
@@ -65,7 +67,7 @@ public class MMAssignorTest {
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
-        Map<Integer, List<Integer>> assignment = assignor.assignReplicasToBrokers("topic", Arrays.asList(0, 1, 2), 3, cluster, principal);
+        Map<Integer, List<Integer>> assignment = assignor.computeAssignment("topic", Arrays.asList(0, 1, 2), 3, cluster, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.get(0);
         assertNotNull(replicas);
@@ -82,7 +84,7 @@ public class MMAssignorTest {
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
-        Map<Integer, List<Integer>> assignment = assignor.assignReplicasToBrokers("topic1", Arrays.asList(0), 3, cluster, principal);
+        Map<Integer, List<Integer>> assignment = assignor.computeAssignment("topic1", Arrays.asList(0), 3, cluster, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.get(0);
         assertNotNull(replicas);
