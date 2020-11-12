@@ -178,8 +178,10 @@ class AdminManager(val config: KafkaConfig,
 
         val assignments = if (topic.assignments.isEmpty) {
           val partitions = List.range(0, resolvedNumPartitions).map(Integer.valueOf)
-          replicaAssignor.assignReplicasToBrokers(topic.name, partitions.asJava, resolvedReplicationFactor,
-              cluster, requestContext.principal).asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
+          val configs = java.util.Collections.emptyMap[String,String] //TODO MMEC
+          val newPartitions = new ReplicaAssignor.NewPartitionsImpl(topic.name, partitions.asJava, resolvedReplicationFactor, configs)
+          replicaAssignor.computeAssignment(newPartitions, cluster, requestContext.principal).assignment()
+              .asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
           // Note: we don't check that replicaAssignment contains unknown brokers - unlike in add-partitions case,

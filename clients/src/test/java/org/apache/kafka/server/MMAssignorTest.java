@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.kafka.common.Cluster;
@@ -35,7 +34,7 @@ import org.apache.kafka.server.ReplicaAssignor.ReplicaAssignment;
 import org.junit.Before;
 import org.junit.Test;
 
-public class MMAssignorTest {
+public class MMAssignorTest { //TODO MM EC
 
     private final KafkaPrincipal principal = new KafkaPrincipal("type", "name");
     private ReplicaAssignor assignor;
@@ -46,10 +45,10 @@ public class MMAssignorTest {
     }
 
     @Test
-    public void testAssignReplicasToBrokersEmptyCluster() {
+    public void testAssignReplicasToBrokersEmptyCluster() throws Exception {
         List<Node> nodes = buildNodes(1);
         Cluster cluster = buildCluster(nodes, Collections.emptyList());
-        ReplicaAssignor.NewTopic topic = new ReplicaAssignor.NewTopicImpl("topic", Arrays.asList(0), (short) 3, Collections.emptyMap());
+        ReplicaAssignor.NewPartitionsImpl topic = new ReplicaAssignor.NewPartitionsImpl("topic", Arrays.asList(0), (short) 3, Collections.emptyMap());
         ReplicaAssignment assignment = assignor.computeAssignment(topic, cluster, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.assignment().get(0);
@@ -67,9 +66,10 @@ public class MMAssignorTest {
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
-        Map<Integer, List<Integer>> assignment = assignor.computeAssignment("topic", Arrays.asList(0, 1, 2), 3, cluster, principal);
+        ReplicaAssignor.NewPartitions newPartitions = new ReplicaAssignor.NewPartitionsImpl("topic", Arrays.asList(0, 1, 2), (short)3, Collections.emptyMap());
+        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, cluster, principal);
         System.out.println(assignment);
-        List<Integer> replicas = assignment.get(0);
+        List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);
         Set<Integer> replicaSet = new HashSet<>(replicas);
         assertEquals(3, replicaSet.size());
@@ -84,9 +84,10 @@ public class MMAssignorTest {
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
-        Map<Integer, List<Integer>> assignment = assignor.computeAssignment("topic1", Arrays.asList(0), 3, cluster, principal);
+        ReplicaAssignor.NewPartitions newPartitions = new ReplicaAssignor.NewPartitionsImpl("topic1", Arrays.asList(0), (short)3, Collections.emptyMap());
+        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, cluster, principal);
         System.out.println(assignment);
-        List<Integer> replicas = assignment.get(0);
+        List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);
         Set<Integer> replicaSet = new HashSet<>(replicas);
         assertEquals(3, replicaSet.size());

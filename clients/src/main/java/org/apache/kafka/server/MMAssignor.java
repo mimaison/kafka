@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.server;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,12 +28,11 @@ import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 
-public class MMAssignor implements ReplicaAssignor {
+public class MMAssignor implements ReplicaAssignor { //TODO MM EC
 
     @Override
-    public Map<Integer, List<Integer>> assignReplicasToBrokers(String topicName, List<Integer> partitions,
-            int replicationFactor, Cluster cluster, KafkaPrincipal principal) {
-
+    public ReplicaAssignment computeAssignment(NewPartitions partitions, Cluster cluster, KafkaPrincipal principal)
+            throws ReplicaAssignorException {
         Map<Integer, List<Integer>> assignment = new HashMap<>();
         Map<Integer, Integer> partitionsByBroker = new HashMap<>();
         Map<String, List<Integer>> brokersByRack = new HashMap<>();
@@ -54,13 +54,13 @@ public class MMAssignor implements ReplicaAssignor {
         }
 
         List<String> racks = new ArrayList<>(brokersByRack.keySet());
-        if (racks.size() != replicationFactor) {
-            throw new RuntimeException("Number of racks is different than requested replication factor");
+        if (racks.size() != partitions.replicationFactor()) {
+            throw new ReplicaAssignorException("Number of racks is different than requested replication factor");
         }
 
-        for (Integer pId : partitions) {
+        for (Integer pId : partitions.partitionIds()) {
             List<Integer> replicas = new ArrayList<>();
-            for (int j = 0; j < replicationFactor; j++) {
+            for (int j = 0; j < partitions.replicationFactor(); j++) {
                 String rack = racks.get(j);
                 List<Integer> brokersInRack = brokersByRack.get(rack);
                 int leastLoadedBroker = findLeastLoadedBroker(brokersInRack, partitionsByBroker);
@@ -70,7 +70,7 @@ public class MMAssignor implements ReplicaAssignor {
             assignment.put(pId, ensureBrokerWithLeastLeadersIsLeader(replicas, leadersByBroker));
         }
 
-        return assignment;
+        return new ReplicaAssignment(assignment);
     }
 
     private List<Integer> ensureBrokerWithLeastLeadersIsLeader(List<Integer> brokers, Map<Integer, Integer> leadersByBroker) {
@@ -92,6 +92,14 @@ public class MMAssignor implements ReplicaAssignor {
             }
         }
         return leastLoadedBroker;
+    }
+
+    @Override
+    public void configure(Map<String, ?> configs) {
+    }
+
+    @Override
+    public void close() throws IOException {
     }
 
 }

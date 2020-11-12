@@ -29,10 +29,21 @@ import scala.jdk.CollectionConverters._
 
 
 class DefaultReplicaAssignor extends ReplicaAssignor {
+  
+  def computeAssignment(newPartitions : ReplicaAssignor.NewPartitions, 
+      cluster: Cluster, principal: KafkaPrincipal): ReplicaAssignor.ReplicaAssignment = {
 
-  def assignReplicasToBrokers(topicName: String, partitions: java.util.List[Integer], replicationFactor: Int,
-                              cluster: Cluster, principal: KafkaPrincipal): Map[Integer, List[Integer]] = {
     val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) }.toSeq;
-    AdminUtils.assignReplicasToBrokers(brokerMetadatas, partitions.size, replicationFactor).map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }.asJava
+
+    val assignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, newPartitions.partitionIds.size, newPartitions.replicationFactor)
+        .map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }
+    
+    new ReplicaAssignor.ReplicaAssignment(assignment.asJava)
+  }
+
+  def configure(configs: java.util.Map[String,_]) {
+  }
+
+  def close() {
   }
 }

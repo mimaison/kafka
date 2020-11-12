@@ -42,7 +42,7 @@ public interface ReplicaAssignor extends Configurable, Closeable {
     public ReplicaAssignment computeAssignment(
             NewPartitions partitions,
             Cluster cluster,
-            KafkaPrincipal principal) throws Exception;
+            KafkaPrincipal principal) throws ReplicaAssignorException;
 
     /**
      * Computed replica assignments for the specified partitions
@@ -58,8 +58,38 @@ public interface ReplicaAssignor extends Configurable, Closeable {
         /**
          * @return a Map with the list of replicas for each partition
          */
-        Map<Integer, List<Integer>> assignment() {
+        public Map<Integer, List<Integer>> assignment() {
             return assignment;
+        }
+
+        @Override
+        public String toString() {
+            return "ReplicaAssignment [assignment=" + assignment + "]";
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((assignment == null) ? 0 : assignment.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            ReplicaAssignment other = (ReplicaAssignment) obj;
+            if (assignment == null) {
+                if (other.assignment != null)
+                    return false;
+            } else if (!assignment.equals(other.assignment))
+                return false;
+            return true;
         }
     }
 
@@ -121,6 +151,52 @@ public interface ReplicaAssignor extends Configurable, Closeable {
         @Override
         public Map<String, String> configs() {
             return configs;
+        }
+
+        @Override
+        public String toString() {
+            return "NewPartitionsImpl [topicName=" + topicName + ", partitionIds=" + partitionIds
+                    + ", replicationFactor=" + replicationFactor + ", configs=" + configs + "]";
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + ((configs == null) ? 0 : configs.hashCode());
+            result = prime * result + ((partitionIds == null) ? 0 : partitionIds.hashCode());
+            result = prime * result + replicationFactor;
+            result = prime * result + ((topicName == null) ? 0 : topicName.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            NewPartitionsImpl other = (NewPartitionsImpl) obj;
+            if (configs == null) {
+                if (other.configs != null)
+                    return false;
+            } else if (!configs.equals(other.configs))
+                return false;
+            if (partitionIds == null) {
+                if (other.partitionIds != null)
+                    return false;
+            } else if (!partitionIds.equals(other.partitionIds))
+                return false;
+            if (replicationFactor != other.replicationFactor)
+                return false;
+            if (topicName == null) {
+                if (other.topicName != null)
+                    return false;
+            } else if (!topicName.equals(other.topicName))
+                return false;
+            return true;
         }
     }
 }
