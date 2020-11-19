@@ -386,6 +386,7 @@ class KafkaApis(val requestChannel: RequestChannel,
           adminManager.tryCompleteDelayedTopicOperations(partitionState.topicName)
         }
       }
+      adminManager.updateClusterMetadata(metadataCache.getClusterMetadata(clusterId, request.context.listenerName))
       quotas.clientQuotaCallback.foreach { callback =>
         if (callback.updateClusterMetadata(metadataCache.getClusterMetadata(clusterId, request.context.listenerName))) {
           quotas.fetch.updateQuotaMetricConfigs()
@@ -1901,7 +1902,6 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       adminManager.createTopics(
         request.context,
-        clusterId,
         createTopicsRequest.data.timeoutMs,
         createTopicsRequest.data.validateOnly,
         toCreate,

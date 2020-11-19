@@ -30,6 +30,7 @@ import kafka.utils.Implicits._
 import kafka.zk.{AdminZkClient, KafkaZkClient}
 import org.apache.kafka.clients.admin.{AlterConfigOp, ScramMechanism}
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType
+import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.config.ConfigDef.ConfigKey
 import org.apache.kafka.common.config.{AbstractConfig, ConfigDef, ConfigException, ConfigResource, LogLevelConfig}
 import org.apache.kafka.common.errors.ThrottlingQuotaExceededException
@@ -76,15 +77,19 @@ class AdminManager(val config: KafkaConfig,
   private val alterConfigPolicy =
     Option(config.getConfiguredInstance(KafkaConfig.AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
 
-  private val replicaAssignor = {
-    val replicaAssignor = config.getConfiguredInstance(KafkaConfig.ReplicaAssignorClassNameProp, classOf[ReplicaAssignor])
-    if (replicaAssignor == null) new DefaultReplicaAssignor() else replicaAssignor 
-  }
-
   def hasDelayedTopicOperations = topicPurgatory.numDelayed != 0
 
   private val defaultNumPartitions = config.numPartitions.intValue()
   private val defaultReplicationFactor = config.defaultReplicationFactor.shortValue()
+
+  private val replicaAssignor = {
+    val replicaAssignor = config.getConfiguredInstance(KafkaConfig.ReplicaAssignorClassNameProp, classOf[ReplicaAssignor])
+    if (replicaAssignor == null) new DefaultReplicaAssignor() else replicaAssignor
+  }
+
+  def updateClusterMetadata(cluster: Cluster) : Unit = {
+    replicaAssignor.updateClusterMetadata(cluster)
+  }
 
   /**
     * Try to complete delayed topic operations with the request key
@@ -145,15 +150,13 @@ class AdminManager(val config: KafkaConfig,
     * Create topics and wait until the topics have been completely created.
     * The callback function will be triggered either when timeout, error or the topics are created.
     */
-  def createTopics(requestContext: RequestContext, clusterId : String,
+  def createTopics(requestContext: RequestContext,
                    timeout: Int,
                    validateOnly: Boolean,
                    toCreate: Map[String, CreatableTopic],
                    includeConfigsAndMetadata: Map[String, CreatableTopicResult],
                    controllerMutationQuota: ControllerMutationQuota,
                    responseCallback: Map[String, ApiError] => Unit): Unit = {
-
-    val cluster = metadataCache.getClusterMetadata(clusterId, requestContext.listenerName)
 
     // 1. map over topics creating assignment and calling zookeeper
     val metadata = toCreate.values.map(topic =>
@@ -180,7 +183,7 @@ class AdminManager(val config: KafkaConfig,
           val partitions = List.range(0, resolvedNumPartitions).map(Integer.valueOf)
           val configs = java.util.Collections.emptyMap[String,String] //TODO MMEC
           val newPartitions = new ReplicaAssignor.NewPartitionsImpl(topic.name, partitions.asJava, resolvedReplicationFactor, configs)
-          replicaAssignor.computeAssignment(newPartitions, cluster, requestContext.principal).assignment()
+          replicaAssignor.computeAssignment(newPartitions, requestContext.principal).assignment()
               .asScala.map { case (k,v) => (scala.Int.unbox(k), v.asScala.map{ i => scala.Int.unbox(i)}) };
         } else {
           val assignments = new mutable.HashMap[Int, Seq[Int]]
@@ -210,8 +213,7 @@ class AdminManager(val config: KafkaConfig,
           adminZkClient.createTopicWithAssignment(topic.name, configs, assignments, validate = false)
           CreatePartitionsMetadata(topic.name, assignments.keySet)
         }
-        //TODO
-        //cluster = updateCluster(cluster, topic.name, assignments)
+
       } catch {
         // Log client errors at a lower level than unexpected exceptions
         case e: TopicExistsException =>

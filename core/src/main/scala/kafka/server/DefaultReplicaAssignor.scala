@@ -17,23 +17,24 @@
 package kafka.server
 
 import kafka.admin.AdminUtils
-
-import org.apache.kafka.server.ReplicaAssignor
+import org.apache.kafka.server.{ReplicaAssignor, ReplicaAssignorException}
 import org.apache.kafka.common.Cluster
 import org.apache.kafka.common.security.auth.KafkaPrincipal
-
-import java.util.List
-import java.util.Map
 
 import scala.jdk.CollectionConverters._
 
 
 class DefaultReplicaAssignor extends ReplicaAssignor {
-  
-  def computeAssignment(newPartitions : ReplicaAssignor.NewPartitions, 
-      cluster: Cluster, principal: KafkaPrincipal): ReplicaAssignor.ReplicaAssignment = {
 
-    val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) }.toSeq;
+  private var cluster : Cluster = null
+
+  override def computeAssignment(newPartitions : ReplicaAssignor.NewPartitions,
+      principal: KafkaPrincipal): ReplicaAssignor.ReplicaAssignment = {
+    if (cluster == null) {
+      throw new ReplicaAssignorException("Missing cluster metadata")
+    }
+
+    val brokerMetadatas : Seq[kafka.admin.BrokerMetadata] = cluster.nodes().asScala.map { b => kafka.admin.BrokerMetadata(b.id, Option(b.rack)) }.toSeq
 
     val assignment = AdminUtils.assignReplicasToBrokers(brokerMetadatas, newPartitions.partitionIds.size, newPartitions.replicationFactor)
         .map { case(k,v) => (Integer.valueOf(k), v.map { i => Integer.valueOf(i) }.asJava) }
@@ -41,9 +42,19 @@ class DefaultReplicaAssignor extends ReplicaAssignor {
     new ReplicaAssignor.ReplicaAssignment(assignment.asJava)
   }
 
-  def configure(configs: java.util.Map[String,_]) {
+  override def configure(configs: java.util.Map[String,_]): Unit = {
   }
 
-  def close() {
+  override def close(): Unit ={
+  }
+
+  /**
+   * Metadata update callback that is invoked whenever UpdateMetadata request is received from
+   * the controller.
+   *
+   * @param cluster Cluster metadata including brokers, partitions and their leaders if known
+   */
+  override def updateClusterMetadata(cluster: Cluster): Unit = {
+    this.cluster = cluster
   }
 }

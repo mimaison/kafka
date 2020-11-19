@@ -30,9 +30,19 @@ import org.apache.kafka.common.security.auth.KafkaPrincipal;
 
 public class MMAssignor implements ReplicaAssignor { //TODO MM EC
 
+    private volatile Cluster cluster;
+
     @Override
-    public ReplicaAssignment computeAssignment(NewPartitions partitions, Cluster cluster, KafkaPrincipal principal)
+    public ReplicaAssignment computeAssignment(NewPartitions partitions, KafkaPrincipal principal)
             throws ReplicaAssignorException {
+
+        if (cluster == null) {
+            throw new ReplicaAssignorException("Missing Cluster metadata");
+        }
+
+        // take snapshot
+        Cluster cluster = this.cluster;
+
         Map<Integer, List<Integer>> assignment = new HashMap<>();
         Map<Integer, Integer> partitionsByBroker = new HashMap<>();
         Map<String, List<Integer>> brokersByRack = new HashMap<>();
@@ -71,6 +81,11 @@ public class MMAssignor implements ReplicaAssignor { //TODO MM EC
         }
 
         return new ReplicaAssignment(assignment);
+    }
+
+    @Override
+    public void updateClusterMetadata(Cluster cluster) {
+        this.cluster = cluster;
     }
 
     private List<Integer> ensureBrokerWithLeastLeadersIsLeader(List<Integer> brokers, Map<Integer, Integer> leadersByBroker) {

@@ -34,15 +34,21 @@ public interface ReplicaAssignor extends Configurable, Closeable {
      * If an assignment can't be computed, for example if the state of the cluster does not satisfy a requirement,
      * implementations can throw ReplicaAssignorException to prevent the topic/partition creation.
      * @param partitions The partitions being created
-     * @param cluster The cluster metadata
      * @param principal The principal of the user initiating the request
      * @return The computed replica assignments
      * @throw ReplicaAssignorException
      */
     public ReplicaAssignment computeAssignment(
             NewPartitions partitions,
-            Cluster cluster,
             KafkaPrincipal principal) throws ReplicaAssignorException;
+
+    /**
+     * Metadata update callback that is invoked whenever UpdateMetadata request is received from
+     * the controller.
+     *
+     * @param cluster Cluster metadata including brokers, partitions and their leaders if known
+     */
+    public void updateClusterMetadata(Cluster cluster);
 
     /**
      * Computed replica assignments for the specified partitions

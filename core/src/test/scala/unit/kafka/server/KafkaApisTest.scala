@@ -737,7 +737,6 @@ class KafkaApisTest {
 
     EasyMock.expect(adminManager.createTopics(
       anyObject(),
-      anyObject(),
       EasyMock.eq(timeout),
       EasyMock.eq(false),
       EasyMock.eq(Map(authorizedTopic -> topicToCreate)),

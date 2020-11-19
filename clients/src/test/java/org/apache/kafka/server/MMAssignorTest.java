@@ -48,8 +48,9 @@ public class MMAssignorTest { //TODO MM EC
     public void testAssignReplicasToBrokersEmptyCluster() throws Exception {
         List<Node> nodes = buildNodes(1);
         Cluster cluster = buildCluster(nodes, Collections.emptyList());
+        assignor.updateClusterMetadata(cluster);
         ReplicaAssignor.NewPartitionsImpl topic = new ReplicaAssignor.NewPartitionsImpl("topic", Arrays.asList(0), (short) 3, Collections.emptyMap());
-        ReplicaAssignment assignment = assignor.computeAssignment(topic, cluster, principal);
+        ReplicaAssignment assignment = assignor.computeAssignment(topic, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);
@@ -66,8 +67,9 @@ public class MMAssignorTest { //TODO MM EC
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
+        assignor.updateClusterMetadata(cluster);
         ReplicaAssignor.NewPartitions newPartitions = new ReplicaAssignor.NewPartitionsImpl("topic", Arrays.asList(0, 1, 2), (short)3, Collections.emptyMap());
-        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, cluster, principal);
+        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);
@@ -84,8 +86,9 @@ public class MMAssignorTest { //TODO MM EC
                 buildPartitionInfo("topic1", 2, nodes.get(2), nodes.get(0), nodes.get(1), nodes.get(2))
         );
         Cluster cluster = buildCluster(nodes, partitions);
+        assignor.updateClusterMetadata(cluster);
         ReplicaAssignor.NewPartitions newPartitions = new ReplicaAssignor.NewPartitionsImpl("topic1", Arrays.asList(0), (short)3, Collections.emptyMap());
-        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, cluster, principal);
+        ReplicaAssignment assignment = assignor.computeAssignment(newPartitions, principal);
         System.out.println(assignment);
         List<Integer> replicas = assignment.assignment().get(0);
         assertNotNull(replicas);

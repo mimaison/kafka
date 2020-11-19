@@ -281,7 +281,7 @@ class AdminZkClient(zkClient: KafkaZkClient) extends Logging {
       val partitions = List.range(existingAssignment.size, partitionsToAdd).map(Integer.valueOf)
       val configs = java.util.Collections.emptyMap[String,String] //TODO MMEC
       val newPartitions = new ReplicaAssignor.NewPartitionsImpl(topic, partitions.asJava, existingAssignmentPartition0.size.toShort, configs)
-      val assignment = replicaAssignor.computeAssignment(newPartitions,cluster, principal).assignment
+      val assignment = replicaAssignor.computeAssignment(newPartitions, principal).assignment
       assignment.asScala.map { case (k, v) => (k.toInt, v.asScala.map(i => i.toInt)) }
     }
 
