@@ -900,7 +900,7 @@ class ControllerIntegrationTest extends ZooKeeperTestHarness {
     assertEquals("correct topic ID cannot be found in the controller context",
       topicIdAfterCreate, servers.head.kafkaController.controllerContext.topicIds.get(tp.topic))
 
-    adminZkClient.addPartitions(tp.topic, assignment, adminZkClient.getBrokerMetadatas(), 2)
+    adminZkClient.addPartitions(tp.topic, assignment, adminZkClient.getBrokerMetadatas(), 2, None)
     val topicIdAfterAddition = zkClient.getTopicIdsForTopics(Set(tp.topic())).get(tp.topic())
     assertEquals(topicIdAfterCreate, topicIdAfterAddition)
     assertEquals("topic ID changed after partition additions",
