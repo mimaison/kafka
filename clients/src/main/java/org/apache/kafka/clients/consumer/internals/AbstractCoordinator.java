@@ -31,6 +31,7 @@ import org.apache.kafka.common.errors.MemberIdRequiredException;
 import org.apache.kafka.common.errors.RebalanceInProgressException;
 import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.UnknownMemberIdException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.message.FindCoordinatorRequestData;
 import org.apache.kafka.common.message.HeartbeatRequestData;
 import org.apache.kafka.common.message.JoinGroupRequestData;
@@ -275,6 +276,10 @@ public abstract class AbstractCoordinator implements Closeable {
     }
 
     protected synchronized RequestFuture<Void> lookupCoordinator() {
+        return lookupCoordinator(true);
+    }
+
+    protected synchronized RequestFuture<Void> lookupCoordinator(boolean batch) {
         if (findCoordinatorFuture == null) {
             // find a node to ask about the coordinator
             Node node = this.client.leastLoadedNode();
@@ -282,7 +287,7 @@ public abstract class AbstractCoordinator implements Closeable {
                 log.debug("No broker available to send FindCoordinator request");
                 return RequestFuture.noBrokersAvailable();
             } else {
-                findCoordinatorFuture = sendFindCoordinatorRequest(node);
+                findCoordinatorFuture = sendFindCoordinatorRequest(node, batch);
             }
         }
         return findCoordinatorFuture;
@@ -811,14 +816,18 @@ public abstract class AbstractCoordinator implements Closeable {
      * one of the brokers. The returned future should be polled to get the result of the request.
      * @return A request future which indicates the completion of the metadata request
      */
-    private RequestFuture<Void> sendFindCoordinatorRequest(Node node) {
+    private RequestFuture<Void> sendFindCoordinatorRequest(Node node, boolean batch) {
         // initiate the group metadata request
         log.debug("Sending FindCoordinator request to broker {}", node);
+        FindCoordinatorRequestData data = new FindCoordinatorRequestData()
+                .setKeyType(CoordinatorType.GROUP.id());
+        if (batch) {
+            data.setCoordinatorKeys(Collections.singletonList(this.rebalanceConfig.groupId));
+        } else {
+            data.setKey(this.rebalanceConfig.groupId);
+        }
         FindCoordinatorRequest.Builder requestBuilder =
-                new FindCoordinatorRequest.Builder(
-                        new FindCoordinatorRequestData()
-                            .setKeyType(CoordinatorType.GROUP.id())
-                            .setKey(this.rebalanceConfig.groupId));
+                new FindCoordinatorRequest.Builder(data);
         return client.send(node, requestBuilder)
                 .compose(new FindCoordinatorResponseHandler());
     }
@@ -858,6 +867,10 @@ public abstract class AbstractCoordinator implements Closeable {
         public void onFailure(RuntimeException e, RequestFuture<Void> future) {
             log.debug("FindCoordinator request failed due to {}", e.toString());
 
+            if (e instanceof UnsupportedVersionException) {
+                lookupCoordinator(false);
+                return;
+            } 
             if (!(e instanceof RetriableException)) {
                 // Remember the exception if fatal so we can ensure it gets thrown by the main thread
                 fatalFindCoordinatorException = e;

@@ -236,10 +236,17 @@ public class MockClient implements KafkaClient {
                 unsupportedVersionException = new UnsupportedVersionException(
                         "Api " + request.apiKey() + " with version " + version);
             } else {
-                AbstractRequest abstractRequest = request.requestBuilder().build(version);
-                if (!futureResp.requestMatcher.matches(abstractRequest))
-                    throw new IllegalStateException("Request matcher did not match next-in-line request "
-                            + abstractRequest + " with prepared response " + futureResp.responseBody);
+                try {
+                    AbstractRequest abstractRequest = request.requestBuilder().build(version);
+                    if (!futureResp.requestMatcher.matches(abstractRequest))
+                        continue;
+                } catch (UnsupportedVersionException uve) {
+                    ClientResponse resp = new ClientResponse(request.makeHeader(version), request.callback(), request.destination(),
+                            request.createdTimeMs(), time.milliseconds(), futureResp.disconnected,
+                            uve, null, futureResp.responseBody);
+                    responses.add(resp);
+                    return;
+                }
             }
             ClientResponse resp = new ClientResponse(request.makeHeader(version), request.callback(), request.destination(),
                     request.createdTimeMs(), time.milliseconds(), futureResp.disconnected,
@@ -306,6 +313,7 @@ public class MockClient implements KafkaClient {
         List<ClientResponse> copy = new ArrayList<>();
         ClientResponse response;
         while ((response = this.responses.poll()) != null) {
+            System.err.println("Response " + response.responseBody());
             response.onComplete();
             copy.add(response);
         }

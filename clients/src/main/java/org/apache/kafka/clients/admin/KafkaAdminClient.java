@@ -129,6 +129,7 @@ import org.apache.kafka.common.message.DescribeUserScramCredentialsRequestData.U
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData;
 import org.apache.kafka.common.message.ExpireDelegationTokenRequestData;
 import org.apache.kafka.common.message.FindCoordinatorRequestData;
+import org.apache.kafka.common.message.FindCoordinatorResponseData.Coordinator;
 import org.apache.kafka.common.message.LeaveGroupRequestData.MemberIdentity;
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse;
 import org.apache.kafka.common.message.ListGroupsRequestData;
@@ -736,7 +737,7 @@ public class KafkaAdminClient extends AdminClient {
         }
     }
 
-    abstract class Call {
+    public abstract class Call {
         private final boolean internal;
         private final String callName;
         private final long deadlineMs;
@@ -3094,17 +3095,20 @@ public class KafkaAdminClient extends AdminClient {
         return new DescribeDelegationTokenResult(tokensFuture);
     }
 
-    private void rescheduleFindCoordinatorTask(ConsumerGroupOperationContext<?, ?> context, Supplier<Call> nextCall, Call failedCall) {
-        log.info("Node {} is no longer the Coordinator. Retrying with new coordinator.",
-                context.node().orElse(null));
+    private void rescheduleFindCoordinatorTask(Node node, ConsumerGroupOperationContext<?, ?> context,
+            Call failedCall) {
+        log.info("Node {} is no longer the Coordinator. Retrying with new coordinator.", node);
         // Requeue the task so that we can try with new coordinator
-        context.setNode(null);
+        for (String groupId : context.groupIds()) {
+            context.setNode(groupId, null);
+        }
 
-        Call call = nextCall.get();
-        call.tries = failedCall.tries + 1;
-        call.nextAllowedTryMs = calculateNextAllowedRetryMs();
+//        for (Call call : context.getSupplier()) {
+//            call.tries = failedCall.tries + 1;
+//            call.nextAllowedTryMs = calculateNextAllowedRetryMs();
+//        }
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context, nextCall);
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
         runnable.call(findCoordinatorCall, time.milliseconds());
     }
 
@@ -3134,27 +3138,16 @@ public class KafkaAdminClient extends AdminClient {
 
     @Override
     public DescribeConsumerGroupsResult describeConsumerGroups(final Collection<String> groupIds,
-                                                               final DescribeConsumerGroupsOptions options) {
+            final DescribeConsumerGroupsOptions options) {
 
         final Map<String, KafkaFutureImpl<ConsumerGroupDescription>> futures = createFutures(groupIds);
 
-        // TODO: KAFKA-6788, we should consider grouping the request per coordinator and send one request with a list of
-        // all consumer groups this coordinator host
-        for (final Map.Entry<String, KafkaFutureImpl<ConsumerGroupDescription>> entry : futures.entrySet()) {
-            // skip sending request for those futures that already failed.
-            if (entry.getValue().isCompletedExceptionally())
-                continue;
-
-            final String groupId = entry.getKey();
-
-            final long startFindCoordinatorMs = time.milliseconds();
-            final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
-            ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> context =
-                    new ConsumerGroupOperationContext<>(groupId, options, deadline, futures.get(groupId));
-            Call findCoordinatorCall = getFindCoordinatorCall(context,
-                () -> getDescribeConsumerGroupsCall(context));
-            runnable.call(findCoordinatorCall, startFindCoordinatorMs);
-        }
+        final long startFindCoordinatorMs = time.milliseconds();
+        final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs()) + 10000000; //TODO
+        ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> context = new ConsumerGroupOperationContext<>(
+                groupIds, options, deadline, futures, getDescribeConsumerGroupsCall());
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new DescribeConsumerGroupsResult(new HashMap<>(futures));
     }
@@ -3168,120 +3161,181 @@ public class KafkaAdminClient extends AdminClient {
      * @param <T> The type of return value of the KafkaFuture, like ConsumerGroupDescription, Void etc.
      * @param <O> The type of configuration option, like DescribeConsumerGroupsOptions, ListConsumerGroupsOptions etc
      */
-    private <T, O extends AbstractOptions<O>> Call getFindCoordinatorCall(ConsumerGroupOperationContext<T, O> context,
-                                                                          Supplier<Call> nextCall) {
-        return new Call("findCoordinator", context.deadline(), new LeastLoadedNodeProvider()) {
+    private <T, O extends AbstractOptions<O>> Call getFindCoordinatorCall(ConsumerGroupOperationContext<T, O> context) {
+        return new Call("findCoordinator", context.deadline(),
+                new LeastLoadedNodeProvider()) {
             @Override
-            FindCoordinatorRequest.Builder createRequest(int timeoutMs) {
-                return new FindCoordinatorRequest.Builder(
-                        new FindCoordinatorRequestData()
-                                .setKeyType(CoordinatorType.GROUP.id())
-                                .setKey(context.groupId()));
+            public FindCoordinatorRequest.Builder createRequest(int timeoutMs) {
+                FindCoordinatorRequestData data = new FindCoordinatorRequestData();
+
+                if (context.batch()) {
+                    data.setCoordinatorKeys(new ArrayList<>(context.groupIds()));
+                } else {
+                    data.setKey(context.groupIds().iterator().next());
+                }
+                data.setKeyType(CoordinatorType.GROUP.id());
+                FindCoordinatorRequest.Builder builder = new FindCoordinatorRequest.Builder(data);
+                System.err.println("Create FindCoordinatorRequest " + builder);
+
+                return builder;
             }
 
             @Override
-            void handleResponse(AbstractResponse abstractResponse) {
+            public void handleResponse(AbstractResponse abstractResponse) {
                 final FindCoordinatorResponse response = (FindCoordinatorResponse) abstractResponse;
-
-                if (handleGroupRequestError(response.error(), context.future()))
+                System.err.println("Received FindCoordinatorResponse " + response);
+                if (handleGroupRequestError(response.error(), context.futures()))
                     return;
 
-                context.setNode(response.node());
-
-                runnable.call(nextCall.get(), time.milliseconds());
+                if (response.data().coordinators() == null || response.data().coordinators().isEmpty()) {
+                    context.setNode(context.groupIds().iterator().next(), response.node());
+                } else {
+                    for (Coordinator c : response.data().coordinators()) {
+                        context.setNode(c.key(), new Node(c.nodeId(), c.host(), c.port()));
+                    }
+                }
+                for (Call call : context.getFunction().apply(context)) {
+                    runnable.call(call, time.milliseconds());
+                }
             }
 
             @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
+            public void handleFailure(Throwable throwable) {
+                System.err.println("FindCoordinatorResponse Failure " + throwable);
+                if (throwable instanceof UnsupportedVersionException) {
+                    for (String groupId : context.groupIds()) {
+                        ConsumerGroupOperationContext<T, O> retryContext = context.getContextFor(groupId);
+                        rescheduleFindCoordinatorTask(curNode(), retryContext, this);
+                    }
+                } else {
+                    for (KafkaFutureImpl<T> future : context.futures()) {
+                        future.completeExceptionally(throwable);
+                    }
+                }
             }
         };
     }
 
-    private Call getDescribeConsumerGroupsCall(
-            ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> context) {
-        return new Call("describeConsumerGroups",
-                context.deadline(),
-                new ConstantNodeIdProvider(context.node().get().id())) {
-            @Override
-            DescribeGroupsRequest.Builder createRequest(int timeoutMs) {
-                return new DescribeGroupsRequest.Builder(
-                    new DescribeGroupsRequestData()
-                        .setGroups(Collections.singletonList(context.groupId()))
-                        .setIncludeAuthorizedOperations(context.options().includeAuthorizedOperations()));
-            }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final DescribeGroupsResponse response = (DescribeGroupsResponse) abstractResponse;
-
-                List<DescribedGroup> describedGroups = response.data().groups();
-                if (describedGroups.isEmpty()) {
-                    context.future().completeExceptionally(
-                            new InvalidGroupIdException("No consumer group found for GroupId: " + context.groupId()));
-                    return;
-                }
-
-                if (describedGroups.size() > 1 ||
-                        !describedGroups.get(0).groupId().equals(context.groupId())) {
-                    String ids = Arrays.toString(describedGroups.stream().map(DescribedGroup::groupId).toArray());
-                    context.future().completeExceptionally(new InvalidGroupIdException(
-                            "DescribeConsumerGroup request for GroupId: " + context.groupId() + " returned " + ids));
-                    return;
-                }
-
-                final DescribedGroup describedGroup = describedGroups.get(0);
-
-                // If coordinator changed since we fetched it, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(response)) {
-                    Call call = getDescribeConsumerGroupsCall(context);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                final Errors groupError = Errors.forCode(describedGroup.errorCode());
-                if (handleGroupRequestError(groupError, context.future()))
-                    return;
-
-                final String protocolType = describedGroup.protocolType();
-                if (protocolType.equals(ConsumerProtocol.PROTOCOL_TYPE) || protocolType.isEmpty()) {
-                    final List<DescribedGroupMember> members = describedGroup.members();
-                    final List<MemberDescription> memberDescriptions = new ArrayList<>(members.size());
-                    final Set<AclOperation> authorizedOperations = validAclOperations(describedGroup.authorizedOperations());
-                    for (DescribedGroupMember groupMember : members) {
-                        Set<TopicPartition> partitions = Collections.emptySet();
-                        if (groupMember.memberAssignment().length > 0) {
-                            final Assignment assignment = ConsumerProtocol.
-                                deserializeAssignment(ByteBuffer.wrap(groupMember.memberAssignment()));
-                            partitions = new HashSet<>(assignment.partitions());
-                        }
-                        final MemberDescription memberDescription = new MemberDescription(
-                                groupMember.memberId(),
-                                Optional.ofNullable(groupMember.groupInstanceId()),
-                                groupMember.clientId(),
-                                groupMember.clientHost(),
-                                new MemberAssignment(partitions));
-                        memberDescriptions.add(memberDescription);
-                    }
-                    final ConsumerGroupDescription consumerGroupDescription =
-                        new ConsumerGroupDescription(context.groupId(), protocolType.isEmpty(),
-                            memberDescriptions,
-                            describedGroup.protocolData(),
-                            ConsumerGroupState.parse(describedGroup.groupState()),
-                            context.node().get(),
-                            authorizedOperations);
-                    context.future().complete(consumerGroupDescription);
+    private Function<ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions>, List<Call>> getDescribeConsumerGroupsCall() {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            Map<Node, List<String>> groupIdsPerNode = new HashMap<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                Optional<Node> optionalNode = entry.getValue();
+                String groupId = entry.getKey();
+                if (optionalNode.isPresent()) {
+                    groupIdsPerNode.putIfAbsent(optionalNode.get(), new ArrayList<>());
+                    groupIdsPerNode.get(optionalNode.get()).add(groupId);
                 } else {
-                    context.future().completeExceptionally(new IllegalArgumentException(
-                        String.format("GroupId %s is not a consumer group (%s).",
-                            context.groupId(), protocolType)));
+                    context.future(groupId).completeExceptionally(new Exception("")); //TODO
                 }
             }
+            for (Map.Entry<Node, List<String>> entry : groupIdsPerNode.entrySet()) {
+                List<String> groupIds = entry.getValue();
+                Node node = entry.getKey();
+                Call call = new Call("describeConsumerGroups", context.deadline(),
+                        new ConstantNodeIdProvider(node.id())) {
+                    @Override
+                    public DescribeGroupsRequest.Builder createRequest(int timeoutMs) {
+                        DescribeGroupsRequest.Builder builder = new DescribeGroupsRequest.Builder(new DescribeGroupsRequestData().setGroups(entry.getValue())
+                                .setIncludeAuthorizedOperations(context.options().includeAuthorizedOperations()));
+                        System.err.println("Create DescribeGroupsRequest " + builder);
+                        return builder;
+                    }
 
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
+                    @Override
+                    public void handleResponse(AbstractResponse abstractResponse) {
+                        final DescribeGroupsResponse response = (DescribeGroupsResponse) abstractResponse;
+                        System.err.println("Received DescribeGroupsResponse " + response.data());
+
+                        List<DescribedGroup> describedGroups = response.data().groups();
+                        if (describedGroups.isEmpty()) {
+                            for (String groupId : groupIds) {
+                                context.future(groupId).completeExceptionally(
+                                        new InvalidGroupIdException("No consumer group found for GroupId: " + groupId));
+                                return;
+                            }
+                        }
+
+                        List<String> retryGroups = new ArrayList<>();
+                        for (DescribedGroup describedGroup : describedGroups) {
+                            String group = describedGroup.groupId();
+                            if (describedGroup.errorCode() == Errors.NOT_COORDINATOR.code()) {
+
+                                retryGroups.add(group);
+                            // If coordinator changed since we fetched it, retry
+                            //if (ConsumerGroupOperationContext2.hasCoordinatorMoved(response)) { //TODO
+                                continue;
+                            }
+
+                            final Errors groupError = Errors.forCode(describedGroup.errorCode());
+                            if (handleGroupRequestError(groupError, context.future(group)))
+                                return;
+
+                            final String protocolType = describedGroup.protocolType();
+                            if (protocolType.equals(ConsumerProtocol.PROTOCOL_TYPE) || protocolType.isEmpty()) {
+                                final List<DescribedGroupMember> members = describedGroup.members();
+                                final List<MemberDescription> memberDescriptions = new ArrayList<>(members.size());
+                                final Set<AclOperation> authorizedOperations = validAclOperations(
+                                        describedGroup.authorizedOperations());
+                                for (DescribedGroupMember groupMember : members) {
+                                    Set<TopicPartition> partitions = Collections.emptySet();
+                                    if (groupMember.memberAssignment().length > 0) {
+                                        final Assignment assignment = ConsumerProtocol
+                                                .deserializeAssignment(ByteBuffer.wrap(groupMember.memberAssignment()));
+                                        partitions = new HashSet<>(assignment.partitions());
+                                    }
+                                    final MemberDescription memberDescription = new MemberDescription(
+                                            groupMember.memberId(), Optional.ofNullable(groupMember.groupInstanceId()),
+                                            groupMember.clientId(), groupMember.clientHost(),
+                                            new MemberAssignment(partitions));
+                                    memberDescriptions.add(memberDescription);
+                                }
+                                final ConsumerGroupDescription consumerGroupDescription = new ConsumerGroupDescription(
+                                        group, protocolType.isEmpty(), memberDescriptions, describedGroup.protocolData(),
+                                        ConsumerGroupState.parse(describedGroup.groupState()), context.node(group).get(),
+                                        authorizedOperations);
+                                context.future(group).complete(consumerGroupDescription);
+                            } else {
+                                context.future(group).completeExceptionally(new IllegalArgumentException(
+                                        String.format("GroupId %s is not a consumer group (%s).", group, protocolType)));
+                            }
+                        }
+                        if (!retryGroups.isEmpty()) {
+                            if (context.batch()) {
+                                Map<String, KafkaFutureImpl<ConsumerGroupDescription>> retryFutures = new HashMap<>();
+                                for (String group : retryGroups) {
+                                    retryFutures.put(group, context.future(group));
+                                }
+
+                                ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                        retryGroups, context.options(), context.deadline(), retryFutures,
+                                        context.getFunction());
+                                rescheduleFindCoordinatorTask(node, retryContext, this);
+                                return;
+                            } else {
+                                for (String group : retryGroups) {
+                                    ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                            group, context.options(), context.deadline(), context.future(group),
+                                            context.getFunction());
+                                    rescheduleFindCoordinatorTask(node, retryContext, this);
+                                }
+                                return;
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void handleFailure(Throwable throwable) {
+                        System.err.println("DescribeGroupsResponse failure " + throwable);
+                        for (String groupId : groupIds) {
+                            context.future(groupId).completeExceptionally(throwable);
+                        }
+                    }
+                };
+                calls.add(call);
             }
+            return calls;
         };
     }
 
@@ -3484,68 +3538,77 @@ public class KafkaAdminClient extends AdminClient {
         final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
 
         ConsumerGroupOperationContext<Map<TopicPartition, OffsetAndMetadata>, ListConsumerGroupOffsetsOptions> context =
-                new ConsumerGroupOperationContext<>(groupId, options, deadline, groupOffsetListingFuture);
+                new ConsumerGroupOperationContext<>(groupId, options, deadline, groupOffsetListingFuture, getListConsumerGroupOffsetsCall());
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context,
-            () -> getListConsumerGroupOffsetsCall(context));
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new ListConsumerGroupOffsetsResult(groupOffsetListingFuture);
     }
 
-    private Call getListConsumerGroupOffsetsCall(ConsumerGroupOperationContext<Map<TopicPartition, OffsetAndMetadata>,
-            ListConsumerGroupOffsetsOptions> context) {
-        return new Call("listConsumerGroupOffsets", context.deadline(),
-                new ConstantNodeIdProvider(context.node().get().id())) {
-            @Override
-            OffsetFetchRequest.Builder createRequest(int timeoutMs) {
-                // Set the flag to false as for admin client request,
-                // we don't need to wait for any pending offset state to clear.
-                return new OffsetFetchRequest.Builder(context.groupId(), false, context.options().topicPartitions(), false);
-            }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final OffsetFetchResponse response = (OffsetFetchResponse) abstractResponse;
-                final Map<TopicPartition, OffsetAndMetadata> groupOffsetsListing = new HashMap<>();
-
-                // If coordinator changed since we fetched it, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(response)) {
-                    Call call = getListConsumerGroupOffsetsCall(context);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                if (handleGroupRequestError(response.error(), context.future()))
-                    return;
-
-                for (Map.Entry<TopicPartition, OffsetFetchResponse.PartitionData> entry :
-                    response.responseData().entrySet()) {
-                    final TopicPartition topicPartition = entry.getKey();
-                    OffsetFetchResponse.PartitionData partitionData = entry.getValue();
-                    final Errors error = partitionData.error;
-
-                    if (error == Errors.NONE) {
-                        final Long offset = partitionData.offset;
-                        final String metadata = partitionData.metadata;
-                        final Optional<Integer> leaderEpoch = partitionData.leaderEpoch;
-                        // Negative offset indicates that the group has no committed offset for this partition
-                        if (offset < 0) {
-                            groupOffsetsListing.put(topicPartition, null);
-                        } else {
-                            groupOffsetsListing.put(topicPartition, new OffsetAndMetadata(offset, leaderEpoch, metadata));
-                        }
-                    } else {
-                        log.warn("Skipping return offset for {} due to error {}.", topicPartition, error);
+    private Function<ConsumerGroupOperationContext<Map<TopicPartition, OffsetAndMetadata>, ListConsumerGroupOffsetsOptions>, List<Call>> getListConsumerGroupOffsetsCall() {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                Optional<Node> optionalNode = entry.getValue();
+                String groupId = entry.getKey();
+                Call call = new Call("listConsumerGroupOffsets", context.deadline(),
+                        new ConstantNodeIdProvider(optionalNode.get().id())) {
+                    @Override
+                    OffsetFetchRequest.Builder createRequest(int timeoutMs) {
+                        // Set the flag to false as for admin client request,
+                        // we don't need to wait for any pending offset state to clear.
+                        return new OffsetFetchRequest.Builder(groupId, false, context.options().topicPartitions(), false);
                     }
-                }
-                context.future().complete(groupOffsetsListing);
+    
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final OffsetFetchResponse response = (OffsetFetchResponse) abstractResponse;
+                        final Map<TopicPartition, OffsetAndMetadata> groupOffsetsListing = new HashMap<>();
+    
+                        // If coordinator changed since we fetched it, retry
+                        if (ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts())) {
+                            ConsumerGroupOperationContext<Map<TopicPartition, OffsetAndMetadata>, ListConsumerGroupOffsetsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                    groupId, context.options(), context.deadline(), context.future(groupId),
+                                    context.getFunction());
+                            rescheduleFindCoordinatorTask(optionalNode.get(), retryContext, this);
+                            return;
+                        }
+    
+                        if (handleGroupRequestError(response.error(), context.future(groupId)))
+                            return;
+    
+                        for (Map.Entry<TopicPartition, OffsetFetchResponse.PartitionData> entry :
+                            response.responseData().entrySet()) {
+                            final TopicPartition topicPartition = entry.getKey();
+                            OffsetFetchResponse.PartitionData partitionData = entry.getValue();
+                            final Errors error = partitionData.error;
+    
+                            if (error == Errors.NONE) {
+                                final Long offset = partitionData.offset;
+                                final String metadata = partitionData.metadata;
+                                final Optional<Integer> leaderEpoch = partitionData.leaderEpoch;
+                                // Negative offset indicates that the group has no committed offset for this partition
+                                if (offset < 0) {
+                                    groupOffsetsListing.put(topicPartition, null);
+                                } else {
+                                    groupOffsetsListing.put(topicPartition, new OffsetAndMetadata(offset, leaderEpoch, metadata));
+                                }
+                            } else {
+                                log.warn("Skipping return offset for {} due to error {}.", topicPartition, error);
+                            }
+                        }
+                        context.future(groupId).complete(groupOffsetsListing);
+                    }
+    
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        context.future(groupId).completeExceptionally(throwable);
+                    }
+                };
+                calls.add(call);
             }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
-            }
+            return calls;
         };
     }
 
@@ -3565,48 +3628,58 @@ public class KafkaAdminClient extends AdminClient {
             final long startFindCoordinatorMs = time.milliseconds();
             final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
             ConsumerGroupOperationContext<Void, DeleteConsumerGroupsOptions> context =
-                    new ConsumerGroupOperationContext<>(groupId, options, deadline, future);
-            Call findCoordinatorCall = getFindCoordinatorCall(context,
-                () -> getDeleteConsumerGroupsCall(context));
+                    new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getDeleteConsumerGroupsCall());
+            Call findCoordinatorCall = getFindCoordinatorCall(context);
             runnable.call(findCoordinatorCall, startFindCoordinatorMs);
         }
 
         return new DeleteConsumerGroupsResult(new HashMap<>(futures));
     }
 
-    private Call getDeleteConsumerGroupsCall(ConsumerGroupOperationContext<Void, DeleteConsumerGroupsOptions> context) {
-        return new Call("deleteConsumerGroups", context.deadline(), new ConstantNodeIdProvider(context.node().get().id())) {
+    private Function<ConsumerGroupOperationContext<Void, DeleteConsumerGroupsOptions>, List<Call>> getDeleteConsumerGroupsCall() {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                String groupId = entry.getKey();
+                Node node = entry.getValue().get();
+                Call call = new Call("deleteConsumerGroups", context.deadline(), new ConstantNodeIdProvider(node.id())) {
 
-            @Override
-            DeleteGroupsRequest.Builder createRequest(int timeoutMs) {
-                return new DeleteGroupsRequest.Builder(
-                    new DeleteGroupsRequestData()
-                        .setGroupsNames(Collections.singletonList(context.groupId()))
-                );
+                    @Override
+                    DeleteGroupsRequest.Builder createRequest(int timeoutMs) {
+                        return new DeleteGroupsRequest.Builder(
+                            new DeleteGroupsRequestData()
+                                .setGroupsNames(Collections.singletonList(groupId))
+                        );
+                    }
+
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final DeleteGroupsResponse response = (DeleteGroupsResponse) abstractResponse;
+
+                        // If coordinator changed since we fetched it, retry
+                        if (ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts())) {
+                            ConsumerGroupOperationContext<Void, DeleteConsumerGroupsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                    groupId, context.options(), context.deadline(), context.future(groupId),
+                                    context.getFunction());
+                            rescheduleFindCoordinatorTask(node, retryContext, this);
+                            return;
+                        }
+
+                        final Errors groupError = response.get(groupId);
+                        if (handleGroupRequestError(groupError, context.future(groupId)))
+                            return;
+
+                        context.future(groupId).complete(null);
+                    }
+
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        context.future(groupId).completeExceptionally(throwable);
+                    }
+                };
+                calls.add(call);
             }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final DeleteGroupsResponse response = (DeleteGroupsResponse) abstractResponse;
-
-                // If coordinator changed since we fetched it, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(response)) {
-                    Call call = getDeleteConsumerGroupsCall(context);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                final Errors groupError = response.get(context.groupId());
-                if (handleGroupRequestError(groupError, context.future()))
-                    return;
-
-                context.future().complete(null);
-            }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
-            }
+            return calls;
         };
     }
 
@@ -3626,71 +3699,79 @@ public class KafkaAdminClient extends AdminClient {
         final long startFindCoordinatorMs = time.milliseconds();
         final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
         ConsumerGroupOperationContext<Map<TopicPartition, Errors>, DeleteConsumerGroupOffsetsOptions> context =
-            new ConsumerGroupOperationContext<>(groupId, options, deadline, future);
+            new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getDeleteConsumerGroupOffsetsCall(partitions));
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context,
-            () -> getDeleteConsumerGroupOffsetsCall(context, partitions));
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new DeleteConsumerGroupOffsetsResult(future, partitions);
     }
 
-    private Call getDeleteConsumerGroupOffsetsCall(
-            ConsumerGroupOperationContext<Map<TopicPartition, Errors>, DeleteConsumerGroupOffsetsOptions> context,
-            Set<TopicPartition> partitions) {
-        return new Call("deleteConsumerGroupOffsets", context.deadline(), new ConstantNodeIdProvider(context.node().get().id())) {
+    private Function<ConsumerGroupOperationContext<Map<TopicPartition, Errors>, DeleteConsumerGroupOffsetsOptions>, List<Call>> getDeleteConsumerGroupOffsetsCall(Set<TopicPartition> partitions) {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                Node node = entry.getValue().get();
+                String groupId = entry.getKey();
+                Call call = new Call("deleteConsumerGroupOffsets", context.deadline(), new ConstantNodeIdProvider(node.id())) {
 
-            @Override
-            OffsetDeleteRequest.Builder createRequest(int timeoutMs) {
-                final OffsetDeleteRequestTopicCollection topics = new OffsetDeleteRequestTopicCollection();
+                    @Override
+                    OffsetDeleteRequest.Builder createRequest(int timeoutMs) {
+                        final OffsetDeleteRequestTopicCollection topics = new OffsetDeleteRequestTopicCollection();
 
-                partitions.stream().collect(Collectors.groupingBy(TopicPartition::topic)).forEach((topic, topicPartitions) -> {
-                    topics.add(
-                        new OffsetDeleteRequestTopic()
-                        .setName(topic)
-                        .setPartitions(topicPartitions.stream()
-                            .map(tp -> new OffsetDeleteRequestPartition().setPartitionIndex(tp.partition()))
-                            .collect(Collectors.toList())
-                        )
-                    );
-                });
+                        partitions.stream().collect(Collectors.groupingBy(TopicPartition::topic)).forEach((topic, topicPartitions) -> {
+                            topics.add(
+                                new OffsetDeleteRequestTopic()
+                                .setName(topic)
+                                .setPartitions(topicPartitions.stream()
+                                    .map(tp -> new OffsetDeleteRequestPartition().setPartitionIndex(tp.partition()))
+                                    .collect(Collectors.toList())
+                                )
+                            );
+                        });
 
-                return new OffsetDeleteRequest.Builder(
-                    new OffsetDeleteRequestData()
-                        .setGroupId(context.groupId())
-                        .setTopics(topics)
-                );
+                        return new OffsetDeleteRequest.Builder(
+                            new OffsetDeleteRequestData()
+                                .setGroupId(groupId)
+                                .setTopics(topics)
+                        );
+                    }
+
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final OffsetDeleteResponse response = (OffsetDeleteResponse) abstractResponse;
+
+                        // If coordinator changed since we fetched it, retry
+                        if (ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts())) {
+                            ConsumerGroupOperationContext<Map<TopicPartition, Errors>, DeleteConsumerGroupOffsetsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                    groupId, context.options(), context.deadline(), context.future(groupId),
+                                    context.getFunction());
+                            rescheduleFindCoordinatorTask(node, retryContext, this);
+                            return;
+                        }
+
+                        // If the error is an error at the group level, the future is failed with it
+                        final Errors groupError = Errors.forCode(response.data().errorCode());
+                        if (handleGroupRequestError(groupError, context.future(groupId)))
+                            return;
+
+                        final Map<TopicPartition, Errors> partitions = new HashMap<>();
+                        response.data().topics().forEach(topic -> topic.partitions().forEach(partition -> partitions.put(
+                            new TopicPartition(topic.name(), partition.partitionIndex()),
+                            Errors.forCode(partition.errorCode())))
+                        );
+
+                        context.future(groupId).complete(partitions);
+                    }
+
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        context.future(groupId).completeExceptionally(throwable);
+                    }
+                };
+                calls.add(call);
             }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final OffsetDeleteResponse response = (OffsetDeleteResponse) abstractResponse;
-
-                // If coordinator changed since we fetched it, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(response)) {
-                    Call call = getDeleteConsumerGroupOffsetsCall(context, partitions);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                // If the error is an error at the group level, the future is failed with it
-                final Errors groupError = Errors.forCode(response.data().errorCode());
-                if (handleGroupRequestError(groupError, context.future()))
-                    return;
-
-                final Map<TopicPartition, Errors> partitions = new HashMap<>();
-                response.data().topics().forEach(topic -> topic.partitions().forEach(partition -> partitions.put(
-                    new TopicPartition(topic.name(), partition.partitionIndex()),
-                    Errors.forCode(partition.errorCode())))
-                );
-
-                context.future().complete(partitions);
-            }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
-            }
+            return calls;
         };
     }
 
@@ -3967,10 +4048,6 @@ public class KafkaAdminClient extends AdminClient {
         return new ListPartitionReassignmentsResult(partitionReassignmentsFuture);
     }
 
-    private long calculateNextAllowedRetryMs() {
-        return time.milliseconds() + retryBackoffMs;
-    }
-
     private void handleNotControllerError(AbstractResponse response) throws ApiException {
         if (response.errorCounts().containsKey(Errors.NOT_CONTROLLER)) {
             handleNotControllerError(Errors.NOT_CONTROLLER);
@@ -4023,57 +4100,67 @@ public class KafkaAdminClient extends AdminClient {
 
         KafkaFutureImpl<Map<MemberIdentity, Errors>> future = new KafkaFutureImpl<>();
 
-        ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions> context =
-            new ConsumerGroupOperationContext<>(groupId, options, deadline, future);
-
         List<MemberIdentity> members;
         if (options.removeAll()) {
             members = getMembersFromGroup(groupId);
         } else {
             members = options.members().stream().map(MemberToRemove::toMemberIdentity).collect(Collectors.toList());
         }
-        Call findCoordinatorCall = getFindCoordinatorCall(context, () -> getRemoveMembersFromGroupCall(context, members));
+        ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions> context =
+            new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getRemoveMembersFromGroupCall(members));
+
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new RemoveMembersFromConsumerGroupResult(future, options.members());
     }
 
-    private Call getRemoveMembersFromGroupCall(ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions> context,
-                                               List<MemberIdentity> members) {
-        return new Call("leaveGroup", context.deadline(), new ConstantNodeIdProvider(context.node().get().id())) {
-            @Override
-            LeaveGroupRequest.Builder createRequest(int timeoutMs) {
-                return new LeaveGroupRequest.Builder(context.groupId(), members);
+    private Function<ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions>, List<Call>> getRemoveMembersFromGroupCall(List<MemberIdentity> members) {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                Node node = entry.getValue().get();
+                String groupId = entry.getKey();
+                Call call = new Call("leaveGroup", context.deadline(), new ConstantNodeIdProvider(node.id())) {
+                    @Override
+                    LeaveGroupRequest.Builder createRequest(int timeoutMs) {
+                        return new LeaveGroupRequest.Builder(groupId, members);
+                    }
+
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final LeaveGroupResponse response = (LeaveGroupResponse) abstractResponse;
+
+                        // If coordinator changed since we fetched it, retry
+                        if (ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts())) {
+                            ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                    groupId, context.options(), context.deadline(), context.future(groupId),
+                                    context.getFunction());
+                            rescheduleFindCoordinatorTask(node, retryContext, this);
+                            return;
+                        }
+
+                        if (handleGroupRequestError(response.topLevelError(), context.future(groupId)))
+                            return;
+
+                        final Map<MemberIdentity, Errors> memberErrors = new HashMap<>();
+                        for (MemberResponse memberResponse : response.memberResponses()) {
+                            memberErrors.put(new MemberIdentity()
+                                                 .setMemberId(memberResponse.memberId())
+                                                 .setGroupInstanceId(memberResponse.groupInstanceId()),
+                                             Errors.forCode(memberResponse.errorCode()));
+                        }
+                        context.future(groupId).complete(memberErrors);
+                    }
+
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        context.future(groupId).completeExceptionally(throwable);
+                    }
+                };
+                calls.add(call);
             }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final LeaveGroupResponse response = (LeaveGroupResponse) abstractResponse;
-
-                // If coordinator changed since we fetched it, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(response)) {
-                    Call call = getRemoveMembersFromGroupCall(context, members);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                if (handleGroupRequestError(response.topLevelError(), context.future()))
-                    return;
-
-                final Map<MemberIdentity, Errors> memberErrors = new HashMap<>();
-                for (MemberResponse memberResponse : response.memberResponses()) {
-                    memberErrors.put(new MemberIdentity()
-                                         .setMemberId(memberResponse.memberId())
-                                         .setGroupInstanceId(memberResponse.groupInstanceId()),
-                                     Errors.forCode(memberResponse.errorCode()));
-                }
-                context.future().complete(memberErrors);
-            }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
-            }
+            return calls;
         };
     }
 
@@ -4087,82 +4174,89 @@ public class KafkaAdminClient extends AdminClient {
         final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
 
         ConsumerGroupOperationContext<Map<TopicPartition, Errors>, AlterConsumerGroupOffsetsOptions> context =
-                new ConsumerGroupOperationContext<>(groupId, options, deadline, future);
+                new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getAlterConsumerGroupOffsetsCall(offsets));
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context,
-            () -> KafkaAdminClient.this.getAlterConsumerGroupOffsetsCall(context, offsets));
+        Call findCoordinatorCall = getFindCoordinatorCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new AlterConsumerGroupOffsetsResult(future);
     }
 
-    private Call getAlterConsumerGroupOffsetsCall(ConsumerGroupOperationContext<Map<TopicPartition, Errors>,
-                                                  AlterConsumerGroupOffsetsOptions> context,
-                                                  Map<TopicPartition, OffsetAndMetadata> offsets) {
+    private Function<ConsumerGroupOperationContext<Map<TopicPartition, Errors>, AlterConsumerGroupOffsetsOptions>, List<Call>> getAlterConsumerGroupOffsetsCall(Map<TopicPartition, OffsetAndMetadata> offsets) {
+        return context -> {
+            List<Call> calls = new ArrayList<>();
+            for (Map.Entry<String, Optional<Node>> entry : context.nodes().entrySet()) {
+                Node node = entry.getValue().get();
+                String groupId = entry.getKey();
+                Call call = new Call("commitOffsets", context.deadline(), new ConstantNodeIdProvider(node.id())) {
 
-        return new Call("commitOffsets", context.deadline(), new ConstantNodeIdProvider(context.node().get().id())) {
-
-            @Override
-            OffsetCommitRequest.Builder createRequest(int timeoutMs) {
-                List<OffsetCommitRequestTopic> topics = new ArrayList<>();
-                Map<String, List<OffsetCommitRequestPartition>> offsetData = new HashMap<>();
-                for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
-                    String topic = entry.getKey().topic();
-                    OffsetAndMetadata oam = entry.getValue();
-                    offsetData.compute(topic, (key, value) -> {
-                        if (value == null) {
-                            value = new ArrayList<>();
+                    @Override
+                    OffsetCommitRequest.Builder createRequest(int timeoutMs) {
+                        List<OffsetCommitRequestTopic> topics = new ArrayList<>();
+                        Map<String, List<OffsetCommitRequestPartition>> offsetData = new HashMap<>();
+                        for (Map.Entry<TopicPartition, OffsetAndMetadata> entry : offsets.entrySet()) {
+                            String topic = entry.getKey().topic();
+                            OffsetAndMetadata oam = entry.getValue();
+                            offsetData.compute(topic, (key, value) -> {
+                                if (value == null) {
+                                    value = new ArrayList<>();
+                                }
+                                OffsetCommitRequestPartition partition = new OffsetCommitRequestPartition()
+                                        .setCommittedOffset(oam.offset())
+                                        .setCommittedLeaderEpoch(oam.leaderEpoch().orElse(-1))
+                                        .setCommittedMetadata(oam.metadata())
+                                        .setPartitionIndex(entry.getKey().partition());
+                                value.add(partition);
+                                return value;
+                            });
                         }
-                        OffsetCommitRequestPartition partition = new OffsetCommitRequestPartition()
-                                .setCommittedOffset(oam.offset())
-                                .setCommittedLeaderEpoch(oam.leaderEpoch().orElse(-1))
-                                .setCommittedMetadata(oam.metadata())
-                                .setPartitionIndex(entry.getKey().partition());
-                        value.add(partition);
-                        return value;
-                    });
-                }
-                for (Map.Entry<String, List<OffsetCommitRequestPartition>> entry : offsetData.entrySet()) {
-                    OffsetCommitRequestTopic topic = new OffsetCommitRequestTopic()
-                            .setName(entry.getKey())
-                            .setPartitions(entry.getValue());
-                    topics.add(topic);
-                }
-                OffsetCommitRequestData data = new OffsetCommitRequestData()
-                    .setGroupId(context.groupId())
-                    .setTopics(topics);
-                return new OffsetCommitRequest.Builder(data);
-            }
-
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                final OffsetCommitResponse response = (OffsetCommitResponse) abstractResponse;
-
-                Map<Errors, Integer> errorCounts = response.errorCounts();
-                // 1) If coordinator changed since we fetched it, retry
-                // 2) If there is a coordinator error, retry
-                if (ConsumerGroupOperationContext.hasCoordinatorMoved(errorCounts) ||
-                    ConsumerGroupOperationContext.shouldRefreshCoordinator(errorCounts)) {
-                    Call call = getAlterConsumerGroupOffsetsCall(context, offsets);
-                    rescheduleFindCoordinatorTask(context, () -> call, this);
-                    return;
-                }
-
-                final Map<TopicPartition, Errors> partitions = new HashMap<>();
-                for (OffsetCommitResponseTopic topic : response.data().topics()) {
-                    for (OffsetCommitResponsePartition partition : topic.partitions()) {
-                        TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
-                        Errors error = Errors.forCode(partition.errorCode());
-                        partitions.put(tp, error);
+                        for (Map.Entry<String, List<OffsetCommitRequestPartition>> entry : offsetData.entrySet()) {
+                            OffsetCommitRequestTopic topic = new OffsetCommitRequestTopic()
+                                    .setName(entry.getKey())
+                                    .setPartitions(entry.getValue());
+                            topics.add(topic);
+                        }
+                        OffsetCommitRequestData data = new OffsetCommitRequestData()
+                            .setGroupId(groupId)
+                            .setTopics(topics);
+                        return new OffsetCommitRequest.Builder(data);
                     }
-                }
-                context.future().complete(partitions);
-            }
 
-            @Override
-            void handleFailure(Throwable throwable) {
-                context.future().completeExceptionally(throwable);
+                    @Override
+                    void handleResponse(AbstractResponse abstractResponse) {
+                        final OffsetCommitResponse response = (OffsetCommitResponse) abstractResponse;
+
+                        Map<Errors, Integer> errorCounts = response.errorCounts();
+                        // 1) If coordinator changed since we fetched it, retry
+                        // 2) If there is a coordinator error, retry
+                        if (ConsumerGroupOperationContext.hasCoordinatorMoved(errorCounts) ||
+                            ConsumerGroupOperationContext.shouldRefreshCoordinator(errorCounts)) {
+                            ConsumerGroupOperationContext<Map<TopicPartition, Errors>, AlterConsumerGroupOffsetsOptions> retryContext = new ConsumerGroupOperationContext<>(
+                                    groupId, context.options(), context.deadline(), context.future(groupId),
+                                    context.getFunction());
+                            rescheduleFindCoordinatorTask(node, retryContext, this);
+                            return;
+                        }
+
+                        final Map<TopicPartition, Errors> partitions = new HashMap<>();
+                        for (OffsetCommitResponseTopic topic : response.data().topics()) {
+                            for (OffsetCommitResponsePartition partition : topic.partitions()) {
+                                TopicPartition tp = new TopicPartition(topic.name(), partition.partitionIndex());
+                                Errors error = Errors.forCode(partition.errorCode());
+                                partitions.put(tp, error);
+                            }
+                        }
+                        context.future(groupId).complete(partitions);
+                    }
+
+                    @Override
+                    void handleFailure(Throwable throwable) {
+                        context.future(groupId).completeExceptionally(throwable);
+                    }
+                };
+                calls.add(call);
             }
+            return calls;
         };
     }
 
@@ -4814,4 +4908,17 @@ public class KafkaAdminClient extends AdminClient {
             return subLevelErrors.get(subKey).exception();
         }
     }
+
+    private <T> boolean handleGroupRequestError(Errors error, Collection<KafkaFutureImpl<T>> futures) {
+        if (error == Errors.COORDINATOR_LOAD_IN_PROGRESS || error == Errors.COORDINATOR_NOT_AVAILABLE) {
+            throw error.exception();
+        } else if (error != Errors.NONE) {
+            for (KafkaFutureImpl<?> future : futures) {
+                future.completeExceptionally(error.exception());
+            }
+            return true;
+        }
+        return false;
+    }
+
 }

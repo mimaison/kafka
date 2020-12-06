@@ -498,7 +498,9 @@ public class NetworkClient implements KafkaClient {
             }
             // The call to build may also throw UnsupportedVersionException, if there are essential
             // fields that cannot be represented in the chosen version.
-            doSend(clientRequest, isInternalRequest, now, builder.build(version));
+            AbstractRequest ar = builder.build(version);
+            System.err.println("Sending " + ar);
+            doSend(clientRequest, isInternalRequest, now, ar);
         } catch (UnsupportedVersionException unsupportedVersionException) {
             // If the version is not supported, skip sending the request over the wire.
             // Instead, simply add it to the local queue of aborted requests.

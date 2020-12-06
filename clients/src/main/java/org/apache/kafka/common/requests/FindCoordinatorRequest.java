@@ -43,6 +43,10 @@ public class FindCoordinatorRequest extends AbstractRequest {
                 throw new UnsupportedVersionException("Cannot create a v" + version + " FindCoordinator request " +
                         "because we require features supported only in 2 or later.");
             }
+            if (version < 4 && !data.coordinatorKeys().isEmpty()) {
+                throw new UnsupportedVersionException("Cannot create a v" + version + " FindCoordinator request " +
+                        "because we require features supported only in 3 or later.");
+            }
             return new FindCoordinatorRequest(data, version);
         }
 

@@ -49,6 +49,7 @@ import org.apache.kafka.common.message.DeleteGroupsResponseData.{DeletableGroupR
 import org.apache.kafka.common.message.DeleteRecordsResponseData.{DeleteRecordsPartitionResult, DeleteRecordsTopicResult}
 import org.apache.kafka.common.message.DeleteTopicsResponseData.{DeletableTopicResult, DeletableTopicResultCollection}
 import org.apache.kafka.common.message.ElectLeadersResponseData.{PartitionResult, ReplicaElectionResult}
+import org.apache.kafka.common.message.FindCoordinatorResponseData.Coordinator
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse
 import org.apache.kafka.common.message.ListOffsetsRequestData.ListOffsetsPartition
 import org.apache.kafka.common.message.ListOffsetsResponseData.{ListOffsetsPartitionResponse, ListOffsetsTopicResponse}
@@ -86,6 +87,9 @@ import scala.collection.{Map, Seq, Set, immutable, mutable}
 import scala.compat.java8.OptionConverters._
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
+
+
+
 
 /**
  * Logic to handle the various Kafka requests
@@ -1308,6 +1312,90 @@ class KafkaApis(val requestChannel: RequestChannel,
   }
 
   def handleFindCoordinatorRequest(request: RequestChannel.Request): Unit = {
+    val version = request.header.apiVersion
+    if (version < 4) {
+      handleFindCoordinatorRequestLessThanV4(request)
+    } else {
+      handleFindCoordinatorRequestV4AndAbove(request)
+    }
+  }
+
+  def handleFindCoordinatorRequestV4AndAbove(request: RequestChannel.Request): Unit = {
+    val findCoordinatorRequest = request.body[FindCoordinatorRequest]
+
+    def errorResponse(key: String, error: Errors): Coordinator = {
+      new Coordinator()
+        .setKey(key)
+        .setErrorCode(error.code)
+        .setErrorMessage(error.message)
+        .setHost(Node.noNode.host)
+        .setNodeId(Node.noNode.id)
+        .setPort(Node.noNode.port)
+    }
+    def coordinatorResponse(key: String, node: Node): Coordinator = {
+      new Coordinator()
+        .setKey(key)
+        .setErrorCode(Errors.NONE.code)
+        .setHost(node.host)
+        .setNodeId(node.id)
+        .setPort(node.port)
+    }
+    val coordinators = findCoordinatorRequest.data.coordinatorKeys.asScala.map { key =>
+      if (findCoordinatorRequest.data.keyType == CoordinatorType.GROUP.id &&
+        !authHelper.authorize(request.context, DESCRIBE, GROUP, findCoordinatorRequest.data.key))
+        errorResponse(key, Errors.GROUP_AUTHORIZATION_FAILED)
+      else if (findCoordinatorRequest.data.keyType == CoordinatorType.TRANSACTION.id &&
+          !authHelper.authorize(request.context, DESCRIBE, TRANSACTIONAL_ID, findCoordinatorRequest.data.key))
+        errorResponse(key, Errors.TRANSACTIONAL_ID_AUTHORIZATION_FAILED)
+      else {
+        val (partition, internalTopicName) = CoordinatorType.forId(findCoordinatorRequest.data.keyType) match {
+          case CoordinatorType.GROUP =>
+            (groupCoordinator.partitionFor(findCoordinatorRequest.data.key), GROUP_METADATA_TOPIC_NAME)
+
+          case CoordinatorType.TRANSACTION =>
+            (txnCoordinator.partitionFor(findCoordinatorRequest.data.key), TRANSACTION_STATE_TOPIC_NAME)
+        }
+
+        val topicMetadata = metadataCache.getTopicMetadata(Set(internalTopicName), request.context.listenerName)
+
+        if (topicMetadata.headOption.isEmpty) {
+          val controllerMutationQuota = quotas.controllerMutation.newPermissiveQuotaFor(request)
+          autoTopicCreationManager.createTopics(Seq(internalTopicName).toSet, controllerMutationQuota)
+          errorResponse(key, Errors.COORDINATOR_NOT_AVAILABLE)
+        } else {
+          if (topicMetadata.head.errorCode != Errors.NONE.code) {
+              errorResponse(key, Errors.COORDINATOR_NOT_AVAILABLE)
+          } else {
+            val coordinatorEndpoint = topicMetadata.head.partitions.asScala
+              .find(_.partitionIndex == partition)
+              .filter(_.leaderId != MetadataResponse.NO_LEADER_ID)
+              .flatMap(metadata => metadataCache.getAliveBroker(metadata.leaderId))
+              .flatMap(_.endpoints.get(request.context.listenerName.value()))
+              .filterNot(_.isEmpty)
+
+            coordinatorEndpoint match {
+              case Some(endpoint) =>
+                coordinatorResponse(key,endpoint)
+              case _ =>
+                errorResponse(key, Errors.COORDINATOR_NOT_AVAILABLE)
+            }
+          }
+        }
+      }
+    }
+    def createResponse(requestThrottleMs: Int): AbstractResponse = {
+      val response = new FindCoordinatorResponse(
+              new FindCoordinatorResponseData()
+                .setCoordinators(coordinators.asJava)
+                .setThrottleTimeMs(requestThrottleMs))
+      trace("Sending FindCoordinator response %s for correlation id %d to client %s."
+              .format(response, request.header.correlationId, request.header.clientId))
+      response
+    }
+    requestHelper.sendResponseMaybeThrottle(request, createResponse)
+  }
+
+  def handleFindCoordinatorRequestLessThanV4(request: RequestChannel.Request): Unit = {
     val findCoordinatorRequest = request.body[FindCoordinatorRequest]
 
     if (findCoordinatorRequest.data.keyType == CoordinatorType.GROUP.id &&

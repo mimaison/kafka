@@ -159,6 +159,7 @@ import org.apache.kafka.common.requests.DescribeProducersRequest;
 import org.apache.kafka.common.requests.DescribeProducersResponse;
 import org.apache.kafka.common.requests.DescribeUserScramCredentialsResponse;
 import org.apache.kafka.common.requests.ElectLeadersResponse;
+import org.apache.kafka.common.requests.FindCoordinatorRequest;
 import org.apache.kafka.common.requests.FindCoordinatorResponse;
 import org.apache.kafka.common.requests.IncrementalAlterConfigsResponse;
 import org.apache.kafka.common.requests.JoinGroupRequest;
@@ -5200,10 +5201,10 @@ public class KafkaAdminClientTest {
             }
         };
 
-        assertFalse(ConsumerGroupOperationContext.hasCoordinatorMoved(response));
+        assertFalse(ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts()));
 
         errors.put(Errors.NOT_COORDINATOR, 1);
-        assertTrue(ConsumerGroupOperationContext.hasCoordinatorMoved(response));
+        assertTrue(ConsumerGroupOperationContext.hasCoordinatorMoved(response.errorCounts()));
     }
 
     @Test
@@ -5635,6 +5636,82 @@ public class KafkaAdminClientTest {
                     return ret;
                 }
             }
+        }
+    }
+
+    private byte[] getMemberAssignmentBytes(TopicPartition tp) {
+        final ByteBuffer memberAssignment = ConsumerProtocol.serializeAssignment(
+                new ConsumerPartitionAssignor.Assignment(
+                        Collections.singletonList(tp)));
+        byte[] memberAssignmentBytes = new byte[memberAssignment.remaining()];
+        memberAssignment.get(memberAssignmentBytes);
+        return memberAssignmentBytes;
+    }
+
+    private MockClient.RequestMatcher findCoordinatorMatcher(final String groupId) {
+        return body -> {
+            if (body instanceof FindCoordinatorRequest) {
+                FindCoordinatorRequest request = (FindCoordinatorRequest) body;
+                return groupId.equals(request.data().key());
+            }
+            return false;
+        };
+    }
+
+    @Test
+    public void testDescribeConsumerGroupsWithOlderBroker() throws Exception {
+        ApiVersion findCoordinatorV3 = new ApiVersion()
+                .setApiKey(ApiKeys.FIND_COORDINATOR.id)
+                .setMinVersion((short) 0)
+                .setMaxVersion((short) 3);
+        ApiVersion describeGroups = new ApiVersion()
+                .setApiKey(ApiKeys.DESCRIBE_GROUPS.id)
+                .setMinVersion((short) 0)
+                .setMaxVersion(ApiKeys.DELETE_GROUPS.latestVersion());
+
+        try (AdminClientUnitTestEnv env = new AdminClientUnitTestEnv(mockCluster(2, 0))) {
+            env.kafkaClient().setNodeApiVersions(NodeApiVersions.create(Arrays.asList(findCoordinatorV3, describeGroups)));
+
+            Node node0 = env.cluster().nodeById(0);
+            Node node1 = env.cluster().nodeById(1);
+            env.kafkaClient().prepareResponse(findCoordinatorMatcher("group-0"), prepareFindCoordinatorResponse(Errors.NONE, node0));
+            env.kafkaClient().prepareResponse(findCoordinatorMatcher("group-1"), prepareFindCoordinatorResponse(Errors.NONE, node1));
+
+            byte[] memberAssignmentBytes = getMemberAssignmentBytes(new TopicPartition("my_topic", 0));
+            DescribeGroupsResponseData group0Data = new DescribeGroupsResponseData();
+            group0Data.groups().add(DescribeGroupsResponse.groupMetadata(
+                    "group-0",
+                    Errors.NONE,
+                    "",
+                    ConsumerProtocol.PROTOCOL_TYPE,
+                    "",
+                    asList(
+                            DescribeGroupsResponse.groupMember("0", null, "clientId0", "clientHost", memberAssignmentBytes, null),
+                            DescribeGroupsResponse.groupMember("1", null, "clientId1", "clientHost", memberAssignmentBytes, null)
+                    ),
+                    Collections.emptySet()));
+
+            DescribeGroupsResponseData group1Data = new DescribeGroupsResponseData();
+            group1Data.groups().add(DescribeGroupsResponse.groupMetadata(
+                    "group-1",
+                    Errors.NONE,
+                    "",
+                    ConsumerProtocol.PROTOCOL_TYPE,
+                    "",
+                    asList(
+                            DescribeGroupsResponse.groupMember("0", null, "clientId0", "clientHost", memberAssignmentBytes, null),
+                            DescribeGroupsResponse.groupMember("1", null, "clientId1", "clientHost", memberAssignmentBytes, null)
+                    ),
+                    Collections.emptySet()));
+
+            env.kafkaClient().prepareResponseFrom(new DescribeGroupsResponse(group0Data), node0);
+            env.kafkaClient().prepareResponseFrom(new DescribeGroupsResponse(group1Data), node1);
+
+            Collection<String> groups = new HashSet<>();
+            groups.add("group-0");
+            groups.add("group-1");
+            final DescribeConsumerGroupsResult result = env.adminClient().describeConsumerGroups(groups);
+            assertEquals(2, result.all().get().size());
         }
     }
 }
