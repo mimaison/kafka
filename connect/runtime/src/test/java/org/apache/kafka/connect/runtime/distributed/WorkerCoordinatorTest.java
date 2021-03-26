@@ -27,7 +27,7 @@ import org.apache.kafka.common.message.JoinGroupResponseData;
 import org.apache.kafka.common.message.SyncGroupResponseData;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.protocol.Errors;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.JoinGroupResponse;
 import org.apache.kafka.common.requests.RequestTestUtils;
 import org.apache.kafka.common.requests.SyncGroupRequest;
@@ -244,7 +244,7 @@ public class WorkerCoordinatorTest {
 
         final String consumerId = "leader";
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, node));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, node));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
 
         // normal join group
@@ -281,7 +281,7 @@ public class WorkerCoordinatorTest {
 
         final String memberId = "member";
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, node));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, node));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
 
         // normal join group
@@ -319,7 +319,7 @@ public class WorkerCoordinatorTest {
 
         final String memberId = "member";
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, node));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, node));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
 
         // config mismatch results in assignment error
@@ -347,7 +347,7 @@ public class WorkerCoordinatorTest {
 
         PowerMock.replayAll();
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, node));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, node));
         coordinator.ensureCoordinatorReady(time.timer(Long.MAX_VALUE));
 
         // join the group once

@@ -44,7 +44,7 @@ import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.requests.AbstractRequest;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
 import org.apache.kafka.common.requests.ProduceRequest;
 import org.apache.kafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.requests.RequestHeader;
@@ -446,7 +446,7 @@ public class Sender implements Runnable {
         AbstractRequest.Builder<?> requestBuilder = nextRequestHandler.requestBuilder();
         Node targetNode = null;
         try {
-            FindCoordinatorRequest.CoordinatorType coordinatorType = nextRequestHandler.coordinatorType();
+            FindCoordinatorsRequest.CoordinatorType coordinatorType = nextRequestHandler.coordinatorType();
             targetNode = coordinatorType != null ?
                     transactionManager.coordinator(coordinatorType) :
                     client.leastLoadedNode(time.milliseconds());
@@ -529,9 +529,9 @@ public class Sender implements Runnable {
         return running;
     }
 
-    private boolean awaitNodeReady(Node node, FindCoordinatorRequest.CoordinatorType coordinatorType) throws IOException {
+    private boolean awaitNodeReady(Node node, FindCoordinatorsRequest.CoordinatorType coordinatorType) throws IOException {
         if (NetworkClientUtils.awaitReady(client, node, time, requestTimeoutMs)) {
-            if (coordinatorType == FindCoordinatorRequest.CoordinatorType.TRANSACTION) {
+            if (coordinatorType == FindCoordinatorsRequest.CoordinatorType.TRANSACTION) {
                 // Indicate to the transaction manager that the coordinator is ready, allowing it to check ApiVersions
                 // This allows us to bump transactional epochs even if the coordinator is temporarily unavailable at
                 // the time when the abortable error is handled

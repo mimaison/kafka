@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class FindCoordinatorRequestTest {
+class FindCoordinatorsRequestTest {
 
     @Test
     public void getInvalidCoordinatorTypeId() {
         assertThrows(InvalidRequestException.class,
-            () -> FindCoordinatorRequest.CoordinatorType.forId((byte) 10));
+            () -> FindCoordinatorsRequest.CoordinatorType.forId((byte) 10));
     }
 }

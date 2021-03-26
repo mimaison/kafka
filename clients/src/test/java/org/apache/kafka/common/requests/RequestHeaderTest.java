@@ -55,7 +55,7 @@ public class RequestHeaderTest {
     @Test
     public void testRequestHeaderV1() {
         short apiVersion = 1;
-        RequestHeader header = new RequestHeader(ApiKeys.FIND_COORDINATOR, apiVersion, "", 10);
+        RequestHeader header = new RequestHeader(ApiKeys.FIND_COORDINATORS, apiVersion, "", 10);
         assertEquals(1, header.headerVersion());
 
         ByteBuffer buffer = RequestTestUtils.serializeRequestHeader(header);
@@ -81,7 +81,7 @@ public class RequestHeaderTest {
         ByteBuffer buffer = ByteBuffer.allocate(64);
         buffer.position(10);
 
-        RequestHeader header = new RequestHeader(ApiKeys.FIND_COORDINATOR, (short) 1, "", 10);
+        RequestHeader header = new RequestHeader(ApiKeys.FIND_COORDINATORS, (short) 1, "", 10);
         ObjectSerializationCache serializationCache = new ObjectSerializationCache();
         // size must be called before write to avoid an NPE with the current implementation
         header.size(serializationCache);

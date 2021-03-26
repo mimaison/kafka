@@ -16,7 +16,7 @@
 {
   "apiKey": 10,
   "type": "response",
-  "name": "FindCoordinatorResponse",
+  "name": "FindCoordinatorsResponse",
   // Version 1 adds throttle time and error messages.
   //
   // Starting in version 2, on quota violation, brokers send out responses before throttling.

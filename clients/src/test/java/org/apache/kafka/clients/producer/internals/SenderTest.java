@@ -63,8 +63,8 @@ import org.apache.kafka.common.requests.AddPartitionsToTxnResponse;
 import org.apache.kafka.common.requests.ApiVersionsResponse;
 import org.apache.kafka.common.requests.EndTxnRequest;
 import org.apache.kafka.common.requests.EndTxnResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.InitProducerIdRequest;
 import org.apache.kafka.common.requests.InitProducerIdResponse;
 import org.apache.kafka.common.requests.MetadataRequest;
@@ -3003,7 +3003,7 @@ public class SenderTest {
 
     private void prepareFindCoordinatorResponse(Errors error) {
         Node node = metadata.fetch().nodes().get(0);
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(error, node));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(error, node));
     }
 
     private void prepareInitProducerResponse(Errors error, long producerId, short producerEpoch) {

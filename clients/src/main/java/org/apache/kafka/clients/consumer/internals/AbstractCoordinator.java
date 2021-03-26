@@ -32,7 +32,7 @@ import org.apache.kafka.common.errors.RebalanceInProgressException;
 import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.UnknownMemberIdException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
-import org.apache.kafka.common.message.FindCoordinatorRequestData;
+import org.apache.kafka.common.message.FindCoordinatorsRequestData;
 import org.apache.kafka.common.message.HeartbeatRequestData;
 import org.apache.kafka.common.message.JoinGroupRequestData;
 import org.apache.kafka.common.message.JoinGroupResponseData;
@@ -51,9 +51,9 @@ import org.apache.kafka.common.metrics.stats.Rate;
 import org.apache.kafka.common.metrics.stats.WindowedCount;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.HeartbeatRequest;
 import org.apache.kafka.common.requests.HeartbeatResponse;
 import org.apache.kafka.common.requests.JoinGroupRequest;
@@ -137,7 +137,7 @@ public abstract class AbstractCoordinator implements Closeable {
     private boolean needsJoinPrepare = true;
     private HeartbeatThread heartbeatThread = null;
     private RequestFuture<ByteBuffer> joinFuture = null;
-    private RequestFuture<Void> findCoordinatorFuture = null;
+    private RequestFuture<Void> findCoordinatorsFuture = null;
     private volatile RuntimeException fatalFindCoordinatorException = null;
     private Generation generation = Generation.NO_GENERATION;
     private long lastRebalanceStartMs = -1L;
@@ -280,21 +280,21 @@ public abstract class AbstractCoordinator implements Closeable {
     }
 
     protected synchronized RequestFuture<Void> lookupCoordinator(boolean batch) {
-        if (findCoordinatorFuture == null) {
+        if (findCoordinatorsFuture == null) {
             // find a node to ask about the coordinator
             Node node = this.client.leastLoadedNode();
             if (node == null) {
                 log.debug("No broker available to send FindCoordinator request");
                 return RequestFuture.noBrokersAvailable();
             } else {
-                findCoordinatorFuture = sendFindCoordinatorRequest(node, batch);
+                findCoordinatorsFuture = sendFindCoordinatorsRequest(node, batch);
             }
         }
-        return findCoordinatorFuture;
+        return findCoordinatorsFuture;
     }
 
     private synchronized void clearFindCoordinatorFuture() {
-        findCoordinatorFuture = null;
+        findCoordinatorsFuture = null;
     }
 
     /**
@@ -816,40 +816,40 @@ public abstract class AbstractCoordinator implements Closeable {
      * one of the brokers. The returned future should be polled to get the result of the request.
      * @return A request future which indicates the completion of the metadata request
      */
-    private RequestFuture<Void> sendFindCoordinatorRequest(Node node, boolean batch) {
+    private RequestFuture<Void> sendFindCoordinatorsRequest(Node node, boolean batch) {
         // initiate the group metadata request
-        log.debug("Sending FindCoordinator request to broker {}", node);
-        FindCoordinatorRequestData data = new FindCoordinatorRequestData()
+        log.debug("Sending FindCoordinators request to broker {}", node);
+        FindCoordinatorsRequestData data = new FindCoordinatorsRequestData()
                 .setKeyType(CoordinatorType.GROUP.id());
         if (batch) {
             data.setCoordinatorKeys(Collections.singletonList(this.rebalanceConfig.groupId));
         } else {
             data.setKey(this.rebalanceConfig.groupId);
         }
-        FindCoordinatorRequest.Builder requestBuilder =
-                new FindCoordinatorRequest.Builder(data);
+        FindCoordinatorsRequest.Builder requestBuilder =
+                new FindCoordinatorsRequest.Builder(data);
         return client.send(node, requestBuilder)
-                .compose(new FindCoordinatorResponseHandler());
+                .compose(new FindCoordinatorsResponseHandler());
     }
 
-    private class FindCoordinatorResponseHandler extends RequestFutureAdapter<ClientResponse, Void> {
+    private class FindCoordinatorsResponseHandler extends RequestFutureAdapter<ClientResponse, Void> {
 
         @Override
         public void onSuccess(ClientResponse resp, RequestFuture<Void> future) {
-            log.debug("Received FindCoordinator response {}", resp);
+            log.debug("Received FindCoordinators response {}", resp);
 
-            FindCoordinatorResponse findCoordinatorResponse = (FindCoordinatorResponse) resp.responseBody();
-            Errors error = findCoordinatorResponse.error();
+            FindCoordinatorsResponse findCoordinatorsResponse = (FindCoordinatorsResponse) resp.responseBody();
+            Errors error = findCoordinatorsResponse.error();
             if (error == Errors.NONE) {
                 synchronized (AbstractCoordinator.this) {
                     // use MAX_VALUE - node.id as the coordinator id to allow separate connections
                     // for the coordinator in the underlying network client layer
-                    int coordinatorConnectionId = Integer.MAX_VALUE - findCoordinatorResponse.data().nodeId();
+                    int coordinatorConnectionId = Integer.MAX_VALUE - findCoordinatorsResponse.data().nodeId();
 
                     AbstractCoordinator.this.coordinator = new Node(
                             coordinatorConnectionId,
-                            findCoordinatorResponse.data().host(),
-                            findCoordinatorResponse.data().port());
+                            findCoordinatorsResponse.data().host(),
+                            findCoordinatorsResponse.data().port());
                     log.info("Discovered group coordinator {}", coordinator);
                     client.tryConnect(coordinator);
                     heartbeat.resetSessionTimeout();
@@ -858,7 +858,7 @@ public abstract class AbstractCoordinator implements Closeable {
             } else if (error == Errors.GROUP_AUTHORIZATION_FAILED) {
                 future.raise(GroupAuthorizationException.forGroupId(rebalanceConfig.groupId));
             } else {
-                log.debug("Group coordinator lookup failed: {}", findCoordinatorResponse.data().errorMessage());
+                log.debug("Group coordinator lookup failed: {}", findCoordinatorsResponse.data().errorMessage());
                 future.raise(error);
             }
         }
@@ -1376,7 +1376,7 @@ public abstract class AbstractCoordinator implements Closeable {
                         long now = time.milliseconds();
 
                         if (coordinatorUnknown()) {
-                            if (findCoordinatorFuture != null) {
+                            if (findCoordinatorsFuture != null) {
                                 // clear the future so that after the backoff, if the hb still sees coordinator unknown in
                                 // the next iteration it will try to re-discover the coordinator in case the main thread cannot
                                 clearFindCoordinatorFuture();

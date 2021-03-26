@@ -111,7 +111,7 @@ import org.apache.kafka.common.message.ExpireDelegationTokenRequestData;
 import org.apache.kafka.common.message.ExpireDelegationTokenResponseData;
 import org.apache.kafka.common.message.FetchRequestData;
 import org.apache.kafka.common.message.FetchResponseData;
-import org.apache.kafka.common.message.FindCoordinatorRequestData;
+import org.apache.kafka.common.message.FindCoordinatorsRequestData;
 import org.apache.kafka.common.message.HeartbeatRequestData;
 import org.apache.kafka.common.message.HeartbeatResponseData;
 import org.apache.kafka.common.message.IncrementalAlterConfigsRequestData;
@@ -192,7 +192,7 @@ import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.SimpleRecord;
 import org.apache.kafka.common.requests.CreateTopicsRequest.Builder;
 import org.apache.kafka.common.requests.DescribeConfigsResponse.ConfigType;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
 import org.apache.kafka.common.resource.PatternType;
 import org.apache.kafka.common.resource.ResourcePattern;
 import org.apache.kafka.common.resource.ResourcePatternFilter;
@@ -248,10 +248,10 @@ public class RequestResponseTest {
 
     @Test
     public void testSerialization() throws Exception {
-        checkRequest(createFindCoordinatorRequest(0), true);
-        checkRequest(createFindCoordinatorRequest(1), true);
-        checkErrorResponse(createFindCoordinatorRequest(0), unknownServerException, true);
-        checkErrorResponse(createFindCoordinatorRequest(1), unknownServerException, true);
+        checkRequest(createFindCoordinatorsRequest(0), true);
+        checkRequest(createFindCoordinatorsRequest(1), true);
+        checkErrorResponse(createFindCoordinatorsRequest(0), unknownServerException, true);
+        checkErrorResponse(createFindCoordinatorsRequest(1), unknownServerException, true);
         checkResponse(createFindCoordinatorResponse(), 0, true);
         checkResponse(createFindCoordinatorResponse(), 1, true);
         checkRequest(createControlledShutdownRequest(), true);
@@ -723,9 +723,9 @@ public class RequestResponseTest {
     }
 
     @Test
-    public void cannotUseFindCoordinatorV0ToFindTransactionCoordinator() {
-        FindCoordinatorRequest.Builder builder = new FindCoordinatorRequest.Builder(
-                new FindCoordinatorRequestData()
+    public void cannotUseFindCoordinatorsV0ToFindTransactionCoordinator() {
+        FindCoordinatorsRequest.Builder builder = new FindCoordinatorsRequest.Builder(
+                new FindCoordinatorsRequestData()
                     .setKeyType(CoordinatorType.TRANSACTION.id)
                     .setKey("foobar"));
         assertThrows(UnsupportedVersionException.class, () -> builder.build((short) 0));
@@ -1135,17 +1135,17 @@ public class RequestResponseTest {
         return new ResponseHeader(10, headerVersion);
     }
 
-    private FindCoordinatorRequest createFindCoordinatorRequest(int version) {
-        return new FindCoordinatorRequest.Builder(
-                new FindCoordinatorRequestData()
+    private FindCoordinatorsRequest createFindCoordinatorsRequest(int version) {
+        return new FindCoordinatorsRequest.Builder(
+                new FindCoordinatorsRequestData()
                     .setKeyType(CoordinatorType.GROUP.id())
                     .setKey("test-group"))
                 .build((short) version);
     }
 
-    private FindCoordinatorResponse createFindCoordinatorResponse() {
+    private FindCoordinatorsResponse createFindCoordinatorResponse() {
         Node node = new Node(10, "host1", 2014);
-        return FindCoordinatorResponse.prepareResponse(Errors.NONE, node);
+        return FindCoordinatorsResponse.prepareResponse(Errors.NONE, node);
     }
 
     private FetchRequest createFetchRequest(int version, FetchMetadata metadata, List<TopicPartition> toForget) {

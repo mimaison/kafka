@@ -46,7 +46,7 @@ import org.apache.kafka.common.message.ListOffsetsRequestData.{ListOffsetsPartit
 import org.apache.kafka.common.message.OffsetForLeaderEpochRequestData.{OffsetForLeaderPartition, OffsetForLeaderTopic, OffsetForLeaderTopicCollection}
 import org.apache.kafka.common.message.StopReplicaRequestData.{StopReplicaPartitionState, StopReplicaTopicState}
 import org.apache.kafka.common.message.UpdateMetadataRequestData.{UpdateMetadataBroker, UpdateMetadataEndpoint, UpdateMetadataPartitionState}
-import org.apache.kafka.common.message.{AddOffsetsToTxnRequestData, AlterPartitionReassignmentsRequestData, AlterReplicaLogDirsRequestData, ControlledShutdownRequestData, CreateAclsRequestData, CreatePartitionsRequestData, CreateTopicsRequestData, DeleteAclsRequestData, DeleteGroupsRequestData, DeleteRecordsRequestData, DeleteTopicsRequestData, DescribeClusterRequestData, DescribeConfigsRequestData, DescribeGroupsRequestData, DescribeLogDirsRequestData, DescribeProducersRequestData, DescribeTransactionsRequestData, FindCoordinatorRequestData, HeartbeatRequestData, IncrementalAlterConfigsRequestData, JoinGroupRequestData, ListPartitionReassignmentsRequestData, ListTransactionsRequestData, MetadataRequestData, OffsetCommitRequestData, ProduceRequestData, SyncGroupRequestData}
+import org.apache.kafka.common.message.{AddOffsetsToTxnRequestData, AlterPartitionReassignmentsRequestData, AlterReplicaLogDirsRequestData, ControlledShutdownRequestData, CreateAclsRequestData, CreatePartitionsRequestData, CreateTopicsRequestData, DeleteAclsRequestData, DeleteGroupsRequestData, DeleteRecordsRequestData, DeleteTopicsRequestData, DescribeClusterRequestData, DescribeConfigsRequestData, DescribeGroupsRequestData, DescribeLogDirsRequestData, DescribeProducersRequestData, DescribeTransactionsRequestData, FindCoordinatorsRequestData, HeartbeatRequestData, IncrementalAlterConfigsRequestData, JoinGroupRequestData, ListPartitionReassignmentsRequestData, ListTransactionsRequestData, MetadataRequestData, OffsetCommitRequestData, ProduceRequestData, SyncGroupRequestData}
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.record.{CompressionType, MemoryRecords, RecordBatch, SimpleRecord}
@@ -177,7 +177,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
     ApiKeys.OFFSET_COMMIT -> ((resp: requests.OffsetCommitResponse) => Errors.forCode(
       resp.data.topics().get(0).partitions().get(0).errorCode)),
     ApiKeys.OFFSET_FETCH -> ((resp: requests.OffsetFetchResponse) => resp.error),
-    ApiKeys.FIND_COORDINATOR -> ((resp: FindCoordinatorResponse) => resp.error),
+    ApiKeys.FIND_COORDINATORS -> ((resp: FindCoordinatorsResponse) => resp.error),
     ApiKeys.UPDATE_METADATA -> ((resp: requests.UpdateMetadataResponse) => resp.error),
     ApiKeys.JOIN_GROUP -> ((resp: JoinGroupResponse) => resp.error),
     ApiKeys.SYNC_GROUP -> ((resp: SyncGroupResponse) => Errors.forCode(resp.data.errorCode)),
@@ -269,7 +269,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
     ApiKeys.LIST_OFFSETS -> topicDescribeAcl,
     ApiKeys.OFFSET_COMMIT -> (topicReadAcl ++ groupReadAcl),
     ApiKeys.OFFSET_FETCH -> (topicReadAcl ++ groupDescribeAcl),
-    ApiKeys.FIND_COORDINATOR -> (topicReadAcl ++ groupDescribeAcl ++ transactionalIdDescribeAcl),
+    ApiKeys.FIND_COORDINATORS -> (topicReadAcl ++ groupDescribeAcl ++ transactionalIdDescribeAcl),
     ApiKeys.UPDATE_METADATA -> clusterAcl,
     ApiKeys.JOIN_GROUP -> groupReadAcl,
     ApiKeys.SYNC_GROUP -> groupReadAcl,
@@ -381,10 +381,10 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
     new requests.OffsetFetchRequest.Builder(group, false, List(tp).asJava, false).build()
   }
 
-  private def createFindCoordinatorRequest = {
-    new FindCoordinatorRequest.Builder(
-        new FindCoordinatorRequestData()
-          .setKeyType(FindCoordinatorRequest.CoordinatorType.GROUP.id)
+  private def createFindCoordinatorsRequest = {
+    new FindCoordinatorsRequest.Builder(
+        new FindCoordinatorsRequestData()
+          .setKeyType(FindCoordinatorsRequest.CoordinatorType.GROUP.id)
           .setKey(group)).build()
   }
 
@@ -711,7 +711,7 @@ class AuthorizerIntegrationTest extends BaseRequestTest {
       ApiKeys.FETCH -> createFetchRequest,
       ApiKeys.LIST_OFFSETS -> createListOffsetsRequest,
       ApiKeys.OFFSET_FETCH -> createOffsetFetchRequest,
-      ApiKeys.FIND_COORDINATOR -> createFindCoordinatorRequest,
+      ApiKeys.FIND_COORDINATORS -> createFindCoordinatorsRequest,
       ApiKeys.JOIN_GROUP -> createJoinGroupRequest,
       ApiKeys.SYNC_GROUP -> createSyncGroupRequest,
       ApiKeys.DESCRIBE_GROUPS -> createDescribeGroupsRequest,

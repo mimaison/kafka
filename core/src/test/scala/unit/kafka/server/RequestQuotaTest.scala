@@ -323,10 +323,10 @@ class RequestQuotaTest extends BaseRequestTest {
         case ApiKeys.OFFSET_FETCH =>
           new OffsetFetchRequest.Builder("test-group", false, List(tp).asJava, false)
 
-        case ApiKeys.FIND_COORDINATOR =>
-          new FindCoordinatorRequest.Builder(
-              new FindCoordinatorRequestData()
-                .setKeyType(FindCoordinatorRequest.CoordinatorType.GROUP.id)
+        case ApiKeys.FIND_COORDINATORS =>
+          new FindCoordinatorsRequest.Builder(
+              new FindCoordinatorsRequestData()
+                .setKeyType(FindCoordinatorsRequest.CoordinatorType.GROUP.id)
                 .setKey("test-group"))
 
         case ApiKeys.JOIN_GROUP =>

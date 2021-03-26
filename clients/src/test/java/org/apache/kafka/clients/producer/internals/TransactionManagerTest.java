@@ -62,9 +62,9 @@ import org.apache.kafka.common.requests.AddPartitionsToTxnRequest;
 import org.apache.kafka.common.requests.AddPartitionsToTxnResponse;
 import org.apache.kafka.common.requests.EndTxnRequest;
 import org.apache.kafka.common.requests.EndTxnResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.InitProducerIdRequest;
 import org.apache.kafka.common.requests.InitProducerIdResponse;
 import org.apache.kafka.common.requests.ProduceRequest;
@@ -820,7 +820,7 @@ public class TransactionManagerTest {
     public void testUnsupportedFindCoordinator() {
         transactionManager.initializeTransactions();
         client.prepareUnsupportedVersionResponse(body -> {
-            FindCoordinatorRequest findCoordinatorRequest = (FindCoordinatorRequest) body;
+            FindCoordinatorsRequest findCoordinatorRequest = (FindCoordinatorsRequest) body;
             assertEquals(CoordinatorType.forId(findCoordinatorRequest.data().keyType()), CoordinatorType.TRANSACTION);
             assertEquals(findCoordinatorRequest.data().key(), transactionalId);
             return true;
@@ -3340,11 +3340,11 @@ public class TransactionManagerTest {
                                                 final CoordinatorType coordinatorType,
                                                 final String coordinatorKey) {
         client.prepareResponse(body -> {
-            FindCoordinatorRequest findCoordinatorRequest = (FindCoordinatorRequest) body;
+            FindCoordinatorsRequest findCoordinatorRequest = (FindCoordinatorsRequest) body;
             assertEquals(CoordinatorType.forId(findCoordinatorRequest.data().keyType()), coordinatorType);
             assertEquals(findCoordinatorRequest.data().key(), coordinatorKey);
             return true;
-        }, FindCoordinatorResponse.prepareResponse(error, brokerNode), shouldDisconnect);
+        }, FindCoordinatorsResponse.prepareResponse(error, brokerNode), shouldDisconnect);
     }
 
     private void prepareInitPidResponse(Errors error, boolean shouldDisconnect, long producerId, short producerEpoch) {

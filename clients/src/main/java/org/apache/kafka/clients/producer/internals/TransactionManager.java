@@ -43,7 +43,7 @@ import org.apache.kafka.common.errors.TransactionalIdAuthorizationException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.message.AddOffsetsToTxnRequestData;
 import org.apache.kafka.common.message.EndTxnRequestData;
-import org.apache.kafka.common.message.FindCoordinatorRequestData;
+import org.apache.kafka.common.message.FindCoordinatorsRequestData;
 import org.apache.kafka.common.message.InitProducerIdRequestData;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.DefaultRecordBatch;
@@ -56,9 +56,9 @@ import org.apache.kafka.common.requests.AddPartitionsToTxnRequest;
 import org.apache.kafka.common.requests.AddPartitionsToTxnResponse;
 import org.apache.kafka.common.requests.EndTxnRequest;
 import org.apache.kafka.common.requests.EndTxnResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.InitProducerIdRequest;
 import org.apache.kafka.common.requests.InitProducerIdResponse;
 import org.apache.kafka.common.requests.ProduceResponse;
@@ -925,7 +925,7 @@ public class TransactionManager {
         }
     }
 
-    Node coordinator(FindCoordinatorRequest.CoordinatorType type) {
+    Node coordinator(FindCoordinatorsRequest.CoordinatorType type) {
         switch (type) {
             case GROUP:
                 return consumerGroupCoordinator;
@@ -1131,7 +1131,7 @@ public class TransactionManager {
         pendingRequests.add(requestHandler);
     }
 
-    private void lookupCoordinator(FindCoordinatorRequest.CoordinatorType type, String coordinatorKey) {
+    private void lookupCoordinator(FindCoordinatorsRequest.CoordinatorType type, String coordinatorKey) {
         switch (type) {
             case GROUP:
                 consumerGroupCoordinator = null;
@@ -1143,8 +1143,8 @@ public class TransactionManager {
                 throw new IllegalStateException("Invalid coordinator type: " + type);
         }
 
-        FindCoordinatorRequest.Builder builder = new FindCoordinatorRequest.Builder(
-                new FindCoordinatorRequestData()
+        FindCoordinatorsRequest.Builder builder = new FindCoordinatorsRequest.Builder(
+                new FindCoordinatorsRequestData()
                     .setKeyType(type.id())
                     .setKey(coordinatorKey));
         enqueueRequest(new FindCoordinatorHandler(builder));
@@ -1299,8 +1299,8 @@ public class TransactionManager {
             return coordinatorType() != null;
         }
 
-        FindCoordinatorRequest.CoordinatorType coordinatorType() {
-            return FindCoordinatorRequest.CoordinatorType.TRANSACTION;
+        FindCoordinatorsRequest.CoordinatorType coordinatorType() {
+            return FindCoordinatorsRequest.CoordinatorType.TRANSACTION;
         }
 
         String coordinatorKey() {
@@ -1347,9 +1347,9 @@ public class TransactionManager {
         }
 
         @Override
-        FindCoordinatorRequest.CoordinatorType coordinatorType() {
+        FindCoordinatorsRequest.CoordinatorType coordinatorType() {
             if (isTransactional()) {
-                return FindCoordinatorRequest.CoordinatorType.TRANSACTION;
+                return FindCoordinatorsRequest.CoordinatorType.TRANSACTION;
             } else {
                 return null;
             }
@@ -1371,7 +1371,7 @@ public class TransactionManager {
                 }
                 result.done();
             } else if (error == Errors.NOT_COORDINATOR || error == Errors.COORDINATOR_NOT_AVAILABLE) {
-                lookupCoordinator(FindCoordinatorRequest.CoordinatorType.TRANSACTION, transactionalId);
+                lookupCoordinator(FindCoordinatorsRequest.CoordinatorType.TRANSACTION, transactionalId);
                 reenqueue();
             } else if (error == Errors.COORDINATOR_LOAD_IN_PROGRESS || error == Errors.CONCURRENT_TRANSACTIONS) {
                 reenqueue();
@@ -1423,7 +1423,7 @@ public class TransactionManager {
                 if (error == Errors.NONE) {
                     continue;
                 } else if (error == Errors.COORDINATOR_NOT_AVAILABLE || error == Errors.NOT_COORDINATOR) {
-                    lookupCoordinator(FindCoordinatorRequest.CoordinatorType.TRANSACTION, transactionalId);
+                    lookupCoordinator(FindCoordinatorsRequest.CoordinatorType.TRANSACTION, transactionalId);
                     reenqueue();
                     return;
                 } else if (error == Errors.CONCURRENT_TRANSACTIONS) {
@@ -1498,15 +1498,15 @@ public class TransactionManager {
     }
 
     private class FindCoordinatorHandler extends TxnRequestHandler {
-        private final FindCoordinatorRequest.Builder builder;
+        private final FindCoordinatorsRequest.Builder builder;
 
-        private FindCoordinatorHandler(FindCoordinatorRequest.Builder builder) {
+        private FindCoordinatorHandler(FindCoordinatorsRequest.Builder builder) {
             super("FindCoordinator");
             this.builder = builder;
         }
 
         @Override
-        FindCoordinatorRequest.Builder requestBuilder() {
+        FindCoordinatorsRequest.Builder requestBuilder() {
             return builder;
         }
 
@@ -1516,7 +1516,7 @@ public class TransactionManager {
         }
 
         @Override
-        FindCoordinatorRequest.CoordinatorType coordinatorType() {
+        FindCoordinatorsRequest.CoordinatorType coordinatorType() {
             return null;
         }
 
@@ -1527,7 +1527,7 @@ public class TransactionManager {
 
         @Override
         public void handleResponse(AbstractResponse response) {
-            FindCoordinatorResponse findCoordinatorResponse = (FindCoordinatorResponse) response;
+            FindCoordinatorsResponse findCoordinatorResponse = (FindCoordinatorsResponse) response;
             Errors error = findCoordinatorResponse.error();
             CoordinatorType coordinatorType = CoordinatorType.forId(builder.data().keyType());
 
@@ -1589,7 +1589,7 @@ public class TransactionManager {
                 completeTransaction();
                 result.done();
             } else if (error == Errors.COORDINATOR_NOT_AVAILABLE || error == Errors.NOT_COORDINATOR) {
-                lookupCoordinator(FindCoordinatorRequest.CoordinatorType.TRANSACTION, transactionalId);
+                lookupCoordinator(FindCoordinatorsRequest.CoordinatorType.TRANSACTION, transactionalId);
                 reenqueue();
             } else if (error == Errors.COORDINATOR_LOAD_IN_PROGRESS || error == Errors.CONCURRENT_TRANSACTIONS) {
                 reenqueue();
@@ -1646,7 +1646,7 @@ public class TransactionManager {
 
                 transactionStarted = true;
             } else if (error == Errors.COORDINATOR_NOT_AVAILABLE || error == Errors.NOT_COORDINATOR) {
-                lookupCoordinator(FindCoordinatorRequest.CoordinatorType.TRANSACTION, transactionalId);
+                lookupCoordinator(FindCoordinatorsRequest.CoordinatorType.TRANSACTION, transactionalId);
                 reenqueue();
             } else if (error == Errors.COORDINATOR_LOAD_IN_PROGRESS || error == Errors.CONCURRENT_TRANSACTIONS) {
                 reenqueue();
@@ -1686,8 +1686,8 @@ public class TransactionManager {
         }
 
         @Override
-        FindCoordinatorRequest.CoordinatorType coordinatorType() {
-            return FindCoordinatorRequest.CoordinatorType.GROUP;
+        FindCoordinatorsRequest.CoordinatorType coordinatorType() {
+            return FindCoordinatorsRequest.CoordinatorType.GROUP;
         }
 
         @Override
@@ -1714,7 +1714,7 @@ public class TransactionManager {
                         || error == Errors.REQUEST_TIMED_OUT) {
                     if (!coordinatorReloaded) {
                         coordinatorReloaded = true;
-                        lookupCoordinator(FindCoordinatorRequest.CoordinatorType.GROUP, builder.data.groupId());
+                        lookupCoordinator(FindCoordinatorsRequest.CoordinatorType.GROUP, builder.data.groupId());
                     }
                 } else if (error == Errors.UNKNOWN_TOPIC_OR_PARTITION
                         || error == Errors.COORDINATOR_LOAD_IN_PROGRESS) {

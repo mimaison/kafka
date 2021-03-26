@@ -128,8 +128,8 @@ import org.apache.kafka.common.message.DescribeUserScramCredentialsRequestData;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsRequestData.UserName;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData;
 import org.apache.kafka.common.message.ExpireDelegationTokenRequestData;
-import org.apache.kafka.common.message.FindCoordinatorRequestData;
-import org.apache.kafka.common.message.FindCoordinatorResponseData.Coordinator;
+import org.apache.kafka.common.message.FindCoordinatorsRequestData;
+import org.apache.kafka.common.message.FindCoordinatorsResponseData.Coordinator;
 import org.apache.kafka.common.message.LeaveGroupRequestData.MemberIdentity;
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse;
 import org.apache.kafka.common.message.ListGroupsRequestData;
@@ -217,9 +217,9 @@ import org.apache.kafka.common.requests.ElectLeadersRequest;
 import org.apache.kafka.common.requests.ElectLeadersResponse;
 import org.apache.kafka.common.requests.ExpireDelegationTokenRequest;
 import org.apache.kafka.common.requests.ExpireDelegationTokenResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.IncrementalAlterConfigsRequest;
 import org.apache.kafka.common.requests.IncrementalAlterConfigsResponse;
 import org.apache.kafka.common.requests.LeaveGroupRequest;
@@ -3108,7 +3108,7 @@ public class KafkaAdminClient extends AdminClient {
 //            call.nextAllowedTryMs = calculateNextAllowedRetryMs();
 //        }
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, time.milliseconds());
     }
 
@@ -3146,7 +3146,7 @@ public class KafkaAdminClient extends AdminClient {
         final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs()) + 10000000; //TODO
         ConsumerGroupOperationContext<ConsumerGroupDescription, DescribeConsumerGroupsOptions> context = new ConsumerGroupOperationContext<>(
                 groupIds, options, deadline, futures, getDescribeConsumerGroupsCall());
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new DescribeConsumerGroupsResult(new HashMap<>(futures));
@@ -3161,12 +3161,12 @@ public class KafkaAdminClient extends AdminClient {
      * @param <T> The type of return value of the KafkaFuture, like ConsumerGroupDescription, Void etc.
      * @param <O> The type of configuration option, like DescribeConsumerGroupsOptions, ListConsumerGroupsOptions etc
      */
-    private <T, O extends AbstractOptions<O>> Call getFindCoordinatorCall(ConsumerGroupOperationContext<T, O> context) {
+    private <T, O extends AbstractOptions<O>> Call getFindCoordinatorsCall(ConsumerGroupOperationContext<T, O> context) {
         return new Call("findCoordinator", context.deadline(),
                 new LeastLoadedNodeProvider()) {
             @Override
-            public FindCoordinatorRequest.Builder createRequest(int timeoutMs) {
-                FindCoordinatorRequestData data = new FindCoordinatorRequestData();
+            public FindCoordinatorsRequest.Builder createRequest(int timeoutMs) {
+                FindCoordinatorsRequestData data = new FindCoordinatorsRequestData();
 
                 if (context.batch()) {
                     data.setCoordinatorKeys(new ArrayList<>(context.groupIds()));
@@ -3174,7 +3174,7 @@ public class KafkaAdminClient extends AdminClient {
                     data.setKey(context.groupIds().iterator().next());
                 }
                 data.setKeyType(CoordinatorType.GROUP.id());
-                FindCoordinatorRequest.Builder builder = new FindCoordinatorRequest.Builder(data);
+                FindCoordinatorsRequest.Builder builder = new FindCoordinatorsRequest.Builder(data);
                 System.err.println("Create FindCoordinatorRequest " + builder);
 
                 return builder;
@@ -3182,7 +3182,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             public void handleResponse(AbstractResponse abstractResponse) {
-                final FindCoordinatorResponse response = (FindCoordinatorResponse) abstractResponse;
+                final FindCoordinatorsResponse response = (FindCoordinatorsResponse) abstractResponse;
                 System.err.println("Received FindCoordinatorResponse " + response);
                 if (handleGroupRequestError(response.error(), context.futures()))
                     return;
@@ -3540,7 +3540,7 @@ public class KafkaAdminClient extends AdminClient {
         ConsumerGroupOperationContext<Map<TopicPartition, OffsetAndMetadata>, ListConsumerGroupOffsetsOptions> context =
                 new ConsumerGroupOperationContext<>(groupId, options, deadline, groupOffsetListingFuture, getListConsumerGroupOffsetsCall());
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new ListConsumerGroupOffsetsResult(groupOffsetListingFuture);
@@ -3629,7 +3629,7 @@ public class KafkaAdminClient extends AdminClient {
             final long deadline = calcDeadlineMs(startFindCoordinatorMs, options.timeoutMs());
             ConsumerGroupOperationContext<Void, DeleteConsumerGroupsOptions> context =
                     new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getDeleteConsumerGroupsCall());
-            Call findCoordinatorCall = getFindCoordinatorCall(context);
+            Call findCoordinatorCall = getFindCoordinatorsCall(context);
             runnable.call(findCoordinatorCall, startFindCoordinatorMs);
         }
 
@@ -3701,7 +3701,7 @@ public class KafkaAdminClient extends AdminClient {
         ConsumerGroupOperationContext<Map<TopicPartition, Errors>, DeleteConsumerGroupOffsetsOptions> context =
             new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getDeleteConsumerGroupOffsetsCall(partitions));
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new DeleteConsumerGroupOffsetsResult(future, partitions);
@@ -4109,7 +4109,7 @@ public class KafkaAdminClient extends AdminClient {
         ConsumerGroupOperationContext<Map<MemberIdentity, Errors>, RemoveMembersFromConsumerGroupOptions> context =
             new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getRemoveMembersFromGroupCall(members));
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new RemoveMembersFromConsumerGroupResult(future, options.members());
@@ -4176,7 +4176,7 @@ public class KafkaAdminClient extends AdminClient {
         ConsumerGroupOperationContext<Map<TopicPartition, Errors>, AlterConsumerGroupOffsetsOptions> context =
                 new ConsumerGroupOperationContext<>(groupId, options, deadline, future, getAlterConsumerGroupOffsetsCall(offsets));
 
-        Call findCoordinatorCall = getFindCoordinatorCall(context);
+        Call findCoordinatorCall = getFindCoordinatorsCall(context);
         runnable.call(findCoordinatorCall, startFindCoordinatorMs);
 
         return new AlterConsumerGroupOffsetsResult(future);

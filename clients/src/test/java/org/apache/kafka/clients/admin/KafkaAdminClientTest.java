@@ -159,8 +159,8 @@ import org.apache.kafka.common.requests.DescribeProducersRequest;
 import org.apache.kafka.common.requests.DescribeProducersResponse;
 import org.apache.kafka.common.requests.DescribeUserScramCredentialsResponse;
 import org.apache.kafka.common.requests.ElectLeadersResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.IncrementalAlterConfigsResponse;
 import org.apache.kafka.common.requests.JoinGroupRequest;
 import org.apache.kafka.common.requests.LeaveGroupResponse;
@@ -465,8 +465,8 @@ public class KafkaAdminClientTest {
         return new DeleteTopicsResponse(data);
     }
 
-    private static FindCoordinatorResponse prepareFindCoordinatorResponse(Errors error, Node node) {
-        return FindCoordinatorResponse.prepareResponse(error, node);
+    private static FindCoordinatorsResponse prepareFindCoordinatorResponse(Errors error, Node node) {
+        return FindCoordinatorsResponse.prepareResponse(error, node);
     }
 
     private static MetadataResponse prepareMetadataResponse(Cluster cluster, Errors error) {
@@ -5650,8 +5650,8 @@ public class KafkaAdminClientTest {
 
     private MockClient.RequestMatcher findCoordinatorMatcher(final String groupId) {
         return body -> {
-            if (body instanceof FindCoordinatorRequest) {
-                FindCoordinatorRequest request = (FindCoordinatorRequest) body;
+            if (body instanceof FindCoordinatorsRequest) {
+                FindCoordinatorsRequest request = (FindCoordinatorsRequest) body;
                 return groupId.equals(request.data().key());
             }
             return false;
@@ -5661,7 +5661,7 @@ public class KafkaAdminClientTest {
     @Test
     public void testDescribeConsumerGroupsWithOlderBroker() throws Exception {
         ApiVersion findCoordinatorV3 = new ApiVersion()
-                .setApiKey(ApiKeys.FIND_COORDINATOR.id)
+                .setApiKey(ApiKeys.FIND_COORDINATORS.id)
                 .setMinVersion((short) 0)
                 .setMaxVersion((short) 3);
         ApiVersion describeGroups = new ApiVersion()

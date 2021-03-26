@@ -19,26 +19,26 @@ package org.apache.kafka.common.requests;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
-import org.apache.kafka.common.message.FindCoordinatorRequestData;
-import org.apache.kafka.common.message.FindCoordinatorResponseData;
+import org.apache.kafka.common.message.FindCoordinatorsRequestData;
+import org.apache.kafka.common.message.FindCoordinatorsResponseData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
 
 import java.nio.ByteBuffer;
 
-public class FindCoordinatorRequest extends AbstractRequest {
+public class FindCoordinatorsRequest extends AbstractRequest {
 
-    public static class Builder extends AbstractRequest.Builder<FindCoordinatorRequest> {
-        private final FindCoordinatorRequestData data;
+    public static class Builder extends AbstractRequest.Builder<FindCoordinatorsRequest> {
+        private final FindCoordinatorsRequestData data;
 
-        public Builder(FindCoordinatorRequestData data) {
-            super(ApiKeys.FIND_COORDINATOR);
+        public Builder(FindCoordinatorsRequestData data) {
+            super(ApiKeys.FIND_COORDINATORS);
             this.data = data;
         }
 
         @Override
-        public FindCoordinatorRequest build(short version) {
+        public FindCoordinatorsRequest build(short version) {
             if (version < 1 && data.keyType() == CoordinatorType.TRANSACTION.id()) {
                 throw new UnsupportedVersionException("Cannot create a v" + version + " FindCoordinator request " +
                         "because we require features supported only in 2 or later.");
@@ -47,7 +47,7 @@ public class FindCoordinatorRequest extends AbstractRequest {
                 throw new UnsupportedVersionException("Cannot create a v" + version + " FindCoordinator request " +
                         "because we require features supported only in 3 or later.");
             }
-            return new FindCoordinatorRequest(data, version);
+            return new FindCoordinatorsRequest(data, version);
         }
 
         @Override
@@ -55,35 +55,35 @@ public class FindCoordinatorRequest extends AbstractRequest {
             return data.toString();
         }
 
-        public FindCoordinatorRequestData data() {
+        public FindCoordinatorsRequestData data() {
             return data;
         }
     }
 
-    private final FindCoordinatorRequestData data;
+    private final FindCoordinatorsRequestData data;
 
-    private FindCoordinatorRequest(FindCoordinatorRequestData data, short version) {
-        super(ApiKeys.FIND_COORDINATOR, version);
+    private FindCoordinatorsRequest(FindCoordinatorsRequestData data, short version) {
+        super(ApiKeys.FIND_COORDINATORS, version);
         this.data = data;
     }
 
     @Override
     public AbstractResponse getErrorResponse(int throttleTimeMs, Throwable e) {
-        FindCoordinatorResponseData response = new FindCoordinatorResponseData();
+        FindCoordinatorsResponseData response = new FindCoordinatorsResponseData();
         if (version() >= 2) {
             response.setThrottleTimeMs(throttleTimeMs);
         }
         Errors error = Errors.forException(e);
-        return FindCoordinatorResponse.prepareResponse(error, Node.noNode());
+        return FindCoordinatorsResponse.prepareResponse(error, Node.noNode());
     }
 
-    public static FindCoordinatorRequest parse(ByteBuffer buffer, short version) {
-        return new FindCoordinatorRequest(new FindCoordinatorRequestData(new ByteBufferAccessor(buffer), version),
+    public static FindCoordinatorsRequest parse(ByteBuffer buffer, short version) {
+        return new FindCoordinatorsRequest(new FindCoordinatorsRequestData(new ByteBufferAccessor(buffer), version),
             version);
     }
 
     @Override
-    public FindCoordinatorRequestData data() {
+    public FindCoordinatorsRequestData data() {
         return data;
     }
 

@@ -166,8 +166,8 @@ public abstract class AbstractRequest implements AbstractRequestResponse {
                 return OffsetCommitRequest.parse(buffer, apiVersion);
             case OFFSET_FETCH:
                 return OffsetFetchRequest.parse(buffer, apiVersion);
-            case FIND_COORDINATOR:
-                return FindCoordinatorRequest.parse(buffer, apiVersion);
+            case FIND_COORDINATORS:
+                return FindCoordinatorsRequest.parse(buffer, apiVersion);
             case JOIN_GROUP:
                 return JoinGroupRequest.parse(buffer, apiVersion);
             case HEARTBEAT:

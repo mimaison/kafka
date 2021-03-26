@@ -46,6 +46,7 @@ import org.apache.kafka.common.memory.MemoryPool
 import org.apache.kafka.common.message.ApiMessageType.ListenerType
 import org.apache.kafka.common.message.CreateTopicsRequestData.{CreatableTopic, CreatableTopicCollection}
 import org.apache.kafka.common.message.DescribeConfigsResponseData.DescribeConfigsResult
+import org.apache.kafka.common.message.FindCoordinatorsRequestData
 import org.apache.kafka.common.message.JoinGroupRequestData.JoinGroupRequestProtocol
 import org.apache.kafka.common.message.LeaveGroupRequestData.MemberIdentity
 import org.apache.kafka.common.message.ListOffsetsRequestData.{ListOffsetsPartition, ListOffsetsTopic}
@@ -61,7 +62,7 @@ import org.apache.kafka.common.quota.{ClientQuotaAlteration, ClientQuotaEntity}
 import org.apache.kafka.common.record.FileRecords.TimestampAndOffset
 import org.apache.kafka.common.record._
 import org.apache.kafka.common.replica.ClientMetadata
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType
 import org.apache.kafka.common.requests.MetadataResponse.TopicMetadata
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse
 import org.apache.kafka.common.requests.WriteTxnMarkersRequest.TxnMarkerEntry
@@ -851,7 +852,7 @@ class KafkaApisTest {
                                                    hasEnoughLiveBrokers: Boolean = true): Unit = {
     val authorizer: Authorizer = EasyMock.niceMock(classOf[Authorizer])
 
-    val requestHeader = new RequestHeader(ApiKeys.FIND_COORDINATOR, ApiKeys.FIND_COORDINATOR.latestVersion,
+    val requestHeader = new RequestHeader(ApiKeys.FIND_COORDINATORS, ApiKeys.FIND_COORDINATORS.latestVersion,
       clientId, 0)
 
     val numBrokersNeeded = 3
@@ -883,12 +884,12 @@ class KafkaApisTest {
           throw new IllegalStateException(s"Unknown coordinator type $coordinatorType")
       }
 
-    val findCoordinatorRequest = new FindCoordinatorRequest.Builder(
-      new FindCoordinatorRequestData()
+    val findCoordinatorsRequest = new FindCoordinatorsRequest.Builder(
+      new FindCoordinatorsRequestData()
         .setKeyType(coordinatorType.id())
         .setKey(groupId)
     ).build(requestHeader.apiVersion)
-    val request = buildRequest(findCoordinatorRequest)
+    val request = buildRequest(findCoordinatorsRequest)
 
     val capturedResponse = expectNoThrottling(request)
 
@@ -898,9 +899,9 @@ class KafkaApisTest {
       autoTopicCreationManager, forwardingManager, controller, clientControllerQuotaManager, groupCoordinator, txnCoordinator)
 
     createKafkaApis(authorizer = Some(authorizer),
-      overrideProperties = topicConfigOverride).handleFindCoordinatorRequest(request)
+      overrideProperties = topicConfigOverride).handleFindCoordinatorsRequest(request)
 
-    val response = capturedResponse.getValue.asInstanceOf[FindCoordinatorResponse]
+    val response = capturedResponse.getValue.asInstanceOf[FindCoordinatorsResponse]
     assertEquals(Errors.COORDINATOR_NOT_AVAILABLE, response.error())
 
     verify(authorizer, autoTopicCreationManager)

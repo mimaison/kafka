@@ -123,8 +123,8 @@ public abstract class AbstractResponse implements AbstractRequestResponse {
                 return OffsetCommitResponse.parse(responseBuffer, version);
             case OFFSET_FETCH:
                 return OffsetFetchResponse.parse(responseBuffer, version);
-            case FIND_COORDINATOR:
-                return FindCoordinatorResponse.parse(responseBuffer, version);
+            case FIND_COORDINATORS:
+                return FindCoordinatorsResponse.parse(responseBuffer, version);
             case JOIN_GROUP:
                 return JoinGroupResponse.parse(responseBuffer, version);
             case HEARTBEAT:

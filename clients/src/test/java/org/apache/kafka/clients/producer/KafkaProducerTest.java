@@ -49,8 +49,8 @@ import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.requests.AddOffsetsToTxnResponse;
 import org.apache.kafka.common.requests.EndTxnResponse;
-import org.apache.kafka.common.requests.FindCoordinatorRequest;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsRequest;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.InitProducerIdResponse;
 import org.apache.kafka.common.requests.JoinGroupRequest;
 import org.apache.kafka.common.requests.MetadataResponse;
@@ -806,16 +806,16 @@ public class KafkaProducerTest {
         try (Producer<String, String> producer = kafkaProducer(configs, new StringSerializer(),
                 new StringSerializer(), metadata, client, null, time)) {
             client.prepareResponse(
-                request -> request instanceof FindCoordinatorRequest &&
-                    ((FindCoordinatorRequest) request).data().keyType() == FindCoordinatorRequest.CoordinatorType.TRANSACTION.id(),
-                FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+                request -> request instanceof FindCoordinatorsRequest &&
+                    ((FindCoordinatorsRequest) request).data().keyType() == FindCoordinatorsRequest.CoordinatorType.TRANSACTION.id(),
+                FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
 
             assertThrows(TimeoutException.class, producer::initTransactions);
 
             client.prepareResponse(
-                request -> request instanceof FindCoordinatorRequest &&
-                               ((FindCoordinatorRequest) request).data().keyType() == FindCoordinatorRequest.CoordinatorType.TRANSACTION.id(),
-                FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+                request -> request instanceof FindCoordinatorsRequest &&
+                               ((FindCoordinatorsRequest) request).data().keyType() == FindCoordinatorsRequest.CoordinatorType.TRANSACTION.id(),
+                FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
 
             client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
 
@@ -841,7 +841,7 @@ public class KafkaProducerTest {
         Node node = metadata.fetch().nodes().get(0);
         client.throttle(node, 5000);
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
 
         try (Producer<String, String> producer = kafkaProducer(configs, new StringSerializer(),
@@ -863,7 +863,7 @@ public class KafkaProducerTest {
         MockClient client = new MockClient(time, metadata);
         client.updateMetadata(initialUpdateResponse);
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
         client.prepareResponse(endTxnResponse(Errors.NONE));
 
@@ -892,10 +892,10 @@ public class KafkaProducerTest {
         Node node = metadata.fetch().nodes().get(0);
         client.throttle(node, 5000);
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
         client.prepareResponse(addOffsetsToTxnResponse(Errors.NONE));
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         String groupId = "group";
         client.prepareResponse(request ->
             ((TxnOffsetCommitRequest) request).data().groupId().equals(groupId),
@@ -940,10 +940,10 @@ public class KafkaProducerTest {
         Node node = metadata.fetch().nodes().get(0);
         client.throttle(node, 5000);
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
         client.prepareResponse(addOffsetsToTxnResponse(Errors.NONE));
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         String groupId = "group";
         String memberId = "member";
         int generationId = 5;
@@ -1003,7 +1003,7 @@ public class KafkaProducerTest {
         Node node = metadata.fetch().nodes().get(0);
         client.throttle(node, 5000);
 
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         client.prepareResponse(initProducerIdResponse(1L, (short) 5, Errors.NONE));
 
         try (Producer<String, String> producer = kafkaProducer(configs, new StringSerializer(),
@@ -1214,7 +1214,7 @@ public class KafkaProducerTest {
 
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         CountDownLatch assertionDoneLatch = new CountDownLatch(1);
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         executorService.submit(() -> {
             assertThrows(KafkaException.class, producer::initTransactions);
             assertionDoneLatch.countDown();
@@ -1243,7 +1243,7 @@ public class KafkaProducerTest {
 
         ExecutorService executorService = Executors.newSingleThreadExecutor();
         CountDownLatch assertionDoneLatch = new CountDownLatch(1);
-        client.prepareResponse(FindCoordinatorResponse.prepareResponse(Errors.NONE, host1));
+        client.prepareResponse(FindCoordinatorsResponse.prepareResponse(Errors.NONE, host1));
         executorService.submit(() -> {
             assertThrows(KafkaException.class, producer::initTransactions);
             assertionDoneLatch.countDown();

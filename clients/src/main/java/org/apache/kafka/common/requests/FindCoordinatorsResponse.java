@@ -17,7 +17,7 @@
 package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.Node;
-import org.apache.kafka.common.message.FindCoordinatorResponseData;
+import org.apache.kafka.common.message.FindCoordinatorsResponseData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
@@ -26,7 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.Map;
 
 
-public class FindCoordinatorResponse extends AbstractResponse {
+public class FindCoordinatorsResponse extends AbstractResponse {
 
     /**
      * Possible error codes:
@@ -38,15 +38,15 @@ public class FindCoordinatorResponse extends AbstractResponse {
      * TRANSACTIONAL_ID_AUTHORIZATION_FAILED (53)
      */
 
-    private final FindCoordinatorResponseData data;
+    private final FindCoordinatorsResponseData data;
 
-    public FindCoordinatorResponse(FindCoordinatorResponseData data) {
-        super(ApiKeys.FIND_COORDINATOR);
+    public FindCoordinatorsResponse(FindCoordinatorsResponseData data) {
+        super(ApiKeys.FIND_COORDINATORS);
         this.data = data;
     }
 
     @Override
-    public FindCoordinatorResponseData data() {
+    public FindCoordinatorsResponseData data() {
         return data;
     }
 
@@ -72,8 +72,8 @@ public class FindCoordinatorResponse extends AbstractResponse {
         return errorCounts(error());
     }
 
-    public static FindCoordinatorResponse parse(ByteBuffer buffer, short version) {
-        return new FindCoordinatorResponse(new FindCoordinatorResponseData(new ByteBufferAccessor(buffer), version));
+    public static FindCoordinatorsResponse parse(ByteBuffer buffer, short version) {
+        return new FindCoordinatorsResponse(new FindCoordinatorsResponseData(new ByteBufferAccessor(buffer), version));
     }
 
     @Override
@@ -86,13 +86,13 @@ public class FindCoordinatorResponse extends AbstractResponse {
         return version >= 2;
     }
 
-    public static FindCoordinatorResponse prepareResponse(Errors error, Node node) {
-        FindCoordinatorResponseData data = new FindCoordinatorResponseData();
+    public static FindCoordinatorsResponse prepareResponse(Errors error, Node node) {
+        FindCoordinatorsResponseData data = new FindCoordinatorsResponseData();
         data.setErrorCode(error.code())
             .setErrorMessage(error.message())
             .setNodeId(node.id())
             .setHost(node.host())
             .setPort(node.port());
-        return new FindCoordinatorResponse(data);
+        return new FindCoordinatorsResponse(data);
     }
 }

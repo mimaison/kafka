@@ -57,7 +57,7 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.RecordBatch;
-import org.apache.kafka.common.requests.FindCoordinatorResponse;
+import org.apache.kafka.common.requests.FindCoordinatorsResponse;
 import org.apache.kafka.common.requests.HeartbeatResponse;
 import org.apache.kafka.common.requests.JoinGroupRequest;
 import org.apache.kafka.common.requests.JoinGroupResponse;
@@ -3028,8 +3028,8 @@ public abstract class ConsumerCoordinatorTest {
         }
     }
 
-    private FindCoordinatorResponse groupCoordinatorResponse(Node node, Errors error) {
-        return FindCoordinatorResponse.prepareResponse(error, node);
+    private FindCoordinatorsResponse groupCoordinatorResponse(Node node, Errors error) {
+        return FindCoordinatorsResponse.prepareResponse(error, node);
     }
 
     private HeartbeatResponse heartbeatResponse(Errors error) {

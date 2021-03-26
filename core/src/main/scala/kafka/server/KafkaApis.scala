@@ -49,7 +49,7 @@ import org.apache.kafka.common.message.DeleteGroupsResponseData.{DeletableGroupR
 import org.apache.kafka.common.message.DeleteRecordsResponseData.{DeleteRecordsPartitionResult, DeleteRecordsTopicResult}
 import org.apache.kafka.common.message.DeleteTopicsResponseData.{DeletableTopicResult, DeletableTopicResultCollection}
 import org.apache.kafka.common.message.ElectLeadersResponseData.{PartitionResult, ReplicaElectionResult}
-import org.apache.kafka.common.message.FindCoordinatorResponseData.Coordinator
+import org.apache.kafka.common.message.FindCoordinatorsResponseData.Coordinator
 import org.apache.kafka.common.message.LeaveGroupResponseData.MemberResponse
 import org.apache.kafka.common.message.ListOffsetsRequestData.ListOffsetsPartition
 import org.apache.kafka.common.message.ListOffsetsResponseData.{ListOffsetsPartitionResponse, ListOffsetsTopicResponse}
@@ -63,7 +63,7 @@ import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.record._
 import org.apache.kafka.common.replica.ClientMetadata
 import org.apache.kafka.common.replica.ClientMetadata.DefaultClientMetadata
-import org.apache.kafka.common.requests.FindCoordinatorRequest.CoordinatorType
+import org.apache.kafka.common.requests.FindCoordinatorsRequest.CoordinatorType
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse
 import org.apache.kafka.common.requests._
 import org.apache.kafka.common.resource.Resource.CLUSTER_NAME
@@ -176,7 +176,7 @@ class KafkaApis(val requestChannel: RequestChannel,
         case ApiKeys.CONTROLLED_SHUTDOWN => handleControlledShutdownRequest(request)
         case ApiKeys.OFFSET_COMMIT => handleOffsetCommitRequest(request)
         case ApiKeys.OFFSET_FETCH => handleOffsetFetchRequest(request)
-        case ApiKeys.FIND_COORDINATOR => handleFindCoordinatorRequest(request)
+        case ApiKeys.FIND_COORDINATORS => handleFindCoordinatorsRequest(request)
         case ApiKeys.JOIN_GROUP => handleJoinGroupRequest(request)
         case ApiKeys.HEARTBEAT => handleHeartbeatRequest(request)
         case ApiKeys.LEAVE_GROUP => handleLeaveGroupRequest(request)
@@ -1311,17 +1311,17 @@ class KafkaApis(val requestChannel: RequestChannel,
     requestHelper.sendResponseMaybeThrottle(request, createResponse)
   }
 
-  def handleFindCoordinatorRequest(request: RequestChannel.Request): Unit = {
+  def handleFindCoordinatorsRequest(request: RequestChannel.Request): Unit = {
     val version = request.header.apiVersion
     if (version < 4) {
-      handleFindCoordinatorRequestLessThanV4(request)
+      handleFindCoordinatorsRequestLessThanV4(request)
     } else {
-      handleFindCoordinatorRequestV4AndAbove(request)
+      handleFindCoordinatorsRequestV4AndAbove(request)
     }
   }
 
-  def handleFindCoordinatorRequestV4AndAbove(request: RequestChannel.Request): Unit = {
-    val findCoordinatorRequest = request.body[FindCoordinatorRequest]
+  def handleFindCoordinatorsRequestV4AndAbove(request: RequestChannel.Request): Unit = {
+    val findCoordinatorRequest = request.body[FindCoordinatorsRequest]
 
     def errorResponse(key: String, error: Errors): Coordinator = {
       new Coordinator()
@@ -1384,8 +1384,8 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
     }
     def createResponse(requestThrottleMs: Int): AbstractResponse = {
-      val response = new FindCoordinatorResponse(
-              new FindCoordinatorResponseData()
+      val response = new FindCoordinatorsResponse(
+              new FindCoordinatorsResponseData()
                 .setCoordinators(coordinators.asJava)
                 .setThrottleTimeMs(requestThrottleMs))
       trace("Sending FindCoordinator response %s for correlation id %d to client %s."
@@ -1395,8 +1395,8 @@ class KafkaApis(val requestChannel: RequestChannel,
     requestHelper.sendResponseMaybeThrottle(request, createResponse)
   }
 
-  def handleFindCoordinatorRequestLessThanV4(request: RequestChannel.Request): Unit = {
-    val findCoordinatorRequest = request.body[FindCoordinatorRequest]
+  def handleFindCoordinatorsRequestLessThanV4(request: RequestChannel.Request): Unit = {
+    val findCoordinatorRequest = request.body[FindCoordinatorsRequest]
 
     if (findCoordinatorRequest.data.keyType == CoordinatorType.GROUP.id &&
         !authHelper.authorize(request.context, DESCRIBE, GROUP, findCoordinatorRequest.data.key))
@@ -1414,11 +1414,11 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       val topicMetadata = metadataCache.getTopicMetadata(Set(internalTopicName), request.context.listenerName)
-      def createFindCoordinatorResponse(error: Errors,
+      def createFindCoordinatorsResponse(error: Errors,
                                         node: Node,
-                                        requestThrottleMs: Int): FindCoordinatorResponse = {
-        new FindCoordinatorResponse(
-          new FindCoordinatorResponseData()
+                                        requestThrottleMs: Int): FindCoordinatorsResponse = {
+        new FindCoordinatorsResponse(
+          new FindCoordinatorsResponseData()
             .setErrorCode(error.code)
             .setErrorMessage(error.message())
             .setNodeId(node.id)
@@ -1430,12 +1430,12 @@ class KafkaApis(val requestChannel: RequestChannel,
       if (topicMetadata.headOption.isEmpty) {
         val controllerMutationQuota = quotas.controllerMutation.newPermissiveQuotaFor(request)
         autoTopicCreationManager.createTopics(Seq(internalTopicName).toSet, controllerMutationQuota)
-        requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs => createFindCoordinatorResponse(
+        requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs => createFindCoordinatorsResponse(
           Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode, requestThrottleMs))
       } else {
         def createResponse(requestThrottleMs: Int): AbstractResponse = {
           val responseBody = if (topicMetadata.head.errorCode != Errors.NONE.code) {
-            createFindCoordinatorResponse(Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode, requestThrottleMs)
+            createFindCoordinatorsResponse(Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode, requestThrottleMs)
           } else {
             val coordinatorEndpoint = topicMetadata.head.partitions.asScala
               .find(_.partitionIndex == partition)
@@ -1446,9 +1446,9 @@ class KafkaApis(val requestChannel: RequestChannel,
 
             coordinatorEndpoint match {
               case Some(endpoint) =>
-                createFindCoordinatorResponse(Errors.NONE, endpoint, requestThrottleMs)
+                createFindCoordinatorsResponse(Errors.NONE, endpoint, requestThrottleMs)
               case _ =>
-                createFindCoordinatorResponse(Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode, requestThrottleMs)
+                createFindCoordinatorsResponse(Errors.COORDINATOR_NOT_AVAILABLE, Node.noNode, requestThrottleMs)
             }
           }
           trace("Sending FindCoordinator response %s for correlation id %d to client %s."
