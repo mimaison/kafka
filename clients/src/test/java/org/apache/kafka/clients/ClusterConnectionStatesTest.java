@@ -442,4 +442,12 @@ public class ClusterConnectionStatesTest {
         this.connectionStates = new ClusterConnectionStates(reconnectBackoffMs, reconnectBackoffMax,
                 connectionSetupTimeoutMs, connectionSetupTimeoutMaxMs, new LogContext(), this.multipleIPHostResolver);
     }
+
+    @Test
+    public void testConnectionDelay() {
+        connectionStates.connecting(nodeId1, time.milliseconds(), "localhost");
+        long t = connectionStates.connectionDelay(nodeId1, time.milliseconds());
+        System.err.println(t);
+        
+    }
 }
