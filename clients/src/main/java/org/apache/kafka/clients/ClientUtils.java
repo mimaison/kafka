@@ -108,8 +108,9 @@ public final class ClientUtils {
 
     static List<InetAddress> resolve(String host, ClientDnsLookup clientDnsLookup,
                                      HostResolver hostResolver) throws UnknownHostException {
-        InetAddress[] addresses = hostResolver.resolve(host);
 
+        InetAddress[] addresses = hostResolver.resolve(host);
+        log.info("Resolved {} to the following IPs: {}", host, addresses);
         switch (clientDnsLookup) {
             case DEFAULT:
                 return Collections.singletonList(addresses[0]);
