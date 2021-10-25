@@ -22,13 +22,12 @@ import java.util
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import java.util.concurrent.{CompletableFuture, TimeUnit, TimeoutException}
-
 import kafka.cluster.Broker.ServerInfo
 import kafka.coordinator.group.GroupCoordinator
 import kafka.coordinator.transaction.{ProducerIdManager, TransactionCoordinator}
 import kafka.log.LogManager
 import kafka.metrics.KafkaYammerMetrics
-import kafka.network.SocketServer
+import kafka.network.{DataPlaneAcceptor, SocketServer}
 import kafka.raft.RaftManager
 import kafka.security.CredentialProvider
 import kafka.server.KafkaRaftServer.ControllerRole
@@ -401,8 +400,8 @@ class BrokerServer(
 
       dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.nodeId,
         socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,
-        config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
-        SocketServer.DataPlaneThreadPrefix)
+        config.numIoThreads, s"${DataPlaneAcceptor.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
+        DataPlaneAcceptor.DataPlaneThreadPrefix)
 
       if (socketServer.controlPlaneRequestChannelOpt.isDefined) {
         throw new RuntimeException(KafkaConfig.ControlPlaneListenerNameProp + " is not " +

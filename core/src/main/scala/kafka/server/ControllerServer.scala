@@ -24,7 +24,7 @@ import java.util.concurrent.{CompletableFuture, TimeUnit}
 import kafka.cluster.Broker.ServerInfo
 import kafka.log.LogConfig
 import kafka.metrics.{KafkaMetricsGroup, KafkaYammerMetrics, LinuxIoMetricsCollector}
-import kafka.network.SocketServer
+import kafka.network.{DataPlaneAcceptor, SocketServer}
 import kafka.raft.RaftManager
 import kafka.security.CredentialProvider
 import kafka.server.KafkaConfig.{AlterConfigPolicyClassNameProp, CreateTopicPolicyClassNameProp}
@@ -193,8 +193,8 @@ class ControllerServer(
         controllerApis,
         time,
         config.numIoThreads,
-        s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
-        SocketServer.DataPlaneThreadPrefix)
+        s"${DataPlaneAcceptor.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
+        DataPlaneAcceptor.DataPlaneThreadPrefix)
       socketServer.startProcessingRequests(authorizerFutures)
     } catch {
       case e: Throwable =>

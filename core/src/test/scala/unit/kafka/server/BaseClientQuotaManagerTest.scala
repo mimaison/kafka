@@ -63,7 +63,7 @@ class BaseClientQuotaManagerTest {
     val header = RequestHeader.parse(buffer)
     val context = new RequestContext(header, "1", InetAddress.getLocalHost, KafkaPrincipal.ANONYMOUS,
       listenerName, SecurityProtocol.PLAINTEXT, ClientInformation.EMPTY, false)
-    (request, new RequestChannel.Request(processor = 1, context = context, startTimeNanos =  0, MemoryPool.NONE, buffer,
+    (request, new RequestChannel.Request(processor = s"${listenerName.value()}-1", context = context, startTimeNanos =  0, MemoryPool.NONE, buffer,
       requestChannelMetrics))
   }
 

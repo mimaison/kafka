@@ -2125,7 +2125,7 @@ object TestUtils extends Logging {
     }
 
     new RequestChannel.Request(
-      processor = 1,
+      processor = s"${listenerName.value()}-1",
       context = requestContext,
       startTimeNanos = startTimeNanos,
       memoryPool = MemoryPool.NONE,

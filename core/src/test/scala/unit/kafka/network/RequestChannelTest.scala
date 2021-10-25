@@ -284,7 +284,7 @@ class RequestChannelTest {
   def request(req: AbstractRequest): RequestChannel.Request = {
     val buffer = req.serializeWithHeader(new RequestHeader(req.apiKey, req.version, "client-id", 1))
     val requestContext = newRequestContext(buffer)
-    new network.RequestChannel.Request(processor = 1,
+    new network.RequestChannel.Request(processor = "1",
       requestContext,
       startTimeNanos = 0,
       createNiceMock(classOf[MemoryPool]),
