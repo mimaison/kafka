@@ -93,6 +93,8 @@
       <allow pkg="org.apache.kafka.common.protocol.types" />
       <allow pkg="org.apache.kafka.common.message" />
       <allow pkg="org.apache.kafka.common.metadata" />
+      <allow pkg="org.apache.kafka.common" />
+      <allow pkg="org.apache.kafka.client.admin" />
     </subpackage>
 
     <subpackage name="metrics">
@@ -249,6 +251,8 @@
 
   <subpackage name="metadata">
     <allow pkg="org.apache.kafka.clients" />
+    <allow pkg="org.apache.kafka.clients.admin" />
+    <allow pkg="org.apache.kafka.common" />
     <allow pkg="org.apache.kafka.common.annotation" />
     <allow pkg="org.apache.kafka.common.message" />
     <allow pkg="org.apache.kafka.common.metadata" />

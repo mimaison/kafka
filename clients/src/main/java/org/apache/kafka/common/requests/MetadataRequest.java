@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.common.requests;
 
+import org.apache.kafka.clients.admin.TagPredicate;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.message.MetadataRequestData;
@@ -26,6 +27,7 @@ import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -83,6 +85,22 @@ public class MetadataRequest extends AbstractRequest {
             // This never causes auto-creation, but we set the boolean to true because that is the default value when
             // deserializing V2 and older. This way, the value is consistent after serialization and deserialization.
             return new Builder(ALL_TOPICS_REQUEST_DATA);
+        }
+
+        public static Builder withTags(List<TagPredicate> predicates) {
+            MetadataRequestData.TopicTagCollection tags = new MetadataRequestData.TopicTagCollection();
+            for (TagPredicate predicate : predicates) {
+                MetadataRequestData.TopicTag tag = new MetadataRequestData.TopicTag()
+                        .setOp(predicate.opType().id())
+                        .setKey(predicate.key())
+                        .setValues(new ArrayList<>(predicate.values()));
+                tags.add(tag);
+            }
+            MetadataRequestData data = new MetadataRequestData()
+                    .setTopics(null)
+                    .setAllowAutoTopicCreation(true)
+                    .setTags(tags);
+            return new Builder(data);
         }
 
         public boolean emptyTopicList() {

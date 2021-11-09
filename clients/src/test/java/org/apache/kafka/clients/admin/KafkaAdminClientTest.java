@@ -31,6 +31,7 @@ import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TagResource;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
@@ -100,6 +101,7 @@ import org.apache.kafka.common.message.DescribeGroupsResponseData.DescribedGroup
 import org.apache.kafka.common.message.DescribeLogDirsResponseData;
 import org.apache.kafka.common.message.DescribeLogDirsResponseData.DescribeLogDirsTopic;
 import org.apache.kafka.common.message.DescribeProducersResponseData;
+import org.apache.kafka.common.message.DescribeTagsResponseData;
 import org.apache.kafka.common.message.DescribeTransactionsResponseData;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData.CredentialInfo;
@@ -160,6 +162,7 @@ import org.apache.kafka.common.requests.DescribeGroupsResponse;
 import org.apache.kafka.common.requests.DescribeLogDirsResponse;
 import org.apache.kafka.common.requests.DescribeProducersRequest;
 import org.apache.kafka.common.requests.DescribeProducersResponse;
+import org.apache.kafka.common.requests.DescribeTagsResponse;
 import org.apache.kafka.common.requests.DescribeTransactionsRequest;
 import org.apache.kafka.common.requests.DescribeTransactionsResponse;
 import org.apache.kafka.common.requests.DescribeUserScramCredentialsResponse;
@@ -217,6 +220,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -6256,6 +6260,38 @@ public class KafkaAdminClientTest {
                 "Timed out waiting for retry");
             env.kafkaClient().respond(prepareMetadataResponse(cluster, Errors.NONE));
             assertEquals(0, result.listings().get().size());
+        }
+    }
+
+    @Test
+    public void testDescribeTags() throws Exception {
+        String topic = "testtopic";
+        TagResource tagResource = new TagResource(TagResource.Type.TOPIC, topic);
+        Properties tags = new Properties();
+        tags.setProperty("tag1", "v1");
+        tags.setProperty("tag2", "v2");
+        List<DescribeTagsResponseData.DescribeTagsResourceResult> tagResults = new ArrayList<>();
+        for (String k : tags.stringPropertyNames()) {
+            tagResults.add(new DescribeTagsResponseData.DescribeTagsResourceResult()
+                    .setName(k)
+                    .setValue(tags.getProperty(k)));
+        }
+        try (AdminClientUnitTestEnv env = mockClientEnv()) {
+            ApiVersion describeTags = new ApiVersion()
+                    .setApiKey(ApiKeys.DESCRIBE_TAGS.id)
+                    .setMinVersion((short) 0)
+                    .setMaxVersion((short) 0);
+            env.kafkaClient().setNodeApiVersions(NodeApiVersions.create(Collections.singletonList(describeTags)));
+            env.kafkaClient().prepareResponse(new DescribeTagsResponse(
+                    new DescribeTagsResponseData().setResults(Collections.singletonList(
+                            new DescribeTagsResponseData.DescribeTagsResult()
+                                    .setResourceName(tagResource.name())
+                                    .setResourceType(tagResource.type().id())
+                                    .setTags(tagResults)))));
+            Map<TagResource, Properties> result = env.adminClient().describeTags(asList(
+                    tagResource)).all().get();
+            assertEquals(new HashSet<>(asList(tagResource)), result.keySet());
+            assertEquals(tags, result.get(tagResource));
         }
     }
 

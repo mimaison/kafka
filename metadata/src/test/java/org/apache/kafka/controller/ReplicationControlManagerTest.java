@@ -145,6 +145,8 @@ public class ReplicationControlManagerTest {
             new LogContext(), snapshotRegistry, Collections.emptyMap(), Optional.empty(),
                 (__, ___) -> { });
         final ReplicationControlManager replicationControl;
+        final TagControlManager tagControl = new TagControlManager(
+            new LogContext(), snapshotRegistry);
 
         void replay(List<ApiMessageAndVersion> records) throws Exception {
             RecordTestUtils.replayAll(clusterControl, records);
@@ -164,7 +166,8 @@ public class ReplicationControlManagerTest {
                 configurationControl,
                 clusterControl,
                 metrics,
-                createTopicPolicy);
+                createTopicPolicy,
+                tagControl);
             clusterControl.activate();
         }
 

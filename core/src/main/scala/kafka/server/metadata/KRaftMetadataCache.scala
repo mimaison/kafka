@@ -22,19 +22,19 @@ import kafka.server.MetadataCache
 import kafka.utils.Logging
 import org.apache.kafka.common.internals.Topic
 import org.apache.kafka.common.message.MetadataResponseData.{MetadataResponsePartition, MetadataResponseTopic}
-import org.apache.kafka.common.{Cluster, Node, PartitionInfo, TopicPartition, Uuid}
+import org.apache.kafka.common.{Cluster, Node, PartitionInfo, TagResource, TopicPartition, Uuid}
 import org.apache.kafka.common.message.UpdateMetadataRequestData.UpdateMetadataPartitionState
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.protocol.Errors
 import org.apache.kafka.common.requests.MetadataResponse
 import org.apache.kafka.image.MetadataImage
+
 import java.util
 import java.util.{Collections, Properties}
 import java.util.concurrent.ThreadLocalRandom
-
 import kafka.admin.BrokerMetadata
 import org.apache.kafka.common.config.ConfigResource
-import org.apache.kafka.common.message.{DescribeClientQuotasRequestData, DescribeClientQuotasResponseData}
+import org.apache.kafka.common.message.{DescribeClientQuotasRequestData, DescribeClientQuotasResponseData, MetadataRequestData}
 import org.apache.kafka.metadata.{PartitionRegistration, Replicas}
 
 import scala.collection.{Seq, Set, mutable}
@@ -42,7 +42,7 @@ import scala.jdk.CollectionConverters._
 import scala.compat.java8.OptionConverters._
 
 
-class KRaftMetadataCache(val brokerId: Int) extends MetadataCache with Logging with ConfigRepository {
+class KRaftMetadataCache(val brokerId: Int) extends MetadataCache with Logging with ConfigRepository with TagRepository {
   this.logIdent = s"[MetadataCache brokerId=$brokerId] "
 
   // This is the cache state. Every MetadataImage instance is immutable, and updates
@@ -363,5 +363,12 @@ class KRaftMetadataCache(val brokerId: Int) extends MetadataCache with Logging w
 
   def describeClientQuotas(request: DescribeClientQuotasRequestData): DescribeClientQuotasResponseData = {
     _currentImage.clientQuotas().describe(request)
+  }
+
+  override def topicTags(tagResource: TagResource): Properties =
+    _currentImage.tags().tagsProperties(tagResource)
+
+  override def queryTopics(predicates: MetadataRequestData.TopicTagCollection): Set[String] = {
+    _currentImage.tags().query(predicates).asScala
   }
 }

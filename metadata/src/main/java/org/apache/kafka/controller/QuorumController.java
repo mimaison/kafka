@@ -971,6 +971,10 @@ public final class QuorumController implements Controller {
                 case PRODUCER_IDS_RECORD:
                     producerIdControlManager.replay((ProducerIdsRecord) message);
                     break;
+                case TAG_RECORD:
+                    //replicationControl.replay((TagRecord) message);
+                    //TODO
+                    break;
                 default:
                     throw new RuntimeException("Unhandled record type " + type);
             }
@@ -1067,6 +1071,8 @@ public final class QuorumController implements Controller {
      * This must be accessed only by the event queue thread.
      */
     private final ConfigurationControlManager configurationControl;
+
+    private final TagControlManager tagControl;
 
     /**
      * An object which stores the controller's dynamic client quotas.
@@ -1182,6 +1188,7 @@ public final class QuorumController implements Controller {
         this.resourceExists = new ConfigResourceExistenceChecker();
         this.configurationControl = new ConfigurationControlManager(logContext,
             snapshotRegistry, configDefs, alterConfigPolicy, configurationValidator);
+        this.tagControl = new TagControlManager(logContext, snapshotRegistry);
         this.clientQuotaControlManager = new ClientQuotaControlManager(snapshotRegistry);
         this.clusterControl = new ClusterControlManager(logContext, clusterId, time,
             snapshotRegistry, sessionTimeoutNs, replicaPlacer, controllerMetrics);
@@ -1190,7 +1197,7 @@ public final class QuorumController implements Controller {
         this.snapshotMaxNewRecordBytes = snapshotMaxNewRecordBytes;
         this.replicationControl = new ReplicationControlManager(snapshotRegistry,
             logContext, defaultReplicationFactor, defaultNumPartitions,
-            configurationControl, clusterControl, controllerMetrics, createTopicPolicy);
+            configurationControl, clusterControl, controllerMetrics, createTopicPolicy, tagControl);
         this.raftClient = raftClient;
         this.metaLogListener = new QuorumMetaLogListener();
         this.curClaimEpoch = -1;

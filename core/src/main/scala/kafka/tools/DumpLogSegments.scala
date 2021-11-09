@@ -408,7 +408,7 @@ object DumpLogSegments {
         json.toString()
       } catch {
         case e: Throwable => {
-          s"Error at ${record.offset}, skipping. ${e.getMessage}"
+          s"1Error at ${record.offset}, skipping. ${e.getMessage} ${e.printStackTrace()}"
         }
       }
       // No keys for metadata records

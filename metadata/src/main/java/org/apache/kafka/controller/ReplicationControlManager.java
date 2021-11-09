@@ -19,6 +19,7 @@ package org.apache.kafka.controller;
 
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType;
 import org.apache.kafka.common.ElectionType;
+import org.apache.kafka.common.TagResource;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.ApiException;
@@ -211,6 +212,11 @@ public class ReplicationControlManager {
      */
     private final TimelineHashMap<Uuid, int[]> reassigningTopics;
 
+    /**
+     * A reference to the controller's tag control manager.
+     */
+    private final TagControlManager tagControl;
+
     ReplicationControlManager(SnapshotRegistry snapshotRegistry,
                               LogContext logContext,
                               short defaultReplicationFactor,
@@ -218,7 +224,8 @@ public class ReplicationControlManager {
                               ConfigurationControlManager configurationControl,
                               ClusterControlManager clusterControl,
                               ControllerMetrics controllerMetrics,
-                              Optional<CreateTopicPolicy> createTopicPolicy) {
+                              Optional<CreateTopicPolicy> createTopicPolicy,
+                              TagControlManager tagControl) {
         this.snapshotRegistry = snapshotRegistry;
         this.log = logContext.logger(ReplicationControlManager.class);
         this.defaultReplicationFactor = defaultReplicationFactor;
@@ -226,6 +233,7 @@ public class ReplicationControlManager {
         this.configurationControl = configurationControl;
         this.controllerMetrics = controllerMetrics;
         this.createTopicPolicy = createTopicPolicy;
+        this.tagControl = tagControl;
         this.clusterControl = clusterControl;
         this.globalPartitionCount = new TimelineInteger(snapshotRegistry);
         this.preferredReplicaImbalanceCount = new TimelineInteger(snapshotRegistry);
@@ -341,6 +349,9 @@ public class ReplicationControlManager {
         // Delete the configurations associated with this topic.
         configurationControl.deleteTopicConfigs(topic.name);
 
+        // Delete the tags associated with this topic.
+        tagControl.deleteTopicTags(topic.name);
+
         // Remove the entries for this topic in brokersToIsrs.
         for (PartitionRegistration partition : topic.parts.values()) {
             for (int i = 0; i < partition.isr.length; i++) {
@@ -385,6 +396,25 @@ public class ReplicationControlManager {
             }
         }
         records.addAll(configResult.records());
+
+        // TODO
+        request.topics().stream().forEach(t -> {
+            if (!t.tags().isEmpty()) {
+                for (CreateTopicsRequestData.CreatableTopicTag tag : t.tags()) {
+                    log.info("@@@@@@ " + tag.name() + " - " + tag.value());
+                }
+            }
+        });
+        Map<TagResource, Map<String, Entry<OpType, String>>> tagChanges = new HashMap<>();
+        for (CreatableTopic topic : request.topics()) {
+            Map<String, Entry<OpType, String>> tags = new HashMap<>();
+            for (CreateTopicsRequestData.CreatableTopicTag tag : topic.tags()) {
+                tags.put(tag.name(), new SimpleImmutableEntry<>(SET, tag.value()));
+            }
+            tagChanges.put(new TagResource(TagResource.Type.TOPIC, topic.name()), tags);
+        }
+        ControllerResult<Map<String, ApiError>> tagResult = tagControl.incrementalAlterTags(tagChanges);
+        records.addAll(tagResult.records());
 
         // Try to create whatever topics are needed.
         Map<String, CreatableTopicResult> successes = new HashMap<>();

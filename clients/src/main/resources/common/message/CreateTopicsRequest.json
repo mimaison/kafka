@@ -29,7 +29,7 @@
   // in the response if the topics creation is throttled (KIP-599).
   //
   // Version 7 is the same as version 6.
-  "validVersions": "0-7",
+  "validVersions": "0-8",
   "flexibleVersions": "5+",
   "fields": [
     { "name": "Topics", "type": "[]CreatableTopic", "versions": "0+",
@@ -53,6 +53,13 @@
           "about": "The configuration name." },
         { "name": "Value", "type": "string", "versions": "0+", "nullableVersions": "0+",
           "about": "The configuration value." }
+      ]},
+      { "name":  "Tags", "type":  "[]CreatableTopicTag", "versions": "8+",
+        "about": "The custom topic tags to set.", "fields":  [
+        { "name": "Name", "type": "string", "versions": "8+" , "mapKey": true,
+          "about": "The tag name." },
+        { "name": "Value", "type": "string", "versions": "8+", "nullableVersions": "8+",
+          "about": "The tag value." }
       ]}
     ]},
     { "name": "timeoutMs", "type": "int32", "versions": "0+", "default": "60000",

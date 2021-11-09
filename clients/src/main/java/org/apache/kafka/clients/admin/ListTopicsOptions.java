@@ -19,7 +19,9 @@ package org.apache.kafka.clients.admin;
 
 import org.apache.kafka.common.annotation.InterfaceStability;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Options for {@link Admin#listTopics()}.
@@ -30,6 +32,7 @@ import java.util.Objects;
 public class ListTopicsOptions extends AbstractOptions<ListTopicsOptions> {
 
     private boolean listInternal = false;
+    private List<TagPredicate> tags;
 
     /**
      * Set the timeout in milliseconds for this operation or {@code null} if the default api timeout for the
@@ -61,10 +64,24 @@ public class ListTopicsOptions extends AbstractOptions<ListTopicsOptions> {
         return listInternal;
     }
 
+    public ListTopicsOptions withTags(List<TagPredicate> tags) {
+        this.tags = tags;
+        return this;
+    }
+
+    public Optional<List<TagPredicate>> tags() {
+        if (tags == null || tags.isEmpty()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(tags);
+        }
+    }
+
     @Override
     public String toString() {
         return "ListTopicsOptions(" +
             "listInternal=" + listInternal +
+            "tags=" + tags +
             ')';
     }
 

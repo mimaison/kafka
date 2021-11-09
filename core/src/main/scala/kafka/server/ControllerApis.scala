@@ -22,7 +22,6 @@ import java.util.Collections
 import java.util.Map.Entry
 import java.util.concurrent.TimeUnit.{MILLISECONDS, NANOSECONDS}
 import java.util.concurrent.{CompletableFuture, ExecutionException}
-
 import kafka.network.RequestChannel
 import kafka.raft.RaftManager
 import kafka.server.QuotaFactory.QuotaManagers
@@ -108,6 +107,7 @@ class ControllerApis(val requestChannel: RequestChannel,
         case ApiKeys.CREATE_ACLS => aclApis.handleCreateAcls(request)
         case ApiKeys.DELETE_ACLS => aclApis.handleDeleteAcls(request)
         case ApiKeys.ELECT_LEADERS => handleElectLeaders(request)
+        //case ApiKeys.INCREMENTAL_ALTER_TAGS => handleIncrementalAlterTags(request)
         case _ => throw new ApiException(s"Unsupported ApiKey ${request.context.header.apiKey}")
       }
     } catch {
@@ -775,4 +775,66 @@ class ControllerApis(val requestChannel: RequestChannel,
         }
       })
   }
+
+//  def handleIncrementalAlterTags(request: RequestChannel.Request): Unit = {
+//    val response = new IncrementalAlterTagsResponseData()
+//    val alterTagsRequest = request.body[IncrementalAlterTagsRequest]
+//    val duplicateResources = new util.HashSet[TagResource]
+//    val tagChanges = new util.HashMap[TagResource,
+//      util.Map[String, Entry[AlterConfigOp.OpType, String]]]()
+//    alterTagsRequest.data.resources.forEach { resource =>
+//      val tagResource = new TagResource(
+//        TagResource.Type.forId(resource.resourceType), resource.resourceName())
+//      if (tagResource.`type`().equals(ConfigResource.Type.UNKNOWN)) {
+//        response.responses().add(new AlterTagsResourceResponse().
+//          setErrorCode(UNSUPPORTED_VERSION.code()).
+//          setErrorMessage("Unknown resource type " + resource.resourceType() + ".").
+//          setResourceName(resource.resourceName()).
+//          setResourceType(resource.resourceType()))
+//      } else if (!duplicateResources.contains(tagResource)) {
+//        val altersByName = new util.HashMap[String, Entry[AlterTagOp.OpType, String]]()
+//        resource.tags.forEach { tag =>
+//          altersByName.put(tag.name, new util.AbstractMap.SimpleEntry[AlterTagOp.OpType, String](
+//            AlterTagOp.OpType.forId(tag.tagOperation()), tag.value))
+//        }
+//        if (tagChanges.put(tagResource, altersByName) != null) {
+//          duplicateResources.add(tagResource)
+//          tagChanges.remove(tagResource)
+//          response.responses().add(new AlterTagsResourceResponse().
+//            setErrorCode(INVALID_REQUEST.code()).
+//            setErrorMessage("Duplicate resource.").
+//            setResourceName(resource.resourceName()).
+//            setResourceType(resource.resourceType()))
+//        }
+//      }
+//    }
+//    val iterator = tagChanges.keySet().iterator()
+//    while (iterator.hasNext) {
+//      val resource = iterator.next()
+//      val apiError = authorizeAlterResource(request.context, resource)
+//      if (apiError.isFailure) {
+//        response.responses().add(new AlterTagsResourceResponse().
+//          setErrorCode(apiError.error().code()).
+//          setErrorMessage(apiError.message()).
+//          setResourceName(resource.name()).
+//          setResourceType(resource.`type`().id()))
+//        iterator.remove()
+//      }
+//    }
+//    controller.incrementalAlterTags(tagChanges, alterTagsRequest.data.validateOnly)
+//      .whenComplete { (controllerResults, exception) =>
+//        if (exception != null) {
+//          requestHelper.handleError(request, exception)
+//        } else {
+//          controllerResults.entrySet().forEach(entry => response.responses().add(
+//            new AlterConfigsResourceResponse().
+//              setErrorCode(entry.getValue.error().code()).
+//              setErrorMessage(entry.getValue.message()).
+//              setResourceName(entry.getKey.name()).
+//              setResourceType(entry.getKey.`type`().id())))
+//          requestHelper.sendResponseMaybeThrottle(request, throttleMs =>
+//            new IncrementalAlterTagsResponse(response.setThrottleTimeMs(throttleMs)))
+//        }
+//      }
+//  }
 }

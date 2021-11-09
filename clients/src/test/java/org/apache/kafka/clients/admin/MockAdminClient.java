@@ -23,6 +23,7 @@ import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TagResource;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.TopicCollection.TopicIdCollection;
 import org.apache.kafka.common.TopicCollection.TopicNameCollection;
@@ -1000,6 +1001,11 @@ public class MockAdminClient extends AdminClient {
 
     @Override
     public ListTransactionsResult listTransactions(ListTransactionsOptions options) {
+        throw new UnsupportedOperationException("Not implemented yet");
+    }
+
+    @Override
+    public DescribeTagsResult describeTags(Collection<TagResource> resources, DescribeTagsOptions options) {
         throw new UnsupportedOperationException("Not implemented yet");
     }
 

@@ -18,7 +18,7 @@
   "type": "request",
   "listeners": ["zkBroker", "broker"],
   "name": "MetadataRequest",
-  "validVersions": "0-12",
+  "validVersions": "0-13",
   "flexibleVersions": "9+",
   "fields": [
     // In version 0, an empty array indicates "request metadata for all topics."  In version 1 and
@@ -39,6 +39,7 @@
     // Version 11 deprecates IncludeClusterAuthorizedOperations field. This is now exposed
     // by the DescribeCluster API (KIP-700).
     // Version 12 supports topic Id.
+    // Version 13 supports tag queries
     { "name": "Topics", "type": "[]MetadataRequestTopic", "versions": "0+", "nullableVersions": "1+",
       "about": "The topics to fetch metadata for.", "fields": [
       { "name": "TopicId", "type": "uuid", "versions": "10+", "ignorable": true, "about": "The topic id." },
@@ -50,6 +51,17 @@
     { "name": "IncludeClusterAuthorizedOperations", "type": "bool", "versions": "8-10",
       "about": "Whether to include cluster authorized operations." },
     { "name": "IncludeTopicAuthorizedOperations", "type": "bool", "versions": "8+",
-      "about": "Whether to include topic authorized operations." }
+      "about": "Whether to include topic authorized operations." },
+    { "name":  "Tags", "type":  "[]TopicTag", "versions": "13+",
+      "about": "", "fields":  [
+      { "name": "Op", "type": "int8", "versions": "13+" , "mapKey": true,
+        "about": "" },
+      { "name": "Prefix", "type": "string", "versions": "13+", "nullableVersions": "13+",
+        "about": "" },
+      { "name": "Key", "type": "string", "versions": "13+", "nullableVersions": "13+",
+        "about": "" },
+      { "name": "Values", "type": "[]string", "versions": "13+", "nullableVersions": "13+",
+        "about": "" }
+    ]}
   ]
 }

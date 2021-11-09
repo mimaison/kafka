@@ -29,6 +29,7 @@ import org.apache.kafka.common.metadata.ProducerIdsRecord;
 import org.apache.kafka.common.metadata.RegisterBrokerRecord;
 import org.apache.kafka.common.metadata.RemoveFeatureLevelRecord;
 import org.apache.kafka.common.metadata.RemoveTopicRecord;
+import org.apache.kafka.common.metadata.TagRecord;
 import org.apache.kafka.common.metadata.TopicRecord;
 import org.apache.kafka.common.metadata.UnfenceBrokerRecord;
 import org.apache.kafka.common.metadata.UnregisterBrokerRecord;
@@ -63,6 +64,8 @@ public final class MetadataDelta {
     private ClientQuotasDelta clientQuotasDelta = null;
 
     private ProducerIdsDelta producerIdsDelta = null;
+
+    private TagsDelta tagsDelta = null;
 
     public MetadataDelta(MetadataImage image) {
         this.image = image;
@@ -130,6 +133,17 @@ public final class MetadataDelta {
         return producerIdsDelta;
     }
 
+    public TagsDelta tagsDelta() {
+        return tagsDelta;
+    }
+
+    public TagsDelta getOrCreateTagsDelta() {
+        if (tagsDelta == null) {
+            tagsDelta = new TagsDelta(image.tags());
+        }
+        return tagsDelta;
+    }
+
     public void read(long highestOffset, int highestEpoch, Iterator<List<ApiMessageAndVersion>> reader) {
         while (reader.hasNext()) {
             List<ApiMessageAndVersion> batch = reader.next();
@@ -187,6 +201,9 @@ public final class MetadataDelta {
             case BROKER_REGISTRATION_CHANGE_RECORD:
                 replay((BrokerRegistrationChangeRecord) record);
                 break;
+            case TAG_RECORD:
+                replay((TagRecord) record);
+                break;
             default:
                 throw new RuntimeException("Unknown metadata record type " + type);
         }
@@ -230,6 +247,10 @@ public final class MetadataDelta {
         getOrCreateTopicsDelta().replay(record);
         String topicName = topicsDelta.replay(record);
         getOrCreateConfigsDelta().replay(record, topicName);
+        if (configsDelta == null) configsDelta = new ConfigurationsDelta(image.configs());
+        configsDelta.replay(record, topicName);
+        if (tagsDelta == null) tagsDelta = new TagsDelta(image.tags());
+        tagsDelta.replay(record, topicName);
     }
 
     public void replay(FeatureLevelRecord record) {
@@ -252,6 +273,11 @@ public final class MetadataDelta {
         getOrCreateFeaturesDelta().replay(record);
     }
 
+    public void replay(TagRecord record) {
+        if (tagsDelta == null) tagsDelta = new TagsDelta(image.tags());
+        tagsDelta.replay(record);
+    }
+
     /**
      * Create removal deltas for anything which was in the base image, but which was not
      * referenced in the snapshot records we just applied.
@@ -263,6 +289,7 @@ public final class MetadataDelta {
         getOrCreateConfigsDelta().finishSnapshot();
         getOrCreateClientQuotasDelta().finishSnapshot();
         getOrCreateProducerIdsDelta().finishSnapshot();
+        getOrCreateTagsDelta().finishSnapshot();
     }
 
     public MetadataImage apply() {
@@ -302,6 +329,12 @@ public final class MetadataDelta {
         } else {
             newProducerIds = producerIdsDelta.apply();
         }
+        TagsImage newTags;
+        if (tagsDelta == null) {
+            newTags = image.tags();
+        } else {
+            newTags = tagsDelta.apply();
+        }
         return new MetadataImage(
             new OffsetAndEpoch(highestOffset, highestEpoch),
             newFeatures,
@@ -309,7 +342,8 @@ public final class MetadataDelta {
             newTopics,
             newConfigs,
             newClientQuotas,
-            newProducerIds
+            newProducerIds,
+            newTags
         );
     }
 
@@ -324,6 +358,7 @@ public final class MetadataDelta {
             ", configsDelta=" + configsDelta +
             ", clientQuotasDelta=" + clientQuotasDelta +
             ", producerIdsDelta=" + producerIdsDelta +
+            ", tagDelta=" + tagsDelta +
             ')';
     }
 }

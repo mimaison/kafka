@@ -27,7 +27,7 @@ import kafka.log.AppendOrigin
 import kafka.message.ZStdCompressionCodec
 import kafka.network.RequestChannel
 import kafka.server.QuotaFactory.{QuotaManagers, UnboundedQuota}
-import kafka.server.metadata.ConfigRepository
+import kafka.server.metadata.{ConfigRepository, TagRepository}
 import kafka.utils.Implicits._
 import kafka.utils.{CoreUtils, Logging}
 import org.apache.kafka.clients.admin.AlterConfigOp.OpType
@@ -72,13 +72,13 @@ import org.apache.kafka.common.security.token.delegation.{DelegationToken, Token
 import org.apache.kafka.common.utils.{ProducerIdAndEpoch, Time}
 import org.apache.kafka.common.{Node, TopicIdPartition, TopicPartition, Uuid}
 import org.apache.kafka.server.authorizer._
+
 import java.lang.{Long => JLong}
 import java.nio.ByteBuffer
 import java.util
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.{Collections, Optional}
-
 import scala.annotation.nowarn
 import scala.collection.{Map, Seq, Set, immutable, mutable}
 import scala.jdk.CollectionConverters._
@@ -105,7 +105,8 @@ class KafkaApis(val requestChannel: RequestChannel,
                 val clusterId: String,
                 time: Time,
                 val tokenManager: DelegationTokenManager,
-                val apiVersionManager: ApiVersionManager) extends ApiRequestHandler with Logging {
+                val apiVersionManager: ApiVersionManager,
+                val tagRepository: Option[TagRepository]) extends ApiRequestHandler with Logging {
 
   type FetchResponseStats = Map[TopicPartition, RecordConversionStats]
   this.logIdent = "[KafkaApi-%d] ".format(brokerId)
@@ -113,6 +114,7 @@ class KafkaApis(val requestChannel: RequestChannel,
   val authHelper = new AuthHelper(authorizer)
   val requestHelper = new RequestHandlerHelper(requestChannel, quotas, time)
   val aclApis = new AclApis(authHelper, authorizer, requestHelper, "broker", config)
+  val tagHelper = new TagHelper(metadataCache, tagRepository)
 
   def close(): Unit = {
     aclApis.close()
@@ -227,6 +229,8 @@ class KafkaApis(val requestChannel: RequestChannel,
         case ApiKeys.LIST_TRANSACTIONS => handleListTransactionsRequest(request)
         case ApiKeys.ALLOCATE_PRODUCER_IDS => handleAllocateProducerIdsRequest(request)
         case ApiKeys.DESCRIBE_QUORUM => forwardToControllerOrFail(request)
+        case ApiKeys.DESCRIBE_TAGS => handleDescribeTagsRequest(request)
+        case ApiKeys.INCREMENTAL_ALTER_TAGS => maybeForwardToController(request, handleIncrementalAlterTagsRequest)
         case _ => throw new IllegalStateException(s"No handler for request api key ${request.header.apiKey}")
       }
     } catch {
@@ -1210,7 +1214,12 @@ class KafkaApis(val requestChannel: RequestChannel,
     val unknownTopicIdsTopicMetadata = unknownTopicIds.map(topicId =>
         metadataResponseTopic(Errors.UNKNOWN_TOPIC_ID, null, topicId, false, util.Collections.emptyList())).toSeq
 
-    val topics = if (metadataRequest.isAllTopics)
+    val topics = if (!metadataRequest.data().tags().isEmpty)
+      if (tagRepository.isDefined)
+        tagRepository.get.queryTopics(metadataRequest.data().tags())
+      else
+        throw new InvalidRequestException("Unable to query tags no tag repository")
+    else if (metadataRequest.isAllTopics)
       metadataCache.getAllTopics()
     else if (useTopicId)
       knownTopicNames
@@ -1292,7 +1301,7 @@ class KafkaApis(val requestChannel: RequestChannel,
 
     val brokers = metadataCache.getAliveBrokerNodes(request.context.listenerName)
 
-    trace("Sending topic metadata %s and brokers %s for correlation id %d to client %s".format(completeTopicMetadata.mkString(","),
+    info("Sending topic metadata %s and brokers %s for correlation id %d to client %s".format(completeTopicMetadata.mkString(","),
       brokers.mkString(","), request.header.correlationId, request.header.clientId))
 
     requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
@@ -2811,6 +2820,19 @@ class KafkaApis(val requestChannel: RequestChannel,
         .setResults((authorizedConfigs ++ unauthorizedConfigs).asJava)))
   }
 
+  def handleDescribeTagsRequest(request: RequestChannel.Request): Unit = {
+    metadataSupport.requireRaftOrThrow(KafkaApis.unsupportedWithZk("Tags are only supported on Raft"))
+    val describeTagsRequest = request.body[DescribeTagsRequest]
+    val results = tagHelper.describeTags(describeTagsRequest.data().resources().asScala.toList)
+    requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
+      new DescribeTagsResponse(new DescribeTagsResponseData().setThrottleTimeMs(requestThrottleMs)
+        .setResults(results.asJava)))
+  }
+
+  def handleIncrementalAlterTagsRequest(request: RequestChannel.Request): Unit = {
+    metadataSupport.requireRaftOrThrow(KafkaApis.unsupportedWithZk("Tags are only supported on Raft"))
+  }
+
   def handleAlterReplicaLogDirsRequest(request: RequestChannel.Request): Unit = {
     val alterReplicaDirsRequest = request.body[AlterReplicaLogDirsRequest]
     if (authHelper.authorize(request.context, ALTER, CLUSTER, CLUSTER_NAME)) {
@@ -3524,5 +3546,9 @@ object KafkaApis {
 
   private def notYetSupported(text: String): Exception = {
     new UnsupportedVersionException(s"Not yet supported when using a Raft-based metadata quorum: $text")
+  }
+
+  private def unsupportedWithZk(text: String): Exception = {
+    new UnsupportedVersionException(s"Unsupported when using ZooKeeper: $text")
   }
 }

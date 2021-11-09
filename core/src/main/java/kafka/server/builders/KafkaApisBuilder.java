@@ -32,6 +32,7 @@ import kafka.server.MetadataSupport;
 import kafka.server.QuotaFactory.QuotaManagers;
 import kafka.server.ReplicaManager;
 import kafka.server.metadata.ConfigRepository;
+import kafka.server.metadata.TagRepository;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.server.authorizer.Authorizer;
@@ -61,6 +62,7 @@ public class KafkaApisBuilder {
     private Time time = Time.SYSTEM;
     private DelegationTokenManager tokenManager = null;
     private ApiVersionManager apiVersionManager = null;
+    private Optional<TagRepository> tagRepository = Optional.empty();
 
     public KafkaApisBuilder setRequestChannel(RequestChannel requestChannel) {
         this.requestChannel = requestChannel;
@@ -157,6 +159,11 @@ public class KafkaApisBuilder {
         return this;
     }
 
+    public KafkaApisBuilder setTagRepository(Optional<TagRepository> tagRepository) {
+        this.tagRepository = tagRepository;
+        return this;
+    }
+
     public KafkaApis build() {
         if (requestChannel == null) throw new RuntimeException("you must set requestChannel");
         if (metadataSupport == null) throw new RuntimeException("you must set metadataSupport");
@@ -192,6 +199,7 @@ public class KafkaApisBuilder {
                              clusterId,
                              time,
                              tokenManager,
-                             apiVersionManager);
+                             apiVersionManager,
+                             OptionConverters.toScala(tagRepository));
     }
 }

@@ -22,6 +22,7 @@ import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.TagResource;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionReplica;
@@ -1574,6 +1575,13 @@ public interface Admin extends AutoCloseable {
      * @return The result
      */
     ListTransactionsResult listTransactions(ListTransactionsOptions options);
+
+    default DescribeTagsResult describeTags(Collection<TagResource> resources) {
+        return describeTags(resources, new DescribeTagsOptions());
+    }
+
+    DescribeTagsResult describeTags(Collection<TagResource> resources, DescribeTagsOptions options);
+
 
     /**
      * Get the metrics kept by the adminClient

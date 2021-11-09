@@ -32,7 +32,7 @@
   // in the response if the topics creation is throttled (KIP-599).
   //
   // Version 7 returns the topic ID of the newly created topic if creation is sucessful.
-  "validVersions": "0-7",
+  "validVersions": "0-8",
   "flexibleVersions": "5+",
   "fields": [
     { "name": "ThrottleTimeMs", "type": "int32", "versions": "2+", "ignorable": true,

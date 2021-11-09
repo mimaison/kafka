@@ -38,7 +38,8 @@ public final class MetadataImage {
         TopicsImage.EMPTY,
         ConfigurationsImage.EMPTY,
         ClientQuotasImage.EMPTY,
-        ProducerIdsImage.EMPTY);
+        ProducerIdsImage.EMPTY,
+        TagsImage.EMPTY);
 
     private final OffsetAndEpoch highestOffsetAndEpoch;
 
@@ -54,6 +55,9 @@ public final class MetadataImage {
 
     private final ProducerIdsImage producerIds;
 
+    private final TagsImage tags;
+
+
     public MetadataImage(
         OffsetAndEpoch highestOffsetAndEpoch,
         FeaturesImage features,
@@ -61,7 +65,8 @@ public final class MetadataImage {
         TopicsImage topics,
         ConfigurationsImage configs,
         ClientQuotasImage clientQuotas,
-        ProducerIdsImage producerIds
+        ProducerIdsImage producerIds,
+        TagsImage tags
     ) {
         this.highestOffsetAndEpoch = highestOffsetAndEpoch;
         this.features = features;
@@ -70,6 +75,7 @@ public final class MetadataImage {
         this.configs = configs;
         this.clientQuotas = clientQuotas;
         this.producerIds = producerIds;
+        this.tags = tags;
     }
 
     public boolean isEmpty() {
@@ -78,7 +84,8 @@ public final class MetadataImage {
             topics.isEmpty() &&
             configs.isEmpty() &&
             clientQuotas.isEmpty() &&
-            producerIds.isEmpty();
+            producerIds.isEmpty() &&
+            tags.isEmpty();
     }
 
     public OffsetAndEpoch highestOffsetAndEpoch() {
@@ -109,6 +116,10 @@ public final class MetadataImage {
         return producerIds;
     }
 
+    public TagsImage tags() {
+        return tags;
+    }
+
     public void write(Consumer<List<ApiMessageAndVersion>> out) {
         features.write(out);
         cluster.write(out);
@@ -116,6 +127,7 @@ public final class MetadataImage {
         configs.write(out);
         clientQuotas.write(out);
         producerIds.write(out);
+        tags.write(out);
     }
 
     @Override
@@ -128,7 +140,8 @@ public final class MetadataImage {
             topics.equals(other.topics) &&
             configs.equals(other.configs) &&
             clientQuotas.equals(other.clientQuotas) &&
-            producerIds.equals(other.producerIds);
+            producerIds.equals(other.producerIds) &&
+            tags.equals(other.tags);
     }
 
     @Override
@@ -139,7 +152,8 @@ public final class MetadataImage {
             topics,
             configs,
             clientQuotas,
-            producerIds);
+            producerIds,
+            tags);
     }
 
     @Override
@@ -151,6 +165,7 @@ public final class MetadataImage {
             ", configs=" + configs +
             ", clientQuotas=" + clientQuotas +
             ", producerIdsImage=" + producerIds +
+            ", tags=" + tags +
             ")";
     }
 }

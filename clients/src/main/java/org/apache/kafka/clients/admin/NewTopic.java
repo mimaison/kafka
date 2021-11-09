@@ -18,6 +18,8 @@
 package org.apache.kafka.clients.admin;
 
 import java.util.Optional;
+
+import org.apache.kafka.common.message.CreateTopicsRequestData;
 import org.apache.kafka.common.message.CreateTopicsRequestData.CreatableReplicaAssignment;
 import org.apache.kafka.common.message.CreateTopicsRequestData.CreatableTopic;
 import org.apache.kafka.common.message.CreateTopicsRequestData.CreateableTopicConfig;
@@ -40,6 +42,7 @@ public class NewTopic {
     private final Optional<Short> replicationFactor;
     private final Map<Integer, List<Integer>> replicasAssignments;
     private Map<String, String> configs = null;
+    private Map<String, String> tags = null;
 
     /**
      * A new topic with the specified replication factor and number of partitions.
@@ -121,6 +124,15 @@ public class NewTopic {
         return configs;
     }
 
+    public NewTopic tags(Map<String, String> tags) {
+        this.tags = tags;
+        return this;
+    }
+    public Map<String, String> tags() {
+        return tags;
+    }
+
+
     CreatableTopic convertToCreatableTopic() {
         CreatableTopic creatableTopic = new CreatableTopic().
             setName(name).
@@ -142,6 +154,14 @@ public class NewTopic {
                         setValue(entry.getValue()));
             }
         }
+        if (tags != null) {
+            for (Entry<String, String> entry : tags.entrySet()) {
+                creatableTopic.tags().add(
+                        new CreateTopicsRequestData.CreatableTopicTag()
+                                .setName(entry.getKey())
+                                .setValue(entry.getValue()));
+            }
+        }
         return creatableTopic;
     }
 
@@ -153,6 +173,7 @@ public class NewTopic {
                 append(", replicationFactor=").append(replicationFactor.map(String::valueOf).orElse("default")).
                 append(", replicasAssignments=").append(replicasAssignments).
                 append(", configs=").append(configs).
+                append(", tags=").append(tags).
                 append(")");
         return bld.toString();
     }
@@ -166,11 +187,12 @@ public class NewTopic {
             Objects.equals(numPartitions, that.numPartitions) &&
             Objects.equals(replicationFactor, that.replicationFactor) &&
             Objects.equals(replicasAssignments, that.replicasAssignments) &&
-            Objects.equals(configs, that.configs);
+            Objects.equals(configs, that.configs) &&
+            Objects.equals(tags, that.tags);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, numPartitions, replicationFactor, replicasAssignments, configs);
+        return Objects.hash(name, numPartitions, replicationFactor, replicasAssignments, configs, tags);
     }
 }

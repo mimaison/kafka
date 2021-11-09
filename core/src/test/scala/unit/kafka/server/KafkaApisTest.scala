@@ -191,7 +191,8 @@ class KafkaApisTest {
       clusterId = clusterId,
       time = time,
       tokenManager = null,
-      apiVersionManager = apiVersionManager)
+      apiVersionManager = apiVersionManager,
+      tagRepository = None)
   }
 
   @Test

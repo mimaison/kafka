@@ -62,6 +62,7 @@ import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TagResource;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.TopicCollection.TopicIdCollection;
 import org.apache.kafka.common.TopicCollection.TopicNameCollection;
@@ -134,6 +135,8 @@ import org.apache.kafka.common.message.DescribeConfigsResponseData;
 import org.apache.kafka.common.message.DescribeLogDirsRequestData;
 import org.apache.kafka.common.message.DescribeLogDirsRequestData.DescribableLogDirTopic;
 import org.apache.kafka.common.message.DescribeLogDirsResponseData;
+import org.apache.kafka.common.message.DescribeTagsRequestData;
+import org.apache.kafka.common.message.DescribeTagsResponseData;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsRequestData;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsRequestData.UserName;
 import org.apache.kafka.common.message.DescribeUserScramCredentialsResponseData;
@@ -205,6 +208,8 @@ import org.apache.kafka.common.requests.DescribeDelegationTokenRequest;
 import org.apache.kafka.common.requests.DescribeDelegationTokenResponse;
 import org.apache.kafka.common.requests.DescribeLogDirsRequest;
 import org.apache.kafka.common.requests.DescribeLogDirsResponse;
+import org.apache.kafka.common.requests.DescribeTagsRequest;
+import org.apache.kafka.common.requests.DescribeTagsResponse;
 import org.apache.kafka.common.requests.DescribeUserScramCredentialsRequest;
 import org.apache.kafka.common.requests.DescribeUserScramCredentialsResponse;
 import org.apache.kafka.common.requests.ElectLeadersRequest;
@@ -255,6 +260,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -1893,12 +1899,18 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             MetadataRequest.Builder createRequest(int timeoutMs) {
-                return MetadataRequest.Builder.allTopics();
+                if (options.tags().isPresent()) {
+                    log.info("Metadata with tags");
+                    return MetadataRequest.Builder.withTags(options.tags().get());
+                } else {
+                    return MetadataRequest.Builder.allTopics();
+                }
             }
 
             @Override
             void handleResponse(AbstractResponse abstractResponse) {
                 MetadataResponse response = (MetadataResponse) abstractResponse;
+                log.info("metadata response {}", response);
                 Map<String, TopicListing> topicListing = new HashMap<>();
                 for (MetadataResponse.TopicMetadata topicMetadata : response.topicMetadata()) {
                     String topicName = topicMetadata.topic();
@@ -4385,6 +4397,66 @@ public class KafkaAdminClient extends AdminClient {
         ListTransactionsHandler handler = new ListTransactionsHandler(options, logContext);
         invokeDriver(handler, future, options.timeoutMs);
         return new ListTransactionsResult(future.all());
+    }
+
+    @Override
+    public DescribeTagsResult describeTags(Collection<TagResource> resources, DescribeTagsOptions options) {
+        final Map<TagResource, KafkaFutureImpl<Properties>> futures = new HashMap<>(resources.size());
+        for (TagResource topic : resources) {
+            futures.put(topic, new KafkaFutureImpl<>());
+        }
+        final long now = time.milliseconds();
+
+        runnable.call(new Call("describeTags", calcDeadlineMs(now, 30000),
+                 new LeastLoadedNodeProvider()) {
+
+            @Override
+            DescribeTagsRequest.Builder createRequest(int timeoutMs) {
+                List<DescribeTagsRequestData.DescribeTagsResource> topics = new ArrayList<>();
+                for (TagResource topic : resources) {
+                    topics.add(new DescribeTagsRequestData.DescribeTagsResource()
+                            .setResourceName(topic.name())
+                            .setResourceType(topic.type().id()));
+                }
+                return new DescribeTagsRequest.Builder(new DescribeTagsRequestData()
+                        .setResources(topics));
+            }
+
+            @Override
+            void handleResponse(AbstractResponse abstractResponse) {
+
+                DescribeTagsResponse response = (DescribeTagsResponse) abstractResponse;
+                for (DescribeTagsResponseData.DescribeTagsResult result : response.data().results()) {
+                    TagResource tagResource = new TagResource(TagResource.Type.forId(result.resourceType()), result.resourceName());
+                    KafkaFutureImpl<Properties> future = futures.get(tagResource);
+                    if (future == null) {
+                        log.warn("The tags for {} in the response from the least loaded broker is not in the request", tagResource);
+                    } else {
+                        if (result.errorCode() != Errors.NONE.code()) {
+                            future.completeExceptionally(Errors.forCode(result.errorCode())
+                                    .exception(result.errorMessage()));
+                        } else {
+                            Properties tags = new Properties();
+                            for (DescribeTagsResponseData.DescribeTagsResourceResult t : result.tags()) {
+                                tags.setProperty(t.name(), t.value());
+                            }
+                            future.complete(tags);
+                        }
+                    }
+                }
+                completeUnrealizedFutures(
+                        futures.entrySet().stream(),
+                        configResource -> "The broker response did not contain a result for tag resource " + configResource);
+            }
+
+            @Override
+            void handleFailure(Throwable throwable) {
+                completeAllExceptionally(futures.values(), throwable);
+            }
+        }, now);
+
+
+        return new DescribeTagsResult(new HashMap<>(futures));
     }
 
     private <K, V> void invokeDriver(

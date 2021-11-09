@@ -57,6 +57,16 @@ public class CreateTopicsRequest extends AbstractRequest {
                     + "version 4+. The following topics need values for partitions and replicas: "
                     + topicsWithDefaults);
             }
+            final List<String> topicsWithTags = data.topics()
+                    .stream()
+                    .filter(topic -> !topic.tags().isEmpty())
+                    .map(CreatableTopic::name)
+                    .collect(Collectors.toList());
+            if (!topicsWithTags.isEmpty() && version < 8) {
+                throw new UnsupportedVersionException("Creating topics with tags is only supported in CreateTopicRequest "
+                        + "version 8+. The following topics should not have tags: "
+                        + topicsWithDefaults);
+            }
 
             return new CreateTopicsRequest(data, version);
         }
