@@ -138,8 +138,42 @@ class SocketServer(val config: KafkaConfig,
       }
     }
 
+    val dataPlaneProcessors = dataPlaneAcceptors.asScala.values.flatMap(a => a.processors)
+    val controlPlaneProcessorOpt = controlPlaneAcceptorOpt.map(a => a.processors(0))
+    newGauge(s"${DataPlaneAcceptor.DataPlaneMetricPrefix}NetworkProcessorAvgIdlePercent", () => SocketServer.this.synchronized {
+      val ioWaitRatioMetricNames = dataPlaneProcessors.map { p =>
+        metrics.metricName("io-wait-ratio", MetricsGroup, p.metricTags)
+      }
+      ioWaitRatioMetricNames.map { metricName =>
+        Option(metrics.metric(metricName)).fold(0.0)(m => Math.min(m.metricValue.asInstanceOf[Double], 1.0))
+      }.sum / dataPlaneProcessors.size
+    })
+    newGauge(s"${ControlPlaneAcceptor.ControlPlaneMetricPrefix}NetworkProcessorAvgIdlePercent", () => SocketServer.this.synchronized {
+      val ioWaitRatioMetricName = controlPlaneProcessorOpt.map { p =>
+        metrics.metricName("io-wait-ratio", MetricsGroup, p.metricTags)
+      }
+      ioWaitRatioMetricName.map { metricName =>
+        Option(metrics.metric(metricName)).fold(0.0)(m => Math.min(m.metricValue.asInstanceOf[Double], 1.0))
+      }.getOrElse(Double.NaN)
+    })
     newGauge("MemoryPoolAvailable", () => memoryPool.availableMemory)
     newGauge("MemoryPoolUsed", () => memoryPool.size() - memoryPool.availableMemory)
+    newGauge(s"${DataPlaneAcceptor.DataPlaneMetricPrefix}ExpiredConnectionsKilledCount", () => SocketServer.this.synchronized {
+      val expiredConnectionsKilledCountMetricNames = dataPlaneProcessors.map { p =>
+        metrics.metricName("expired-connections-killed-count", MetricsGroup, p.metricTags)
+      }
+      expiredConnectionsKilledCountMetricNames.map { metricName =>
+        Option(metrics.metric(metricName)).fold(0.0)(m => m.metricValue.asInstanceOf[Double])
+      }.sum
+    })
+    newGauge(s"${ControlPlaneAcceptor.ControlPlaneMetricPrefix}ExpiredConnectionsKilledCount", () => SocketServer.this.synchronized {
+      val expiredConnectionsKilledCountMetricNames = controlPlaneProcessorOpt.map { p =>
+        metrics.metricName("expired-connections-killed-count", MetricsGroup, p.metricTags)
+      }
+      expiredConnectionsKilledCountMetricNames.map { metricName =>
+        Option(metrics.metric(metricName)).fold(0.0)(m => m.metricValue.asInstanceOf[Double])
+      }.getOrElse(0.0)
+    })
   }
 
   /**
@@ -489,24 +523,6 @@ class DataPlaneAcceptor(endPoint: EndPoint,
   override def metricPrefix(): String = DataPlaneAcceptor.DataPlaneMetricPrefix
   override def threadPrefix(): String = DataPlaneAcceptor.DataPlaneThreadPrefix
 
-  newGauge(s"${metricPrefix()}NetworkProcessorAvgIdlePercent", () => this.synchronized {
-    val ioWaitRatioMetricNames = processors.iterator.map { p =>
-      metrics.metricName("io-wait-ratio", MetricsGroup, p.metricTags)
-    }
-    ioWaitRatioMetricNames.map { metricName =>
-      Option(metrics.metric(metricName)).fold(0.0)(m => Math.min(m.metricValue.asInstanceOf[Double], 1.0))
-    }.sum / processors.size
-  })
-
-  newGauge(s"${metricPrefix()}ExpiredConnectionsKilledCount", () => this.synchronized {
-    val expiredConnectionsKilledCountMetricNames = processors.iterator.map { p =>
-      metrics.metricName("expired-connections-killed-count", MetricsGroup, p.metricTags)
-    }
-    expiredConnectionsKilledCountMetricNames.map { metricName =>
-      Option(metrics.metric(metricName)).fold(0.0)(m => m.metricValue.asInstanceOf[Double])
-    }.sum
-  })
-
   /**
    * Returns the listener name associated with this reconfigurable. Listener-specific
    * configs corresponding to this listener name are provided for reconfiguration.
@@ -615,24 +631,6 @@ class ControlPlaneAcceptor(endPoint: EndPoint,
     else
       Some(processors.apply(0))
   }
-
-  newGauge(s"${metricPrefix()}NetworkProcessorAvgIdlePercent", () => this.synchronized {
-    val ioWaitRatioMetricName = processorOpt().map { p =>
-      metrics.metricName("io-wait-ratio", MetricsGroup, p.metricTags)
-    }
-    ioWaitRatioMetricName.map { metricName =>
-      Option(metrics.metric(metricName)).fold(0.0)(m => Math.min(m.metricValue.asInstanceOf[Double], 1.0))
-    }.getOrElse(Double.NaN)
-  })
-
-  newGauge(s"${metricPrefix()}ExpiredConnectionsKilledCount", () => this.synchronized {
-    val expiredConnectionsKilledCountMetricNames = processorOpt().map { p =>
-      metrics.metricName("expired-connections-killed-count", MetricsGroup, p.metricTags)
-    }
-    expiredConnectionsKilledCountMetricNames.map { metricName =>
-      Option(metrics.metric(metricName)).fold(0.0)(m => m.metricValue.asInstanceOf[Double])
-    }.getOrElse(0.0)
-  })
 }
 
 /**
@@ -663,8 +661,13 @@ private[kafka] abstract class Acceptor(val endPoint: EndPoint,
   private[network] val serverChannel = openServerSocket(endPoint.host, endPoint.port, listenBacklogSize)
   private[network] val processors = new ArrayBuffer[Processor]()
   private val processorsStarted = new AtomicBoolean
-  private val blockedPercentMeter = newMeter(s"${metricPrefix()}AcceptorBlockedPercent",
-    "blocked time", TimeUnit.NANOSECONDS, Map(ListenerMetricTag -> endPoint.listenerName.value))
+  // Build the metric name explicitly to keep the existing name for compatibility
+  private val blockedPercentMeterMetricName = explicitMetricName(
+    "kafka.network",
+    "Acceptor",
+    s"${metricPrefix()}AcceptorBlockedPercent",
+    Map(ListenerMetricTag -> endPoint.listenerName.value))
+  private val blockedPercentMeter = newMeter(blockedPercentMeterMetricName,"blocked time", TimeUnit.NANOSECONDS)
   private var currentProcessorIndex = 0
   private[network] val throttledSockets = new mutable.PriorityQueue[DelayedCloseSocket]()
 

@@ -1980,8 +1980,7 @@ class SocketServerTest {
     connectionId.contains(s":${socket.getLocalPort}-")
 
   private def verifyAcceptorBlockedPercent(listenerName: String, expectBlocked: Boolean): Unit = {
-    //TODO renamed metric!
-    val blockedPercentMetricMBeanName = "kafka.network:type=DataPlaneAcceptor,name=AcceptorBlockedPercent,listener=PLAINTEXT"
+    val blockedPercentMetricMBeanName = "kafka.network:type=Acceptor,name=AcceptorBlockedPercent,listener=PLAINTEXT"
     val blockedPercentMetrics = KafkaYammerMetrics.defaultRegistry.allMetrics.asScala.filter { case (k, _) =>
       k.getMBeanName == blockedPercentMetricMBeanName
     }.values
