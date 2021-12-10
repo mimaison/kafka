@@ -49,7 +49,6 @@ object RequestChannel extends Logging {
   val RequestQueueSizeMetric = "RequestQueueSize"
   val ResponseQueueSizeMetric = "ResponseQueueSize"
   val ProcessorMetricTag = "processor"
-  val ListenerMetricTag = "listener"
 
   def isRequestLoggingEnabled: Boolean = requestLogger.underlying.isDebugEnabled
 
@@ -79,7 +78,7 @@ object RequestChannel extends Logging {
     }
   }
 
-  class Request(val processor: String,
+  class Request(val processor: Int,
                 val context: RequestContext,
                 val startTimeNanos: Long,
                 val memoryPool: MemoryPool,
@@ -294,7 +293,7 @@ object RequestChannel extends Logging {
 
   sealed abstract class Response(val request: Request) {
 
-    def processor: String = request.processor
+    def processor: Int = request.processor
 
     def responseLog: Option[JsonNode] = None
 
@@ -341,7 +340,7 @@ class RequestChannel(val queueSize: Int,
                      val metrics: RequestChannel.Metrics) extends KafkaMetricsGroup {
   import RequestChannel._
   private val requestQueue = new ArrayBlockingQueue[BaseRequest](queueSize)
-  private val processors = new ConcurrentHashMap[String, Processor]()
+  private val processors = new ConcurrentHashMap[Int, Processor]()
   val requestQueueSizeMetricName = metricNamePrefix.concat(RequestQueueSizeMetric)
   val responseQueueSizeMetricName = metricNamePrefix.concat(ResponseQueueSizeMetric)
 
@@ -354,17 +353,16 @@ class RequestChannel(val queueSize: Int,
   })
 
   def addProcessor(processor: Processor): Unit = {
-    if (processors.putIfAbsent(processor.name, processor) != null)
-      warn(s"Unexpected processor with processorId ${processor.name}")
+    if (processors.putIfAbsent(processor.id, processor) != null)
+      warn(s"Unexpected processor with processorId ${processor.id}")
 
     newGauge(responseQueueSizeMetricName, () => processor.responseQueueSize,
-      Map(ProcessorMetricTag -> processor.id.toString, ListenerMetricTag -> processor.listenerName.value()))
+      Map(ProcessorMetricTag -> processor.id.toString))
   }
 
-  def removeProcessor(processor: Processor): Unit = {
-    processors.remove(processor.name)
-    removeMetric(responseQueueSizeMetricName,
-      Map(ProcessorMetricTag -> processor.id.toString, ListenerMetricTag -> processor.listenerName.value()))
+  def removeProcessor(processorId: Int): Unit = {
+    processors.remove(processorId)
+    removeMetric(responseQueueSizeMetricName, Map(ProcessorMetricTag -> processorId.toString))
   }
 
   /** Send a request to be handled, potentially blocking until there is room in the queue for the request */

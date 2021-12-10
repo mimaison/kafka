@@ -17,7 +17,6 @@
  */
 package integration.kafka.network
 
-import kafka.metrics.KafkaYammerMetrics
 import kafka.server.{BaseRequestTest, Defaults, KafkaConfig}
 import kafka.utils.TestUtils
 import org.apache.kafka.clients.admin.{Admin, AdminClientConfig}
@@ -50,11 +49,9 @@ class DynamicNumNetworkThreadsTest extends BaseRequestTest {
   }
 
   def getNumNetworkThreads(listener: String): Int = {
-    val processorMetrics = KafkaYammerMetrics.defaultRegistry.allMetrics
-      .asScala
-      .filter(_._1.getName == "IdlePercent")
-      .filter(_._1.getScope.contains(listener))
-    processorMetrics.size
+    brokers.head.metrics.metrics().keySet().asScala
+      .filter(_.name() == "request-rate")
+      .count(listener == _.tags().get("listener"))
   }
 
   @Test
@@ -63,7 +60,7 @@ class DynamicNumNetworkThreadsTest extends BaseRequestTest {
     val newBaseNetworkThreadsCount = Defaults.NumNetworkThreads + 1
     var props = new Properties
     props.put(KafkaConfig.NumNetworkThreadsProp, newBaseNetworkThreadsCount.toString)
-    reconfigureServers(props, perBrokerConfig = false, (KafkaConfig.NumNetworkThreadsProp, newBaseNetworkThreadsCount.toString))
+    reconfigureServers(props, (KafkaConfig.NumNetworkThreadsProp, newBaseNetworkThreadsCount.toString))
 
     // Only the external listener is changed
     assertEquals(2, getNumNetworkThreads(internal))
@@ -73,16 +70,16 @@ class DynamicNumNetworkThreadsTest extends BaseRequestTest {
     val newInternalNetworkThreadsCount = 3
     props = new Properties
     props.put(s"listener.name.${internal.toLowerCase}.${KafkaConfig.NumNetworkThreadsProp}", newInternalNetworkThreadsCount.toString)
-    reconfigureServers(props, perBrokerConfig = false, (s"listener.name.${internal.toLowerCase}.${KafkaConfig.NumNetworkThreadsProp}", newInternalNetworkThreadsCount.toString))
+    reconfigureServers(props, (s"listener.name.${internal.toLowerCase}.${KafkaConfig.NumNetworkThreadsProp}", newInternalNetworkThreadsCount.toString))
 
     // The internal listener is changed
     assertEquals(newInternalNetworkThreadsCount, getNumNetworkThreads(internal))
     assertEquals(newBaseNetworkThreadsCount, getNumNetworkThreads(external))
   }
 
-  private def reconfigureServers(newProps: Properties, perBrokerConfig: Boolean, aPropToVerify: (String, String)): Unit = {
+  private def reconfigureServers(newProps: Properties, aPropToVerify: (String, String)): Unit = {
     val adminClient = createAdminClient()
-    TestUtils.incrementalAlterConfigs(servers, adminClient, newProps, perBrokerConfig).all.get()
+    TestUtils.incrementalAlterConfigs(servers, adminClient, newProps, perBrokerConfig = false).all.get()
     waitForConfigOnServer(aPropToVerify._1, aPropToVerify._2)
     adminClient.close()
   }

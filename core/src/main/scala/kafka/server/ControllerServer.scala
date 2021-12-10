@@ -193,8 +193,8 @@ class ControllerServer(
         controllerApis,
         time,
         config.numIoThreads,
-        s"${DataPlaneAcceptor.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
-        DataPlaneAcceptor.DataPlaneThreadPrefix)
+        s"${DataPlaneAcceptor.MetricPrefix}RequestHandlerAvgIdlePercent",
+        DataPlaneAcceptor.ThreadPrefix)
       socketServer.startProcessingRequests(authorizerFutures)
     } catch {
       case e: Throwable =>

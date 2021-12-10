@@ -113,8 +113,8 @@ class TestRaftServer(
       requestHandler,
       time,
       config.numIoThreads,
-      s"${DataPlaneAcceptor.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent",
-      DataPlaneAcceptor.DataPlaneThreadPrefix
+      s"${DataPlaneAcceptor.MetricPrefix}RequestHandlerAvgIdlePercent",
+      DataPlaneAcceptor.ThreadPrefix
     )
 
     workloadGenerator.start()
