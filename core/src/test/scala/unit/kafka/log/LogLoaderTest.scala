@@ -29,9 +29,11 @@ import kafka.utils.{CoreUtils, MockTime, Scheduler, TestUtils}
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.record.{CompressionType, ControlRecordType, DefaultRecordBatch, MemoryRecords, RecordBatch, RecordVersion, SimpleRecord, TimestampType}
 import org.apache.kafka.common.utils.{Time, Utils}
-import org.easymock.EasyMock
 import org.junit.jupiter.api.Assertions.{assertEquals, assertFalse, assertNotEquals, assertThrows, assertTrue}
 import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
+import org.mockito.ArgumentMatchers
+import org.mockito.ArgumentMatchers.{any, anyLong}
+import org.mockito.Mockito.{mock, reset, times, verify, when}
 
 import scala.annotation.nowarn
 import scala.collection.mutable.ListBuffer
@@ -339,26 +341,12 @@ class LogLoaderTest {
 
   @Test
   def testSkipLoadingIfEmptyProducerStateBeforeTruncation(): Unit = {
-    val stateManager: ProducerStateManager = EasyMock.mock(classOf[ProducerStateManager])
-    EasyMock.expect(stateManager.removeStraySnapshots(EasyMock.anyObject())).anyTimes()
+    val stateManager: ProducerStateManager = mock(classOf[ProducerStateManager])
     // Load the log
-    EasyMock.expect(stateManager.latestSnapshotOffset).andReturn(None)
-
-    stateManager.updateMapEndOffset(0L)
-    EasyMock.expectLastCall().anyTimes()
-
-    EasyMock.expect(stateManager.mapEndOffset).andStubReturn(0L)
-    EasyMock.expect(stateManager.isEmpty).andStubReturn(true)
-
-    stateManager.takeSnapshot()
-    EasyMock.expectLastCall().anyTimes()
-
-    stateManager.truncateAndReload(EasyMock.eq(0L), EasyMock.eq(0L), EasyMock.anyLong)
-    EasyMock.expectLastCall()
-
-    EasyMock.expect(stateManager.firstUnstableOffset).andStubReturn(None)
-
-    EasyMock.replay(stateManager)
+    when(stateManager.latestSnapshotOffset).thenReturn(None)
+    when(stateManager.mapEndOffset).thenReturn(0L)
+    when(stateManager.isEmpty).thenReturn(true)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
 
     val topicPartition = UnifiedLog.parseTopicPartitionName(logDir)
     val logDirFailureChannel: LogDirFailureChannel = new LogDirFailureChannel(1)
@@ -392,46 +380,35 @@ class LogLoaderTest {
       _topicId = None,
       keepPartitionMetadataFile = true)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).updateMapEndOffset(0L)
+    verify(stateManager).removeStraySnapshots(any())
+    verify(stateManager).takeSnapshot()
+    verify(stateManager).truncateAndReload(ArgumentMatchers.eq(0L), ArgumentMatchers.eq(0L), anyLong)
 
     // Append some messages
-    EasyMock.reset(stateManager)
-    EasyMock.expect(stateManager.firstUnstableOffset).andStubReturn(None)
-
-    stateManager.updateMapEndOffset(1L)
-    EasyMock.expectLastCall()
-    stateManager.updateMapEndOffset(2L)
-    EasyMock.expectLastCall()
-
-    EasyMock.replay(stateManager)
+    reset(stateManager)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
 
     log.appendAsLeader(TestUtils.records(List(new SimpleRecord("a".getBytes))), leaderEpoch = 0)
     log.appendAsLeader(TestUtils.records(List(new SimpleRecord("b".getBytes))), leaderEpoch = 0)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).updateMapEndOffset(1L)
+    verify(stateManager).updateMapEndOffset(2L)
 
     // Now truncate
-    EasyMock.reset(stateManager)
-    EasyMock.expect(stateManager.firstUnstableOffset).andStubReturn(None)
-    EasyMock.expect(stateManager.latestSnapshotOffset).andReturn(None)
-    EasyMock.expect(stateManager.isEmpty).andStubReturn(true)
-    EasyMock.expect(stateManager.mapEndOffset).andReturn(2L)
-    stateManager.truncateAndReload(EasyMock.eq(0L), EasyMock.eq(1L), EasyMock.anyLong)
-    EasyMock.expectLastCall()
+    reset(stateManager)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
+    when(stateManager.latestSnapshotOffset).thenReturn(None)
+    when(stateManager.isEmpty).thenReturn(true)
+    when(stateManager.mapEndOffset).thenReturn(2L)
     // Truncation causes the map end offset to reset to 0
-    EasyMock.expect(stateManager.mapEndOffset).andReturn(0L)
-    // We skip directly to updating the map end offset
-    EasyMock.expect(stateManager.updateMapEndOffset(1L))
-
-    // Finally, we take a snapshot
-    stateManager.takeSnapshot()
-    EasyMock.expectLastCall().once()
-
-    EasyMock.replay(stateManager)
+    when(stateManager.mapEndOffset).thenReturn(0L)
 
     log.truncateTo(1L)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).truncateAndReload(ArgumentMatchers.eq(0L), ArgumentMatchers.eq(1L), anyLong)
+    verify(stateManager).updateMapEndOffset(1L)
+    verify(stateManager, times(2)).takeSnapshot()
   }
 
   @Test
@@ -470,22 +447,9 @@ class LogLoaderTest {
   @nowarn("cat=deprecation")
   @Test
   def testSkipTruncateAndReloadIfOldMessageFormatAndNoCleanShutdown(): Unit = {
-    val stateManager: ProducerStateManager = EasyMock.mock(classOf[ProducerStateManager])
-    EasyMock.expect(stateManager.removeStraySnapshots(EasyMock.anyObject())).anyTimes()
-
-    stateManager.updateMapEndOffset(0L)
-    EasyMock.expectLastCall().anyTimes()
-
-    stateManager.takeSnapshot()
-    EasyMock.expectLastCall().anyTimes()
-
-    EasyMock.expect(stateManager.isEmpty).andReturn(true)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.expect(stateManager.firstUnstableOffset).andReturn(None)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.replay(stateManager)
+    val stateManager: ProducerStateManager = mock(classOf[ProducerStateManager])
+    when(stateManager.isEmpty).thenReturn(true)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
 
     val topicPartition = UnifiedLog.parseTopicPartitionName(logDir)
     val logProps = new Properties()
@@ -521,28 +485,21 @@ class LogLoaderTest {
       _topicId = None,
       keepPartitionMetadataFile = true)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).removeStraySnapshots(any[Seq[Long]])
+    verify(stateManager, times(2)).updateMapEndOffset(0L)
+    verify(stateManager, times(2)).takeSnapshot()
+    verify(stateManager).isEmpty
+    verify(stateManager).firstUnstableOffset
+    verify(stateManager, times(2)).takeSnapshot()
+    verify(stateManager, times(2)).updateMapEndOffset(0L)
   }
 
   @nowarn("cat=deprecation")
   @Test
   def testSkipTruncateAndReloadIfOldMessageFormatAndCleanShutdown(): Unit = {
-    val stateManager: ProducerStateManager = EasyMock.mock(classOf[ProducerStateManager])
-    EasyMock.expect(stateManager.removeStraySnapshots(EasyMock.anyObject())).anyTimes()
-
-    stateManager.updateMapEndOffset(0L)
-    EasyMock.expectLastCall().anyTimes()
-
-    stateManager.takeSnapshot()
-    EasyMock.expectLastCall().anyTimes()
-
-    EasyMock.expect(stateManager.isEmpty).andReturn(true)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.expect(stateManager.firstUnstableOffset).andReturn(None)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.replay(stateManager)
+    val stateManager: ProducerStateManager = mock(classOf[ProducerStateManager])
+    when(stateManager.isEmpty).thenReturn(true)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
 
     val topicPartition = UnifiedLog.parseTopicPartitionName(logDir)
     val logProps = new Properties()
@@ -578,30 +535,20 @@ class LogLoaderTest {
       _topicId = None,
       keepPartitionMetadataFile = true)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).removeStraySnapshots(any[Seq[Long]])
+    verify(stateManager, times(2)).updateMapEndOffset(0L)
+    verify(stateManager, times(2)).takeSnapshot()
+    verify(stateManager).isEmpty
+    verify(stateManager).firstUnstableOffset
   }
 
   @nowarn("cat=deprecation")
   @Test
   def testSkipTruncateAndReloadIfNewMessageFormatAndCleanShutdown(): Unit = {
-    val stateManager: ProducerStateManager = EasyMock.mock(classOf[ProducerStateManager])
-    EasyMock.expect(stateManager.removeStraySnapshots(EasyMock.anyObject())).anyTimes()
-
-    EasyMock.expect(stateManager.latestSnapshotOffset).andReturn(None)
-
-    stateManager.updateMapEndOffset(0L)
-    EasyMock.expectLastCall().anyTimes()
-
-    stateManager.takeSnapshot()
-    EasyMock.expectLastCall().anyTimes()
-
-    EasyMock.expect(stateManager.isEmpty).andReturn(true)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.expect(stateManager.firstUnstableOffset).andReturn(None)
-    EasyMock.expectLastCall().once()
-
-    EasyMock.replay(stateManager)
+    val stateManager: ProducerStateManager = mock(classOf[ProducerStateManager])
+    when(stateManager.latestSnapshotOffset).thenReturn(None)
+    when(stateManager.isEmpty).thenReturn(true)
+    when(stateManager.firstUnstableOffset).thenReturn(None)
 
     val topicPartition = UnifiedLog.parseTopicPartitionName(logDir)
     val logProps = new Properties()
@@ -637,7 +584,11 @@ class LogLoaderTest {
       _topicId = None,
       keepPartitionMetadataFile = true)
 
-    EasyMock.verify(stateManager)
+    verify(stateManager).removeStraySnapshots(any[Seq[Long]])
+    verify(stateManager, times(2)).updateMapEndOffset(0L)
+    verify(stateManager, times(2)).takeSnapshot()
+    verify(stateManager).isEmpty
+    verify(stateManager).firstUnstableOffset
   }
 
   @Test
