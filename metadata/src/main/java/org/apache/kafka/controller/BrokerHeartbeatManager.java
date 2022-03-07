@@ -18,10 +18,12 @@
 package org.apache.kafka.controller;
 
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
+import org.apache.kafka.common.errors.ReplicaPlacementException;
 import org.apache.kafka.common.message.BrokerHeartbeatRequestData;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
-import org.apache.kafka.metadata.UsableBroker;
+import org.apache.kafka.server.placer.ReplicaPlacer;
+import org.apache.kafka.server.placer.UsableBroker;
 import org.slf4j.Logger;
 
 import java.util.Collection;
@@ -449,6 +451,7 @@ public class BrokerHeartbeatManager {
      * @return                  A list of replica lists.
      *
      * @throws InvalidReplicationFactorException    If too many replicas were requested.
+     * @throws ReplicaPlacementException            If the placement can't be created by the replica placer.
      */
     List<List<Integer>> placeReplicas(int startPartition,
                                       int numPartitions,

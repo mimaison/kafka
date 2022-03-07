@@ -24,11 +24,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Random;
 
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
+import org.apache.kafka.common.errors.ReplicaPlacementException;
 import org.apache.kafka.metadata.OptionalStringComparator;
-import org.apache.kafka.metadata.UsableBroker;
+import org.apache.kafka.server.placer.UsableBroker;
+import org.apache.kafka.server.placer.ReplicaPlacer;
 
 
 /**
@@ -409,7 +412,7 @@ public class StripedReplicaPlacer implements ReplicaPlacer {
 
     private static void throwInvalidReplicationFactorIfZero(int numUnfenced) {
         if (numUnfenced == 0) {
-            throw new InvalidReplicationFactorException("All brokers are currently fenced.");
+            throw new ReplicaPlacementException("All brokers are currently fenced.");
         }
     }
 
@@ -423,8 +426,13 @@ public class StripedReplicaPlacer implements ReplicaPlacer {
 
     private final Random random;
 
+    // For testing
     public StripedReplicaPlacer(Random random) {
         this.random = random;
+    }
+
+    public StripedReplicaPlacer() {
+        this(new Random());
     }
 
     @Override

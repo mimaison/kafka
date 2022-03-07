@@ -84,6 +84,7 @@ import org.apache.kafka.raft.BatchReader;
 import org.apache.kafka.raft.LeaderAndEpoch;
 import org.apache.kafka.raft.OffsetAndEpoch;
 import org.apache.kafka.raft.RaftClient;
+import org.apache.kafka.server.placer.ReplicaPlacer;
 import org.apache.kafka.server.policy.AlterConfigPolicy;
 import org.apache.kafka.server.policy.CreateTopicPolicy;
 import org.apache.kafka.snapshot.SnapshotReader;
@@ -100,7 +101,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.RejectedExecutionException;
@@ -145,7 +145,7 @@ public final class QuorumController implements Controller {
         private Map<String, VersionRange> supportedFeatures = Collections.emptyMap();
         private short defaultReplicationFactor = 3;
         private int defaultNumPartitions = 1;
-        private ReplicaPlacer replicaPlacer = new StripedReplicaPlacer(new Random());
+        private ReplicaPlacer replicaPlacer;
         private long snapshotMaxNewRecordBytes = Long.MAX_VALUE;
         private long sessionTimeoutNs = NANOSECONDS.convert(18, TimeUnit.SECONDS);
         private ControllerMetrics controllerMetrics = null;
@@ -239,7 +239,6 @@ public final class QuorumController implements Controller {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
         public QuorumController build() throws Exception {
             if (raftClient == null) {
                 throw new RuntimeException("You must set a raft client.");
@@ -527,7 +526,7 @@ public final class QuorumController implements Controller {
 
         ControllerReadEvent(String name, Supplier<T> handler) {
             this.name = name;
-            this.future = new CompletableFuture<T>();
+            this.future = new CompletableFuture<>();
             this.handler = handler;
         }
 
@@ -564,13 +563,13 @@ public final class QuorumController implements Controller {
 
     // VisibleForTesting
     <T> CompletableFuture<T> appendReadEvent(String name, Supplier<T> handler) {
-        ControllerReadEvent<T> event = new ControllerReadEvent<T>(name, handler);
+        ControllerReadEvent<T> event = new ControllerReadEvent<>(name, handler);
         queue.append(event);
         return event.future();
     }
 
     <T> CompletableFuture<T> appendReadEvent(String name, long deadlineNs, Supplier<T> handler) {
-        ControllerReadEvent<T> event = new ControllerReadEvent<T>(name, handler);
+        ControllerReadEvent<T> event = new ControllerReadEvent<>(name, handler);
         queue.appendWithDeadline(deadlineNs, event);
         return event.future();
     }
@@ -616,7 +615,7 @@ public final class QuorumController implements Controller {
 
         ControllerWriteEvent(String name, ControllerWriteOperation<T> op) {
             this.name = name;
-            this.future = new CompletableFuture<T>();
+            this.future = new CompletableFuture<>();
             this.op = op;
             this.resultAndOffset = null;
         }
@@ -953,7 +952,6 @@ public final class QuorumController implements Controller {
         queue.cancelDeferred(MAYBE_FENCE_REPLICAS);
     }
 
-    @SuppressWarnings("unchecked")
     private void replay(ApiMessage message, Optional<OffsetAndEpoch> snapshotId, long offset) {
         try {
             MetadataRecordType type = MetadataRecordType.fromId(message.apiKey());
@@ -1494,9 +1492,7 @@ public final class QuorumController implements Controller {
     @Override
     public CompletableFuture<Void> waitForReadyBrokers(int minBrokers) {
         final CompletableFuture<Void> future = new CompletableFuture<>();
-        appendControlEvent("waitForReadyBrokers", () -> {
-            clusterControl.addReadyBrokersFuture(future, minBrokers);
-        });
+        appendControlEvent("waitForReadyBrokers", () -> clusterControl.addReadyBrokersFuture(future, minBrokers));
         return future;
     }
 

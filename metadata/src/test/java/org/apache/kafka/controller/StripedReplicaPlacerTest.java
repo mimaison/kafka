@@ -20,7 +20,7 @@ package org.apache.kafka.controller;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.controller.StripedReplicaPlacer.BrokerList;
 import org.apache.kafka.controller.StripedReplicaPlacer.RackList;
-import org.apache.kafka.metadata.UsableBroker;
+import org.apache.kafka.server.placer.UsableBroker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -90,8 +90,7 @@ public class StripedReplicaPlacerTest {
      */
     @Test
     public void testMultiPartitionTopicPlacementOnSingleUnfencedBroker() {
-        MockRandom random = new MockRandom();
-        StripedReplicaPlacer placer = new StripedReplicaPlacer(random);
+        StripedReplicaPlacer placer = new StripedReplicaPlacer();
         assertEquals(Arrays.asList(Arrays.asList(0),
                 Arrays.asList(0),
                 Arrays.asList(0)),
@@ -162,8 +161,7 @@ public class StripedReplicaPlacerTest {
 
     @Test
     public void testAllBrokersFenced() {
-        MockRandom random = new MockRandom();
-        StripedReplicaPlacer placer = new StripedReplicaPlacer(random);
+        StripedReplicaPlacer placer = new StripedReplicaPlacer();
         assertEquals("All brokers are currently fenced.",
             assertThrows(InvalidReplicationFactorException.class,
                 () -> placer.place(0, 1, (short) 1, Arrays.asList(
@@ -173,8 +171,7 @@ public class StripedReplicaPlacerTest {
 
     @Test
     public void testNotEnoughBrokers() {
-        MockRandom random = new MockRandom();
-        StripedReplicaPlacer placer = new StripedReplicaPlacer(random);
+        StripedReplicaPlacer placer = new StripedReplicaPlacer();
         assertEquals("The target replication factor of 3 cannot be reached because only " +
             "2 broker(s) are registered.",
             assertThrows(InvalidReplicationFactorException.class,
@@ -185,8 +182,7 @@ public class StripedReplicaPlacerTest {
 
     @Test
     public void testNonPositiveReplicationFactor() {
-        MockRandom random = new MockRandom();
-        StripedReplicaPlacer placer = new StripedReplicaPlacer(random);
+        StripedReplicaPlacer placer = new StripedReplicaPlacer();
         assertEquals("Invalid replication factor 0: the replication factor must be positive.",
                 assertThrows(InvalidReplicationFactorException.class,
                         () -> placer.place(0, 1, (short) 0, Arrays.asList(

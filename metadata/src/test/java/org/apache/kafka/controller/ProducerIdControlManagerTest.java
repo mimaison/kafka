@@ -33,7 +33,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,11 +51,10 @@ public class ProducerIdControlManagerTest {
         final LogContext logContext = new LogContext();
         String clusterId = Uuid.randomUuid().toString();
         final MockTime time = new MockTime();
-        final Random random = new Random();
         snapshotRegistry = new SnapshotRegistry(logContext);
         clusterControl = new ClusterControlManager(
             logContext, clusterId, time, snapshotRegistry, 1000,
-            new StripedReplicaPlacer(random), new MockControllerMetrics());
+            new StripedReplicaPlacer(), new MockControllerMetrics());
 
         clusterControl.activate();
         for (int i = 0; i < 4; i++) {
@@ -95,13 +93,12 @@ public class ProducerIdControlManagerTest {
         assertEquals(42, range.firstProducerId());
 
         // Can't go backwards in Producer IDs
-        assertThrows(RuntimeException.class, () -> {
+        assertThrows(RuntimeException.class, () ->
             producerIdControlManager.replay(
                 new ProducerIdsRecord()
                     .setBrokerId(1)
                     .setBrokerEpoch(100)
-                    .setNextProducerId(40));
-        }, "Producer ID range must only increase");
+                    .setNextProducerId(40)), "Producer ID range must only increase");
         range = producerIdControlManager.generateNextProducerId(1, 100).response();
         assertEquals(42, range.firstProducerId());
 
@@ -117,8 +114,6 @@ public class ProducerIdControlManagerTest {
 
     @Test
     public void testUnknownBrokerOrEpoch() {
-        ControllerResult<ProducerIdsBlock> result;
-
         assertThrows(StaleBrokerEpochException.class, () ->
             producerIdControlManager.generateNextProducerId(99, 0));
 

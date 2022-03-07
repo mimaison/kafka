@@ -15,36 +15,40 @@
  * limitations under the License.
  */
 
-package org.apache.kafka.controller;
+package org.apache.kafka.server.placer;
 
 import java.util.Iterator;
 import java.util.List;
+
 import org.apache.kafka.common.annotation.InterfaceStability;
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
-import org.apache.kafka.metadata.UsableBroker;
+import org.apache.kafka.common.errors.ReplicaPlacementException;
 
 
 /**
  * The interface which a Kafka replica placement policy must implement.
  */
 @InterfaceStability.Unstable
+public
 interface ReplicaPlacer {
     /**
      * Create a new replica placement.
      *
      * @param startPartition        The partition ID to start with.
      * @param numPartitions         The number of partitions to create placements for.
-     * @param numReplicas           The number of replicas to create for each partitions.
+     * @param numReplicas           The number of replicas to create for each partition.
      *                              Must be positive.
      * @param iterator              An iterator that yields all the usable brokers.
      *
      * @return                      A list of replica lists.
      *
      * @throws InvalidReplicationFactorException    If too many replicas were requested.
+     * @throws ReplicaPlacementException            If a new replica placement can't be created
      */
     List<List<Integer>> place(int startPartition,
                               int numPartitions,
                               short numReplicas,
                               Iterator<UsableBroker> iterator)
-        throws InvalidReplicationFactorException;
+        throws InvalidReplicationFactorException, ReplicaPlacementException;
 }
+

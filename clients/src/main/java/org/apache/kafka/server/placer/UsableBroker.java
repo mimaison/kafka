@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.kafka.metadata;
+package org.apache.kafka.server.placer;
 
 import java.util.Objects;
 import java.util.Optional;

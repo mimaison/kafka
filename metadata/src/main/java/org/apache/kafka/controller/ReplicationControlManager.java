@@ -30,6 +30,7 @@ import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.NoReassignmentInProgressException;
 import org.apache.kafka.common.errors.PolicyViolationException;
+import org.apache.kafka.common.errors.ReplicaPlacementException;
 import org.apache.kafka.common.errors.UnknownServerException;
 import org.apache.kafka.common.errors.UnknownTopicIdException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
@@ -500,6 +501,9 @@ public class ReplicationControlManager {
                 return new ApiError(Errors.INVALID_REPLICATION_FACTOR,
                     "Unable to replicate the partition " + replicationFactor +
                         " time(s): " + e.getMessage());
+            } catch (ReplicaPlacementException e) {
+                return new ApiError(Errors.REPLICA_PLACEMENT_FAILED,
+                    "Unable to place partitions of " + topic.name() + ": " + e.getMessage());
             }
             ApiError error = maybeCheckCreateTopicPolicy(() -> {
                 Map<String, String> configs = new HashMap<>();

@@ -132,7 +132,6 @@ public class ReplicationControlManagerTest {
         final SnapshotRegistry snapshotRegistry = new SnapshotRegistry(new LogContext());
         final LogContext logContext = new LogContext();
         final MockTime time = new MockTime();
-        final MockRandom random = new MockRandom();
         final ControllerMetrics metrics = new MockControllerMetrics();
         final String clusterId = Uuid.randomUuid().toString();
         final ClusterControlManager clusterControl = new ClusterControlManager(logContext,
@@ -140,7 +139,7 @@ public class ReplicationControlManagerTest {
             time,
             snapshotRegistry,
             TimeUnit.MILLISECONDS.convert(BROKER_SESSION_TIMEOUT_MS, TimeUnit.NANOSECONDS),
-            new StripedReplicaPlacer(random),
+            new StripedReplicaPlacer(),
             metrics);
         final ConfigurationControlManager configurationControl = new ConfigurationControlManager(
             new LogContext(), snapshotRegistry, KafkaConfigSchema.EMPTY, Optional.empty(),
@@ -413,10 +412,14 @@ public class ReplicationControlManagerTest {
             setTopicId(result2.response().topics().find("foo").topicId()));
         assertEquals(expectedResponse2, result2.response());
         ctx.replay(result2.records());
-        assertEquals(new PartitionRegistration(new int[] {1, 2, 0},
-            new int[] {1, 2, 0}, Replicas.NONE, Replicas.NONE, 1, 0, 0),
-            replicationControl.getPartition(
-                ((TopicRecord) result2.records().get(0).message()).topicId(), 0));
+        PartitionRegistration partitionRegistration = replicationControl.getPartition(
+                ((TopicRecord) result2.records().get(0).message()).topicId(), 0);
+        assertArrayEquals(partitionRegistration.replicas, partitionRegistration.isr);
+        assertEquals(3, partitionRegistration.replicas.length);
+        assertArrayEquals(Replicas.NONE, partitionRegistration.addingReplicas);
+        assertArrayEquals(Replicas.NONE, partitionRegistration.removingReplicas);
+        assertEquals(0, partitionRegistration.leaderEpoch);
+        assertEquals(0, partitionRegistration.partitionEpoch);
         ControllerResult<CreateTopicsResponseData> result3 =
                 replicationControl.createTopics(request);
         CreateTopicsResponseData expectedResponse3 = new CreateTopicsResponseData();

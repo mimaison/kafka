@@ -39,6 +39,7 @@ import org.apache.kafka.metadata.BrokerRegistrationReply;
 import org.apache.kafka.metadata.FeatureMapAndEpoch;
 import org.apache.kafka.metadata.VersionRange;
 import org.apache.kafka.server.common.ApiMessageAndVersion;
+import org.apache.kafka.server.placer.ReplicaPlacer;
 import org.apache.kafka.timeline.SnapshotRegistry;
 import org.apache.kafka.timeline.TimelineHashMap;
 import org.slf4j.Logger;
@@ -289,10 +290,10 @@ public class ClusterControlManager {
         BrokerRegistration registration = brokerRegistrations.get(brokerId);
         if (registration == null) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration found for that id", record.toString()));
+                "registration found for that id", record));
         } else if (registration.epoch() !=  record.brokerEpoch()) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration with that epoch found", record.toString()));
+                "registration with that epoch found", record));
         } else {
             brokerRegistrations.remove(brokerId);
             updateMetrics(registration, brokerRegistrations.get(brokerId));
@@ -305,10 +306,10 @@ public class ClusterControlManager {
         BrokerRegistration registration = brokerRegistrations.get(brokerId);
         if (registration == null) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration found for that id", record.toString()));
+                "registration found for that id", record));
         } else if (registration.epoch() !=  record.epoch()) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration with that epoch found", record.toString()));
+                "registration with that epoch found", record));
         } else {
             brokerRegistrations.put(brokerId, registration.cloneWithFencing(true));
             updateMetrics(registration, brokerRegistrations.get(brokerId));
@@ -321,10 +322,10 @@ public class ClusterControlManager {
         BrokerRegistration registration = brokerRegistrations.get(brokerId);
         if (registration == null) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration found for that id", record.toString()));
+                "registration found for that id", record));
         } else if (registration.epoch() !=  record.epoch()) {
             throw new RuntimeException(String.format("Unable to replay %s: no broker " +
-                "registration with that epoch found", record.toString()));
+                "registration with that epoch found", record));
         } else {
             brokerRegistrations.put(brokerId, registration.cloneWithFencing(false));
             updateMetrics(registration, brokerRegistrations.get(brokerId));
