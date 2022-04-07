@@ -60,6 +60,7 @@ import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.MetricsContext;
 import org.apache.kafka.common.metrics.MetricsReporter;
+import org.apache.kafka.common.metrics.PluginMetrics;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.network.ChannelBuilder;
 import org.apache.kafka.common.network.Selector;
@@ -396,7 +397,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             List<ProducerInterceptor<K, V>> interceptorList = (List) config.getConfiguredInstances(
                     ProducerConfig.INTERCEPTOR_CLASSES_CONFIG,
                     ProducerInterceptor.class,
-                    Collections.singletonMap(ProducerConfig.CLIENT_ID_CONFIG, clientId));
+                    Collections.singletonMap(ProducerConfig.CLIENT_ID_CONFIG, clientId),
+                    metrics);
             if (interceptors != null)
                 this.interceptors = interceptors;
             else
