@@ -32,7 +32,7 @@ public class PluginMetrics {
 
     public PluginMetrics(Metrics metrics, String name) {
         this.metrics = metrics;
-        this.name = name;
+        this.name = name + "-metrics";
         this.templateTags = new LinkedHashSet<>(this.metrics.config().tags().keySet());
     }
 
