@@ -398,13 +398,13 @@ public class AbstractConfig {
         if (klass instanceof String) {
             try {
                 o = Utils.newInstance((String) klass, t);
-                name = (String) klass;
+                name = o.getClass().getSimpleName();
             } catch (ClassNotFoundException e) {
                 throw new KafkaException("Class " + klass + " cannot be found", e);
             }
         } else if (klass instanceof Class<?>) {
             o = Utils.newInstance((Class<?>) klass);
-            name = ((Class<?>) klass).getName();
+            name = ((Class<?>) klass).getSimpleName();
         } else
             throw new KafkaException("Unexpected element of type " + klass.getClass().getName() + ", expected String or Class");
         if (!t.isInstance(o))
