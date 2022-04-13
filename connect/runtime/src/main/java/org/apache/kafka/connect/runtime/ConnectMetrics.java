@@ -69,6 +69,7 @@ public class ConnectMetrics {
      * @param time     the time; may not be null
      * @param clusterId the Kafka cluster ID
      */
+    @SuppressWarnings("deprecation")
     public ConnectMetrics(String workerId, WorkerConfig config, Time time, String clusterId) {
         this.workerId = workerId;
         this.time = time;
@@ -81,9 +82,11 @@ public class ConnectMetrics {
         MetricConfig metricConfig = new MetricConfig().samples(numSamples)
                 .timeWindow(sampleWindowMs, TimeUnit.MILLISECONDS).recordLevel(
                         Sensor.RecordingLevel.forName(metricsRecordingLevel));
-        JmxReporter jmxReporter = new JmxReporter();
-        jmxReporter.configure(config.originals());
-        reporters.add(jmxReporter);
+        if (config.getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
+            JmxReporter jmxReporter = new JmxReporter();
+            jmxReporter.configure(config.originals());
+            reporters.add(jmxReporter);
+        }
 
         Map<String, Object> contextLabels = new HashMap<>();
         contextLabels.putAll(config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));

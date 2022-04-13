@@ -346,7 +346,7 @@ public class KafkaAdminClient extends AdminClient {
     /**
      * The metrics for this KafkaAdminClient.
      */
-    private final Metrics metrics;
+    final Metrics metrics;
 
     /**
      * The network client to use.
@@ -443,6 +443,10 @@ public class KafkaAdminClient extends AdminClient {
         return "adminclient-" + ADMIN_CLIENT_ID_SEQUENCE.getAndIncrement();
     }
 
+    String getClientId() {
+        return clientId;
+    }
+
     /**
      * Get the deadline for a particular call.
      *
@@ -477,6 +481,7 @@ public class KafkaAdminClient extends AdminClient {
         return createInternal(config, timeoutProcessorFactory, null);
     }
 
+    @SuppressWarnings("deprecation")
     static KafkaAdminClient createInternal(AdminClientConfig config, TimeoutProcessorFactory timeoutProcessorFactory,
                                            HostResolver hostResolver) {
         Metrics metrics = null;
@@ -506,9 +511,11 @@ public class KafkaAdminClient extends AdminClient {
                 .timeWindow(config.getLong(AdminClientConfig.METRICS_SAMPLE_WINDOW_MS_CONFIG), TimeUnit.MILLISECONDS)
                 .recordLevel(Sensor.RecordingLevel.forName(config.getString(AdminClientConfig.METRICS_RECORDING_LEVEL_CONFIG)))
                 .tags(metricTags);
-            JmxReporter jmxReporter = new JmxReporter();
-            jmxReporter.configure(config.originals());
-            reporters.add(jmxReporter);
+            if (config.getBoolean(AdminClientConfig.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
+                JmxReporter jmxReporter = new JmxReporter();
+                jmxReporter.configure(config.originals());
+                reporters.add(jmxReporter);
+            }
             MetricsContext metricsContext = new KafkaMetricsContext(JMX_PREFIX,
                     config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));
             metrics = new Metrics(metricConfig, reporters, time, metricsContext);
@@ -3327,7 +3334,7 @@ public class KafkaAdminClient extends AdminClient {
                         ListGroupsRequest.Builder createRequest(int timeoutMs) {
                             List<String> states = options.states()
                                     .stream()
-                                    .map(s -> s.toString())
+                                    .map(ConsumerGroupState::toString)
                                     .collect(Collectors.toList());
                             return new ListGroupsRequest.Builder(new ListGroupsRequestData().setStatesFilter(states));
                         }

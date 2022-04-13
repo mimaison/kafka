@@ -870,6 +870,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
         this.kafkaConsumerMetrics = new KafkaConsumerMetrics(metrics, "consumer");
     }
 
+    @SuppressWarnings("deprecation")
     private static Metrics buildMetrics(ConsumerConfig config, Time time, String clientId) {
         Map<String, String> metricsTags = Collections.singletonMap(CLIENT_ID_METRIC_TAG, clientId);
         MetricConfig metricConfig = new MetricConfig().samples(config.getInt(ConsumerConfig.METRICS_NUM_SAMPLES_CONFIG))
@@ -878,9 +879,11 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
                 .tags(metricsTags);
         List<MetricsReporter> reporters = config.getConfiguredInstances(ConsumerConfig.METRIC_REPORTER_CLASSES_CONFIG,
                 MetricsReporter.class, Collections.singletonMap(ConsumerConfig.CLIENT_ID_CONFIG, clientId));
-        JmxReporter jmxReporter = new JmxReporter();
-        jmxReporter.configure(config.originals(Collections.singletonMap(ConsumerConfig.CLIENT_ID_CONFIG, clientId)));
-        reporters.add(jmxReporter);
+        if (config.getBoolean(ConsumerConfig.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
+            JmxReporter jmxReporter = new JmxReporter();
+            jmxReporter.configure(config.originals(Collections.singletonMap(ConsumerConfig.CLIENT_ID_CONFIG, clientId)));
+            reporters.add(jmxReporter);
+        }
         MetricsContext metricsContext = new KafkaMetricsContext(JMX_PREFIX,
                 config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));
         return new Metrics(metricConfig, reporters, time, metricsContext);

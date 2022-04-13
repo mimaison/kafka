@@ -199,6 +199,9 @@ public class WorkerConfig extends AbstractConfig {
     public static final String METRICS_RECORDING_LEVEL_CONFIG = CommonClientConfigs.METRICS_RECORDING_LEVEL_CONFIG;
     public static final String METRIC_REPORTER_CLASSES_CONFIG = CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG;
 
+    @Deprecated
+    public static final String AUTO_INCLUDE_JMX_REPORTER_CONFIG = CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG;
+
     public static final String TOPIC_TRACKING_ENABLE_CONFIG = "topic.tracking.enable";
     protected static final String TOPIC_TRACKING_ENABLE_DOC = "Enable tracking the set of active "
             + "topics per connector during runtime.";
@@ -280,6 +283,11 @@ public class WorkerConfig extends AbstractConfig {
                 .define(METRIC_REPORTER_CLASSES_CONFIG, Type.LIST,
                         "", Importance.LOW,
                         CommonClientConfigs.METRIC_REPORTER_CLASSES_DOC)
+                .define(AUTO_INCLUDE_JMX_REPORTER_CONFIG,
+                        Type.BOOLEAN,
+                        true,
+                        Importance.LOW,
+                        CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_DOC)
                 .define(BrokerSecurityConfigs.SSL_CLIENT_AUTH_CONFIG,
                         ConfigDef.Type.STRING, SslClientAuth.NONE.toString(), in(Utils.enumOptions(SslClientAuth.class)), ConfigDef.Importance.LOW, BrokerSecurityConfigs.SSL_CLIENT_AUTH_DOC)
                 .define(HEADER_CONVERTER_CLASS_CONFIG, Type.CLASS,
@@ -321,7 +329,7 @@ public class WorkerConfig extends AbstractConfig {
                             + "and specifying them will have no effect. "
                             + "Instead, an instance of the JsonConverter with schemas.enable "
                             + "set to false will be used. For more information, please visit "
-                            + "http://kafka.apache.org/documentation/#upgrade and consult the upgrade notes"
+                            + "https://kafka.apache.org/documentation/#upgrade and consult the upgrade notes"
                             + "for the 3.0 release.",
                     removedProperties);
         }

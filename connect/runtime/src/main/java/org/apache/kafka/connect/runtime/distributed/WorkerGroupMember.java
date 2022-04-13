@@ -72,6 +72,7 @@ public class WorkerGroupMember {
 
     private boolean stopped = false;
 
+    @SuppressWarnings("deprecation")
     public WorkerGroupMember(DistributedConfig config,
                              String restUrl,
                              ConfigBackingStore configStorage,
@@ -92,9 +93,11 @@ public class WorkerGroupMember {
             List<MetricsReporter> reporters = config.getConfiguredInstances(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG,
                     MetricsReporter.class,
                     Collections.singletonMap(CommonClientConfigs.CLIENT_ID_CONFIG, clientId));
-            JmxReporter jmxReporter = new JmxReporter();
-            jmxReporter.configure(config.originals());
-            reporters.add(jmxReporter);
+            if (config.getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
+                JmxReporter jmxReporter = new JmxReporter();
+                jmxReporter.configure(config.originals());
+                reporters.add(jmxReporter);
+            }
 
             Map<String, Object> contextLabels = new HashMap<>();
             contextLabels.putAll(config.originalsWithPrefix(CommonClientConfigs.METRICS_CONTEXT_PREFIX));

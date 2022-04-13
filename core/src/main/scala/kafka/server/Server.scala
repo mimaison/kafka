@@ -22,6 +22,8 @@ import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.common.metrics.{JmxReporter, KafkaMetricsContext, MetricConfig, Metrics, MetricsReporter, Sensor}
 import org.apache.kafka.common.utils.Time
 
+import scala.annotation.nowarn
+
 
 trait Server {
   def startup(): Unit
@@ -80,14 +82,17 @@ object Server {
     new KafkaMetricsContext(MetricsPrefix, contextLabels)
   }
 
-  private def initializeDefaultReporters(
+  @nowarn("cat=deprecation")
+  private[server] def initializeDefaultReporters(
     config: KafkaConfig
   ): java.util.List[MetricsReporter] = {
-    val jmxReporter = new JmxReporter()
-    jmxReporter.configure(config.originals)
 
     val reporters = new java.util.ArrayList[MetricsReporter]
-    reporters.add(jmxReporter)
+    if (config.getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream.noneMatch(r => r.isInstanceOf[JmxReporter])) {
+      val jmxReporter = new JmxReporter()
+      jmxReporter.configure(config.originals)
+      reporters.add(jmxReporter)
+    }
     reporters
   }
 

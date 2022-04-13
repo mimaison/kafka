@@ -23,6 +23,7 @@ import org.apache.kafka.common.metrics.MetricsContext
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.Test
 
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters._
 
 class ServerTest {
@@ -63,6 +64,28 @@ class ServerTest {
       Server.ClusterIdLabel -> clusterId,
       Server.BrokerIdLabel -> brokerId.toString
     ), context.contextLabels.asScala)
+  }
+
+  @Test
+  @nowarn("cat=deprecation")
+  def testMetricsReporter(): Unit = {
+    val props = new Properties()
+    props.put(KafkaConfig.BrokerIdProp, "0")
+    props.put(KafkaConfig.ZkConnectProp, "127.0.0.1:0")
+    var config = KafkaConfig.fromProps(props)
+    var reporters = Server.initializeDefaultReporters(config)
+    assertEquals(1, reporters.size)
+
+    props.put(KafkaConfig.AutoIncludeJmxReporterProp, "false")
+    config = KafkaConfig.fromProps(props)
+    reporters = Server.initializeDefaultReporters(config)
+    assertTrue(reporters.isEmpty)
+
+    props.remove(KafkaConfig.AutoIncludeJmxReporterProp)
+    props.put(KafkaConfig.MetricReporterClassesProp, "org.apache.kafka.common.metrics.JmxReporter")
+    config = KafkaConfig.fromProps(props)
+    reporters = Server.initializeDefaultReporters(config)
+    assertEquals(1, reporters.size)
   }
 
 }

@@ -319,12 +319,15 @@ public class MirrorConnectorConfig extends AbstractConfig {
         return props;
     }
 
+    @SuppressWarnings("deprecation")
     List<MetricsReporter> metricsReporters() {
         List<MetricsReporter> reporters = getConfiguredInstances(
                 CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class);
-        JmxReporter jmxReporter = new JmxReporter();
-        jmxReporter.configure(this.originals());
-        reporters.add(jmxReporter);
+        if (getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
+            JmxReporter jmxReporter = new JmxReporter();
+            jmxReporter.configure(this.originals());
+            reporters.add(jmxReporter);
+        }
         MetricsContext metricsContext = new KafkaMetricsContext("kafka.connect.mirror");
 
         for (MetricsReporter reporter : reporters) {
@@ -478,6 +481,7 @@ public class MirrorConnectorConfig extends AbstractConfig {
         }
     }
 
+    @SuppressWarnings("deprecation")
     protected static final ConfigDef CONNECTOR_CONFIG_DEF = ConnectorConfig.configDef()
             .define(
                     ENABLED,
@@ -720,6 +724,13 @@ public class MirrorConnectorConfig extends AbstractConfig {
                     in(Utils.enumOptions(SecurityProtocol.class)),
                     ConfigDef.Importance.MEDIUM,
                     CommonClientConfigs.SECURITY_PROTOCOL_DOC)
+            .define(
+                    CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG,
+                    ConfigDef.Type.BOOLEAN,
+                    true,
+                    ConfigDef.Importance.LOW,
+                    CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_DOC
+            )
             .withClientSslSupport()
             .withClientSaslSupport();
 }
