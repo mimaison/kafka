@@ -19,13 +19,18 @@ package org.apache.kafka.server.metrics;
 
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.common.Reconfigurable;
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.utils.Sanitizer;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -44,6 +49,20 @@ public class KafkaYammerMetrics implements Reconfigurable {
 
     public static final KafkaYammerMetrics INSTANCE = new KafkaYammerMetrics();
 
+    @SuppressWarnings("deprecation")
+    private final static ConfigDef CONFIG_DEF = new ConfigDef()
+            .define(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG,
+                    ConfigDef.Type.LIST,
+                    Collections.emptyList(),
+                    new ConfigDef.NonNullValidator(),
+                    ConfigDef.Importance.LOW,
+                    CommonClientConfigs.METRIC_REPORTER_CLASSES_DOC)
+            .define(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG,
+                    ConfigDef.Type.BOOLEAN,
+                    true,
+                    ConfigDef.Importance.LOW,
+                    CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_DOC);
+
     /**
      * convenience method to replace {@link com.yammer.metrics.Metrics#defaultRegistry()}
      */
@@ -52,16 +71,21 @@ public class KafkaYammerMetrics implements Reconfigurable {
     }
 
     private final MetricsRegistry metricsRegistry = new MetricsRegistry();
-    private final FilteringJmxReporter jmxReporter = new FilteringJmxReporter(metricsRegistry,
-        metricName -> true);
+    private FilteringJmxReporter jmxReporter;
 
     private KafkaYammerMetrics() {
-        jmxReporter.start();
-        Runtime.getRuntime().addShutdownHook(new Thread(jmxReporter::shutdown));
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void configure(Map<String, ?> configs) {
+        AbstractConfig config = new AbstractConfig(CONFIG_DEF, configs);
+        List<String> reporters = config.getList(CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG);
+        if (config.getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) || reporters.stream().anyMatch(r -> JmxReporter.class.getName().equals(r))) {
+            jmxReporter = new FilteringJmxReporter(metricsRegistry, metricName -> true);
+            jmxReporter.start();
+            Runtime.getRuntime().addShutdownHook(new Thread(jmxReporter::shutdown));
+        }
         reconfigure(configs);
     }
 
@@ -77,8 +101,10 @@ public class KafkaYammerMetrics implements Reconfigurable {
 
     @Override
     public void reconfigure(Map<String, ?> configs) {
-        Predicate<String> mBeanPredicate = JmxReporter.compilePredicate(configs);
-        jmxReporter.updatePredicate(metricName -> mBeanPredicate.test(metricName.getMBeanName()));
+        if (jmxReporter != null) {
+            Predicate<String> mBeanPredicate = JmxReporter.compilePredicate(configs);
+            jmxReporter.updatePredicate(metricName -> mBeanPredicate.test(metricName.getMBeanName()));
+        }
     }
 
     public static MetricName getMetricName(

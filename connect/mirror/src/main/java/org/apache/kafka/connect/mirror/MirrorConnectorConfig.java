@@ -22,7 +22,6 @@ import org.apache.kafka.common.config.ConfigDef.ValidString;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.metrics.KafkaMetricsContext;
 import org.apache.kafka.common.metrics.MetricsReporter;
-import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.metrics.MetricsContext;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
@@ -319,15 +318,8 @@ public class MirrorConnectorConfig extends AbstractConfig {
         return props;
     }
 
-    @SuppressWarnings("deprecation")
     List<MetricsReporter> metricsReporters() {
-        List<MetricsReporter> reporters = getConfiguredInstances(
-                CommonClientConfigs.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class);
-        if (getBoolean(CommonClientConfigs.AUTO_INCLUDE_JMX_REPORTER_CONFIG) && reporters.stream().noneMatch(r -> r instanceof JmxReporter)) {
-            JmxReporter jmxReporter = new JmxReporter();
-            jmxReporter.configure(this.originals());
-            reporters.add(jmxReporter);
-        }
+        List<MetricsReporter> reporters = CommonClientConfigs.metricsReporters(this);
         MetricsContext metricsContext = new KafkaMetricsContext("kafka.connect.mirror");
 
         for (MetricsReporter reporter : reporters) {
