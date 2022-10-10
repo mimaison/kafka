@@ -174,9 +174,9 @@ class ControllerServer(
       val threadNamePrefixAsString = threadNamePrefix.getOrElse("")
 
       createTopicPolicy = Option(config.
-        getConfiguredInstance(CreateTopicPolicyClassNameProp, classOf[CreateTopicPolicy]))
+        getConfiguredInstance(CreateTopicPolicyClassNameProp, classOf[CreateTopicPolicy], metrics))
       alterConfigPolicy = Option(config.
-        getConfiguredInstance(AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy]))
+        getConfiguredInstance(AlterConfigPolicyClassNameProp, classOf[AlterConfigPolicy], metrics))
 
       val controllerNodes = RaftConfig.voterConnectionsToNodes(controllerQuorumVotersFuture.get())
       val quorumFeatures = QuorumFeatures.create(config.nodeId, raftApiVersions, QuorumFeatures.defaultFeatureMap(), controllerNodes)

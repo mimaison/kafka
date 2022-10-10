@@ -21,7 +21,6 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Monitorable;
-import org.apache.kafka.common.metrics.PluginMetrics;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -383,9 +382,9 @@ public class AbstractConfig {
      * Log warnings for any unused configurations
      */
     public void logUnused() {
-        Set<String> unusedkeys = unused();
-        if (!unusedkeys.isEmpty()) {
-            log.warn("These configurations '{}' were supplied but are not used yet.", unusedkeys);
+        Set<String> unusedKeys = unused();
+        if (!unusedKeys.isEmpty()) {
+            log.warn("These configurations '{}' were supplied but are not used yet.", unusedKeys);
         }
     }
 
@@ -412,7 +411,7 @@ public class AbstractConfig {
         if (o instanceof Configurable)
             ((Configurable) o).configure(configPairs);
         if (metrics != null && o instanceof Monitorable) {
-            ((Monitorable) o).setMetrics(new PluginMetrics(metrics, name));
+            ((Monitorable) o).setMetrics(metrics);
         }
 
         return t.cast(o);
@@ -427,22 +426,11 @@ public class AbstractConfig {
      * @return A configured instance of the class
      */
     public <T> T getConfiguredInstance(String key, Class<T> t) {
-        return getConfiguredInstance(key, t, Collections.emptyMap());
+        return getConfiguredInstance(key, t, Collections.emptyMap(), null);
     }
 
-    /**
-     * Get a configured instance of the give class specified by the given configuration key. If the object implements
-     * Configurable configure it using the configuration.
-     *
-     * @param key The configuration key for the class
-     * @param t The interface the class should implement
-     * @param configOverrides override origin configs
-     * @return A configured instance of the class
-     */
-    public <T> T getConfiguredInstance(String key, Class<T> t, Map<String, Object> configOverrides) {
-        Class<?> c = getClass(key);
-
-        return getConfiguredInstance(c, t, originals(configOverrides), null);
+    public <T> T getConfiguredInstance(String key, Class<T> t, Metrics metrics) {
+        return getConfiguredInstance(key, t, Collections.emptyMap(), metrics);
     }
 
     /**
@@ -453,6 +441,7 @@ public class AbstractConfig {
      * @param t The interface the class should implement
      * @return The list of configured instances
      */
+    // Only for tests
     public <T> List<T> getConfiguredInstances(String key, Class<T> t) {
         return getConfiguredInstances(key, t, Collections.emptyMap());
     }
@@ -467,15 +456,11 @@ public class AbstractConfig {
      * @return The list of configured instances
      */
     public <T> List<T> getConfiguredInstances(String key, Class<T> t, Map<String, Object> configOverrides) {
-        return getConfiguredInstances(getList(key), t, configOverrides);
+        return getConfiguredInstances(getList(key), t, configOverrides, null);
     }
 
     public <T> List<T> getConfiguredInstances(String key, Class<T> t, Map<String, Object> configOverrides, Metrics metrics) {
         return getConfiguredInstances(getList(key), t, configOverrides, metrics);
-    }
-
-    public <T> List<T> getConfiguredInstances(List<String> classNames, Class<T> t, Map<String, Object> configOverrides) {
-        return getConfiguredInstances(classNames, t, configOverrides, null);
     }
 
     /**
@@ -512,14 +497,7 @@ public class AbstractConfig {
         return configMapAsString;
     }
 
-    /**
-     * Instantiates given list of config providers and fetches the actual values of config variables from the config providers.
-     * returns a map of config key and resolved values.
-     * @param configProviderProps The map of config provider configs
-     * @param originals The map of raw configs.
-     * @return map of resolved config variable.
-     */
-    @SuppressWarnings("unchecked")
+
     private  Map<String, ?> resolveConfigVariables(Map<String, ?> configProviderProps, Map<String, Object> originals) {
         Map<String, String> providerConfigString;
         Map<String, ?> configProperties;

@@ -22,7 +22,9 @@ import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.metrics.FakeMetricsReporter;
 import org.apache.kafka.common.metrics.JmxReporter;
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.MetricsReporter;
+import org.apache.kafka.common.metrics.Monitorable;
 import org.apache.kafka.common.security.TestSecurityConfig;
 import org.apache.kafka.common.config.provider.MockVaultConfigProvider;
 import org.apache.kafka.common.config.provider.MockFileConfigProvider;
@@ -54,6 +56,22 @@ public class AbstractConfigTest {
         testInvalidInputs("org.apache.kafka.clients.producer.unknown-metrics-reporter");
         testInvalidInputs("test1,test2");
         testInvalidInputs("org.apache.kafka.common.metrics.FakeMetricsReporter,");
+    }
+
+    @Test
+    public void testConfiguredInstanceConfigurableAndMonitorable() {
+        Properties props = new Properties();
+        props.put(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, "org.apache.kafka.common.config.AbstractConfigTest$ConfiguredFakeMetricsReporter");
+        TestConfig config = new TestConfig(props);
+        try {
+            List<ConfiguredFakeMetricsReporter> fmrs = (List) config.getConfiguredInstances(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class, new Metrics());
+            assertEquals(1, fmrs.size());
+            ConfiguredFakeMetricsReporter fmr = fmrs.get(0);
+            assertTrue(fmr.configuredCalled);
+            assertTrue(fmr.setMetricsCalled);
+        } catch (ConfigException e) {
+            fail("No exceptions are expected here, valid props are :" + props);
+        }
     }
 
     @Test
@@ -552,7 +570,7 @@ public class AbstractConfigTest {
         }
 
         void checkInstances(Class<?> expectedClassPropClass, Class<?>... expectedListPropClasses) {
-            assertEquals(expectedClassPropClass, getConfiguredInstance("class.prop", MetricsReporter.class).getClass());
+            assertEquals(expectedClassPropClass, getConfiguredInstance("class.prop", MetricsReporter.class, null).getClass());
             List<?> list = getConfiguredInstances("list.prop", MetricsReporter.class);
             for (int i = 0; i < list.size(); i++)
                 assertEquals(expectedListPropClasses[i], list.get(i).getClass());
@@ -599,13 +617,22 @@ public class AbstractConfigTest {
         }
     }
 
-    public static class ConfiguredFakeMetricsReporter extends FakeMetricsReporter {
+    public static class ConfiguredFakeMetricsReporter extends FakeMetricsReporter implements Monitorable {
+
         public static final String EXTRA_CONFIG = "metric.extra_config";
+        public boolean configuredCalled = false;
+        public boolean setMetricsCalled = false;
         @Override
         public void configure(Map<String, ?> configs) {
             // Calling get() should have the side effect of marking that config as used.
             // this is required by testUnusedConfigs
             configs.get(EXTRA_CONFIG);
+            configuredCalled = true;
+        }
+
+        @Override
+        public void setMetrics(Metrics Metrics) {
+            setMetricsCalled = true;
         }
     }
 }
