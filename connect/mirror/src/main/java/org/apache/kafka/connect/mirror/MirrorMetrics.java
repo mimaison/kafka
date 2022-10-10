@@ -101,10 +101,10 @@ class MirrorMetrics implements AutoCloseable {
     private final String source;
     private final String target;
 
-    MirrorMetrics(MirrorTaskConfig taskConfig) {
+    MirrorMetrics(MirrorTaskConfig taskConfig, Metrics metrics) {
         this.target = taskConfig.targetClusterAlias();
         this.source = taskConfig.sourceClusterAlias();
-        this.metrics = new Metrics();
+        this.metrics = metrics;
 
         // for side-effect
         metrics.sensor("record-count");

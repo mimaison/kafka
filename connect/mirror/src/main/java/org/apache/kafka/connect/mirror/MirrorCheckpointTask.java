@@ -99,7 +99,7 @@ public class MirrorCheckpointTask extends SourceTask {
         offsetSyncStore = new OffsetSyncStore(config);
         sourceAdminClient = AdminClient.create(config.sourceAdminConfig());
         targetAdminClient = AdminClient.create(config.targetAdminConfig());
-        metrics = config.metrics();
+        metrics = config.metrics(context.metrics());
         idleConsumerGroupsOffset = new HashMap<>();
         checkpointsPerConsumerGroup = new HashMap<>();
         scheduler = new Scheduler(MirrorCheckpointTask.class, config.adminTimeout());

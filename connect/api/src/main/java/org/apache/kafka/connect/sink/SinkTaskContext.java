@@ -17,6 +17,7 @@
 package org.apache.kafka.connect.sink;
 
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.metrics.Metrics;
 
 import java.util.Map;
 import java.util.Set;
@@ -122,5 +123,7 @@ public interface SinkTaskContext {
     default ErrantRecordReporter errantRecordReporter() {
         return null;
     }
+
+    Metrics metrics();
 
 }

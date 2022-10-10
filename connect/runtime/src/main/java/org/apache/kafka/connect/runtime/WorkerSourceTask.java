@@ -84,7 +84,7 @@ class WorkerSourceTask extends AbstractWorkerSourceTask {
                             Executor closeExecutor) {
 
         super(id, task, statusListener, initialState, keyConverter, valueConverter, headerConverter, transformationChain,
-                new WorkerSourceTaskContext(offsetReader, id, configState, null), producer,
+                new WorkerSourceTaskContext(offsetReader, id, configState, null, connectMetrics.metrics()), producer,
                 admin, topicGroups, offsetReader, offsetWriter, offsetStore, workerConfig, connectMetrics, loader,
                 time, retryWithToleranceOperator, statusBackingStore, closeExecutor);
 

@@ -75,6 +75,7 @@ class WorkerSinkTask extends WorkerTask {
     private final WorkerConfig workerConfig;
     private final SinkTask task;
     private final ClusterConfigState configState;
+    private final ConnectMetrics connectMetrics;
     private Map<String, String> taskConfig;
     private final Converter keyConverter;
     private final Converter valueConverter;
@@ -121,6 +122,7 @@ class WorkerSinkTask extends WorkerTask {
         this.workerConfig = workerConfig;
         this.task = task;
         this.configState = configState;
+        this.connectMetrics = connectMetrics;
         this.keyConverter = keyConverter;
         this.valueConverter = valueConverter;
         this.headerConverter = headerConverter;
@@ -149,7 +151,7 @@ class WorkerSinkTask extends WorkerTask {
     public void initialize(TaskConfig taskConfig) {
         try {
             this.taskConfig = taskConfig.originalsStrings();
-            this.context = new WorkerSinkTaskContext(consumer, this, configState);
+            this.context = new WorkerSinkTaskContext(consumer, this, configState, connectMetrics.metrics());
         } catch (Throwable t) {
             log.error("{} Task failed initialization and will not be started.", this, t);
             onFailure(t);

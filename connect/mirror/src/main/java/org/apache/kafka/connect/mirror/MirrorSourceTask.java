@@ -85,7 +85,7 @@ public class MirrorSourceTask extends SourceTask {
         outstandingOffsetSyncs = new Semaphore(MAX_OUTSTANDING_OFFSET_SYNCS);
         consumerAccess = new Semaphore(1);  // let one thread at a time access the consumer
         sourceClusterAlias = config.sourceClusterAlias();
-        metrics = config.metrics();
+        metrics = config.metrics(context.metrics());
         pollTimeout = config.consumerPollTimeout();
         maxOffsetLag = config.maxOffsetLag();
         replicationPolicy = config.replicationPolicy();

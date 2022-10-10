@@ -18,6 +18,7 @@ package org.apache.kafka.connect.mirror;
 
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.metrics.Metrics;
 
 import java.util.Map;
 import java.util.Set;
@@ -53,10 +54,8 @@ public class MirrorTaskConfig extends MirrorConnectorConfig {
         return new HashSet<>(fields);
     } 
 
-    MirrorMetrics metrics() {
-        MirrorMetrics metrics = new MirrorMetrics(this);
-        metricsReporters().forEach(metrics::addReporter);
-        return metrics;
+    MirrorMetrics metrics(Metrics metrics) {
+        return new MirrorMetrics(this, metrics);
     }
  
     protected static final ConfigDef TASK_CONFIG_DEF = new ConfigDef(CONNECTOR_CONFIG_DEF)

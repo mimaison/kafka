@@ -18,6 +18,7 @@ package org.apache.kafka.connect.runtime;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.connect.errors.IllegalWorkerStateException;
 import org.apache.kafka.connect.storage.ClusterConfigState;
 import org.apache.kafka.connect.sink.ErrantRecordReporter;
@@ -40,18 +41,21 @@ public class WorkerSinkTaskContext implements SinkTaskContext {
     private final WorkerSinkTask sinkTask;
     private final ClusterConfigState configState;
     private final Set<TopicPartition> pausedPartitions;
+    private final Metrics metrics;
     private long timeoutMs;
     private boolean commitRequested;
 
     public WorkerSinkTaskContext(KafkaConsumer<byte[], byte[]> consumer,
                                  WorkerSinkTask sinkTask,
-                                 ClusterConfigState configState) {
+                                 ClusterConfigState configState,
+                                 Metrics metrics) {
         this.offsets = new HashMap<>();
         this.timeoutMs = -1L;
         this.consumer = consumer;
         this.sinkTask = sinkTask;
         this.configState = configState;
         this.pausedPartitions = new HashSet<>();
+        this.metrics = metrics;
     }
 
     @Override
@@ -162,6 +166,11 @@ public class WorkerSinkTaskContext implements SinkTaskContext {
     @Override
     public ErrantRecordReporter errantRecordReporter() {
         return sinkTask.workerErrantRecordReporter();
+    }
+
+    @Override
+    public Metrics metrics() {
+        return metrics;
     }
 
     @Override

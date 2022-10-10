@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.runtime;
 
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.connector.Connector;
 import org.apache.kafka.connect.connector.ConnectorContext;
@@ -68,8 +69,9 @@ public class WorkerConnector implements Runnable {
     private final ConnectorStatus.Listener statusListener;
     private final ClassLoader loader;
     private final CloseableConnectorContext ctx;
+    private final ConnectMetrics connectMetrics;
     private final Connector connector;
-    private final ConnectorMetricsGroup metrics;
+    private final ConnectorMetricsGroup connectorMetricsGroup;
     private final AtomicReference<TargetState> pendingTargetStateChange;
     private final AtomicReference<Callback<TargetState>> pendingStateChangeCallback;
     private final CountDownLatch shutdownLatch;
@@ -84,7 +86,7 @@ public class WorkerConnector implements Runnable {
                            Connector connector,
                            ConnectorConfig connectorConfig,
                            CloseableConnectorContext ctx,
-                           ConnectMetrics metrics,
+                           ConnectMetrics connectMetrics,
                            ConnectorStatus.Listener statusListener,
                            CloseableOffsetStorageReader offsetStorageReader,
                            ConnectorOffsetBackingStore offsetStore,
@@ -93,10 +95,11 @@ public class WorkerConnector implements Runnable {
         this.config = connectorConfig.originalsStrings();
         this.loader = loader;
         this.ctx = ctx;
+        this.connectMetrics = connectMetrics;
         this.connector = connector;
         this.state = State.INIT;
-        this.metrics = new ConnectorMetricsGroup(metrics, AbstractStatus.State.UNASSIGNED, statusListener);
-        this.statusListener = this.metrics;
+        this.connectorMetricsGroup = new ConnectorMetricsGroup(connectMetrics, AbstractStatus.State.UNASSIGNED, statusListener);
+        this.statusListener = this.connectorMetricsGroup;
         this.offsetStorageReader = offsetStorageReader;
         this.offsetStore = offsetStore;
         this.pendingTargetStateChange = new AtomicReference<>();
@@ -169,12 +172,12 @@ public class WorkerConnector implements Runnable {
             log.debug("{} Initializing connector {}", this, connName);
             if (isSinkConnector()) {
                 SinkConnectorConfig.validate(config);
-                connector.initialize(new WorkerSinkConnectorContext());
+                connector.initialize(new WorkerSinkConnectorContext(connectMetrics.metrics()));
             } else {
                 Objects.requireNonNull(offsetStore, "Offset store cannot be null for source connectors");
                 Objects.requireNonNull(offsetStorageReader, "Offset reader cannot be null for source connectors");
                 offsetStore.start();
-                connector.initialize(new WorkerSourceConnectorContext(offsetStorageReader));
+                connector.initialize(new WorkerSourceConnectorContext(offsetStorageReader, connectMetrics.metrics()));
             }
         } catch (Throwable t) {
             log.error("{} Error initializing connector", this, t);
@@ -281,7 +284,7 @@ public class WorkerConnector implements Runnable {
             statusListener.onFailure(connName, t);
         } finally {
             Utils.closeQuietly(ctx, "connector context for " + connName);
-            Utils.closeQuietly(metrics, "connector metrics for " + connName);
+            Utils.closeQuietly(connectorMetricsGroup, "connector metrics for " + connName);
             Utils.closeQuietly(offsetStorageReader, "offset reader for " + connName);
             if (offsetStore != null) {
                 Utils.closeQuietly(offsetStore::stop, "offset backing store for " + connName);
@@ -389,7 +392,7 @@ public class WorkerConnector implements Runnable {
     }
 
     ConnectorMetricsGroup metrics() {
-        return metrics;
+        return connectorMetricsGroup;
     }
 
     @Override
@@ -530,19 +533,37 @@ public class WorkerConnector implements Runnable {
     }
 
     private class WorkerSinkConnectorContext extends WorkerConnectorContext implements SinkConnectorContext {
+
+        private final Metrics metrics;
+
+        WorkerSinkConnectorContext(Metrics metrics) {
+            this.metrics = metrics;
+        }
+
+        @Override
+        public Metrics metrics() {
+            return metrics;
+        }
     }
 
     private class WorkerSourceConnectorContext extends WorkerConnectorContext implements SourceConnectorContext {
 
         private final OffsetStorageReader offsetStorageReader;
+        private final Metrics metrics;
 
-        WorkerSourceConnectorContext(OffsetStorageReader offsetStorageReader) {
+        WorkerSourceConnectorContext(OffsetStorageReader offsetStorageReader, Metrics metrics) {
             this.offsetStorageReader = offsetStorageReader;
+            this.metrics = metrics;
         }
 
         @Override
         public OffsetStorageReader offsetStorageReader() {
             return offsetStorageReader;
+        }
+
+        @Override
+        public Metrics metrics() {
+            return metrics;
         }
     }
 }

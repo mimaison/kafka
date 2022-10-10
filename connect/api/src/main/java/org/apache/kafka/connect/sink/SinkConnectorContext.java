@@ -16,10 +16,13 @@
  */
 package org.apache.kafka.connect.sink;
 
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.connect.connector.ConnectorContext;
 
 /**
  * A context to allow a {@link SinkConnector} to interact with the Kafka Connect runtime.
  */
 public interface SinkConnectorContext extends ConnectorContext {
+
+    Metrics metrics();
 }

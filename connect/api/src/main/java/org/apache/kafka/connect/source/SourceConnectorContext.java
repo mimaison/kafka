@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.source;
 
+import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.connect.connector.ConnectorContext;
 import org.apache.kafka.connect.storage.OffsetStorageReader;
 
@@ -29,4 +30,6 @@ public interface SourceConnectorContext extends ConnectorContext {
      * @return the OffsetStorageReader for this connector.
      */
     OffsetStorageReader offsetStorageReader();
+
+    Metrics metrics();
 }
