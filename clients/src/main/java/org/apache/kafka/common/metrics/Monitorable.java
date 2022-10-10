@@ -18,6 +18,6 @@ package org.apache.kafka.common.metrics;
 
 public interface Monitorable {
 
-    void setMetrics(PluginMetrics pluginMetrics);
+    void setMetrics(Metrics Metrics);
 
 }
