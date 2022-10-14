@@ -388,7 +388,7 @@ public class AbstractConfig {
         }
     }
 
-    private <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
+    public <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
         if (klass == null)
             return null;
 

@@ -58,21 +58,21 @@ public class AbstractConfigTest {
         testInvalidInputs("org.apache.kafka.common.metrics.FakeMetricsReporter,");
     }
 
-    @Test
-    public void testConfiguredInstanceConfigurableAndMonitorable() {
-        Properties props = new Properties();
-        props.put(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, "org.apache.kafka.common.config.AbstractConfigTest$ConfiguredFakeMetricsReporter");
-        TestConfig config = new TestConfig(props);
-        try {
-            List<ConfiguredFakeMetricsReporter> fmrs = (List) config.getConfiguredInstances(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class, new Metrics());
-            assertEquals(1, fmrs.size());
-            ConfiguredFakeMetricsReporter fmr = fmrs.get(0);
-            assertTrue(fmr.configuredCalled);
-            assertTrue(fmr.setMetricsCalled);
-        } catch (ConfigException e) {
-            fail("No exceptions are expected here, valid props are :" + props);
-        }
-    }
+//    @Test
+//    public void testConfiguredInstanceConfigurableAndMonitorable() {
+//        Properties props = new Properties();
+//        props.put(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, "org.apache.kafka.common.config.AbstractConfigTest$ConfiguredFakeMetricsReporter");
+//        TestConfig config = new TestConfig(props);
+//        try {
+//            List<ConfiguredFakeMetricsReporter> fmrs = (List) config.getConfiguredInstances(TestConfig.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class, new Metrics());
+//            assertEquals(1, fmrs.size());
+//            ConfiguredFakeMetricsReporter fmr = fmrs.get(0);
+//            assertTrue(fmr.configuredCalled);
+//            assertTrue(fmr.setMetricsCalled);
+//        } catch (ConfigException e) {
+//            fail("No exceptions are expected here, valid props are :" + props);
+//        }
+//    }
 
     @Test
     public void testEmptyList() {
