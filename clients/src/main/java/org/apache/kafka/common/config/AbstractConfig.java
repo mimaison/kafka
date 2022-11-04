@@ -388,7 +388,7 @@ public class AbstractConfig {
         }
     }
 
-    public <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
+    private <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
         if (klass == null)
             return null;
 
@@ -426,11 +426,16 @@ public class AbstractConfig {
      * @return A configured instance of the class
      */
     public <T> T getConfiguredInstance(String key, Class<T> t) {
-        return getConfiguredInstance(key, t, Collections.emptyMap(), null);
+        return getConfiguredInstance(key, t, null);
     }
 
     public <T> T getConfiguredInstance(String key, Class<T> t, Metrics metrics) {
         return getConfiguredInstance(key, t, Collections.emptyMap(), metrics);
+    }
+
+    public <T> T getConfiguredInstance(String key, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
+        Class<?> c = getClass(key);
+        return getConfiguredInstance(c, t, configPairs, metrics);
     }
 
     /**
