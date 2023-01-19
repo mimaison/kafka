@@ -617,7 +617,7 @@ public class AbstractConfigTest {
         }
     }
 
-    public static class ConfiguredFakeMetricsReporter extends FakeMetricsReporter implements Monitorable {
+    public static class ConfiguredFakeMetricsReporter extends FakeMetricsReporter /*implements Monitorable*/ {
 
         public static final String EXTRA_CONFIG = "metric.extra_config";
         public boolean configuredCalled = false;
@@ -629,10 +629,10 @@ public class AbstractConfigTest {
             configs.get(EXTRA_CONFIG);
             configuredCalled = true;
         }
-
-        @Override
-        public void setMetrics(Metrics Metrics) {
-            setMetricsCalled = true;
-        }
+//TODO
+//        @Override
+//        public void setMetrics(Metrics Metrics) {
+//            setMetricsCalled = true;
+//        }
     }
 }

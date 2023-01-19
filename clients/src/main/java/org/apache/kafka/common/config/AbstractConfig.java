@@ -21,6 +21,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Monitorable;
+import org.apache.kafka.common.metrics.PluginMetrics;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -411,7 +412,7 @@ public class AbstractConfig {
         if (o instanceof Configurable)
             ((Configurable) o).configure(configPairs);
         if (metrics != null && o instanceof Monitorable) {
-            ((Monitorable) o).setMetrics(metrics);
+            ((Monitorable) o).setPluginMetrics(new PluginMetrics(metrics, name));
         }
 
         return t.cast(o);
