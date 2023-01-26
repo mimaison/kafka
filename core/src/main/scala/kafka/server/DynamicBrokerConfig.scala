@@ -825,7 +825,7 @@ class DynamicMetricReporterState(brokerId: Int, config: KafkaConfig, metrics: Me
     val props = new util.HashMap[String, AnyRef]
     updatedConfigs.forEach((k, v) => props.put(k, v.asInstanceOf[AnyRef]))
     propsOverride.forKeyValue((k, v) => props.put(k, v))
-    val reporters = dynamicConfig.currentKafkaConfig.getConfiguredInstances(reporterClasses, classOf[MetricsReporter], props, metrics)
+    val reporters = dynamicConfig.currentKafkaConfig.getConfiguredInstances(reporterClasses, classOf[MetricsReporter], props, metrics, KafkaConfig.MetricReporterClassesProp)
 
     // Call notifyMetricsReporters first to satisfy the contract for MetricsReporter.contextChange,
     // which provides that MetricsReporter.contextChange must be called before the first call to MetricsReporter.init.

@@ -30,6 +30,8 @@ import org.apache.kafka.common.MetricNameTemplate;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigValue;
 import org.apache.kafka.common.config.provider.ConfigProvider;
+import org.apache.kafka.common.metrics.Monitorable;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.connector.Connector;
@@ -80,6 +82,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -298,6 +301,12 @@ public class Worker {
 
                 log.info("Creating connector {} of type {}", connName, connClass);
                 final Connector connector = plugins.newConnector(connClass);
+                if (connector instanceof Monitorable) {
+                    Map<String, String> tags = new LinkedHashMap<>();
+                    tags.put("class", connector.getClass().getSimpleName());
+                    tags.put("connector", connName);
+                    ((Monitorable)connector).setPluginMetrics(new PluginMetricsImpl(metrics.metrics(), tags));
+                }
                 final ConnectorConfig connConfig;
                 final CloseableOffsetStorageReader offsetReader;
                 final ConnectorOffsetBackingStore offsetStore;
@@ -631,6 +640,13 @@ public class Worker {
                 final Class<? extends Task> taskClass = taskConfig.getClass(TaskConfig.TASK_CLASS_CONFIG).asSubclass(Task.class);
                 final Task task = plugins.newTask(taskClass);
                 log.info("Instantiated task {} with version {} of type {}", id, task.version(), taskClass.getName());
+                if (task instanceof Monitorable) {
+                    Map<String, String> tags = new LinkedHashMap<>();
+                    tags.put("class", task.getClass().getSimpleName());
+                    tags.put("connector", id.connector());
+                    tags.put("task", String.valueOf(id.task()));
+                    ((Monitorable)task).setPluginMetrics(new PluginMetricsImpl(metrics.metrics(), tags));
+                }
 
                 // By maintaining connector's specific class loader for this thread here, we first
                 // search for converters within the connector dependencies.
@@ -1294,7 +1310,7 @@ public class Worker {
                            Class<? extends Connector> connectorClass,
                            RetryWithToleranceOperator retryWithToleranceOperator) {
 
-            TransformationChain<SinkRecord> transformationChain = new TransformationChain<>(connectorConfig.<SinkRecord>transformations(), retryWithToleranceOperator);
+            TransformationChain<SinkRecord> transformationChain = new TransformationChain<>(connectorConfig.<SinkRecord>transformations(metrics.metrics(), id), retryWithToleranceOperator);
             log.info("Initializing: {}", transformationChain);
             SinkConnectorConfig sinkConfig = new SinkConnectorConfig(plugins, connectorConfig.originalsStrings());
             retryWithToleranceOperator.reporters(sinkTaskReporters(id, sinkConfig, errorHandlingMetrics, connectorClass));
@@ -1338,7 +1354,7 @@ public class Worker {
             SourceConnectorConfig sourceConfig = new SourceConnectorConfig(plugins,
                     connectorConfig.originalsStrings(), config.topicCreationEnable());
             retryWithToleranceOperator.reporters(sourceTaskReporters(id, sourceConfig, errorHandlingMetrics));
-            TransformationChain<SourceRecord> transformationChain = new TransformationChain<>(sourceConfig.<SourceRecord>transformations(), retryWithToleranceOperator);
+            TransformationChain<SourceRecord> transformationChain = new TransformationChain<>(sourceConfig.<SourceRecord>transformations(metrics.metrics(), id), retryWithToleranceOperator);
             log.info("Initializing: {}", transformationChain);
 
             Map<String, Object> producerProps = baseProducerConfigs(id.connector(), "connector-producer-" + id, config, sourceConfig, connectorClass,
@@ -1406,7 +1422,7 @@ public class Worker {
             SourceConnectorConfig sourceConfig = new SourceConnectorConfig(plugins,
                     connectorConfig.originalsStrings(), config.topicCreationEnable());
             retryWithToleranceOperator.reporters(sourceTaskReporters(id, sourceConfig, errorHandlingMetrics));
-            TransformationChain<SourceRecord> transformationChain = new TransformationChain<>(sourceConfig.<SourceRecord>transformations(), retryWithToleranceOperator);
+            TransformationChain<SourceRecord> transformationChain = new TransformationChain<>(sourceConfig.<SourceRecord>transformations(metrics.metrics(), id), retryWithToleranceOperator);
             log.info("Initializing: {}", transformationChain);
 
             Map<String, Object> producerProps = exactlyOnceSourceTaskProducerConfigs(

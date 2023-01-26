@@ -516,7 +516,7 @@ public class TopicCreationTest {
         topicCreation.addTopic(FOO_TOPIC);
         assertFalse(topicCreation.isTopicCreationRequired(FOO_TOPIC));
 
-        List<Transformation<SourceRecord>> transformations = sourceConfig.transformations();
+        List<Transformation<SourceRecord>> transformations = sourceConfig.transformations(null, null);
         assertEquals(1, transformations.size());
         Cast<SourceRecord> xform = (Cast<SourceRecord>) transformations.get(0);
         SourceRecord transformed = xform.apply(new SourceRecord(null, null, "topic", 0, null, null, Schema.INT8_SCHEMA, 42));
@@ -623,7 +623,7 @@ public class TopicCreationTest {
         assertEquals(barPartitions, barTopicSpec.numPartitions());
         assertThat(barTopicSpec.configs(), is(barTopicProps));
 
-        List<Transformation<SourceRecord>> transformations = sourceConfig.transformations();
+        List<Transformation<SourceRecord>> transformations = sourceConfig.transformations(null, null);
         assertEquals(2, transformations.size());
 
         Cast<SourceRecord> castXForm = (Cast<SourceRecord>) transformations.get(0);

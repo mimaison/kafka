@@ -703,7 +703,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
             List<ConsumerInterceptor<K, V>> interceptorList = (List) config.getConfiguredInstances(
                     ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG,
                     ConsumerInterceptor.class,
-                    Collections.singletonMap(ConsumerConfig.CLIENT_ID_CONFIG, clientId), metrics);
+                    Collections.singletonMap(ConsumerConfig.CLIENT_ID_CONFIG, clientId),
+                    metrics);
             this.interceptors = new ConsumerInterceptors<>(interceptorList);
             if (keyDeserializer == null) {
                 this.keyDeserializer = config.getConfiguredInstance(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, Deserializer.class, metrics);

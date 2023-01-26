@@ -16,6 +16,8 @@
  */
 package org.apache.kafka.common.metrics;
 
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
+
 public interface Monitorable {
 
     void setPluginMetrics(PluginMetrics pluginMetrics);

@@ -18,97 +18,57 @@ package org.apache.kafka.common.metrics;
 
 import org.apache.kafka.common.MetricName;
 
-import java.util.HashMap;
-import java.util.HashSet;
+import java.io.Closeable;
 import java.util.Map;
-import java.util.Set;
 
-public class PluginMetrics {
-
-    private final Metrics metrics;
-    private final String className;
-    private final Set<MetricName> metricNames = new HashSet<>();
-    private final Set<String> sensors = new HashSet<>();
+public interface PluginMetrics extends Closeable {
 
     /**
-     * Create a PluginMetric instance for plugins to register metrics
-     *
-     * @param metrics The underlying Metrics repository to use for metrics
-     * @param className The class name of the plugin
+     * Name of the tag for the plugin identifier.
      */
-    public PluginMetrics(Metrics metrics, String className) {
-        this.metrics = metrics;
-        this.className = className;
-    }
+    String PLUGIN_ID_TAG = "plugin-id";
 
     /**
-     * Create a MetricName with the given name, description and tags. The plugin class name will be used as the metric group.
+     * Create a {@link MetricName} with the given name, description and tags.
+     * The plugin class name is used as the metric group and the plugin identifier is added to the
+     * tags using {@link #PLUGIN_ID_TAG} as the name.
      *
      * @param name        The name of the metric
      * @param description A human-readable description to include in the metric
      * @param tags        additional key/value attributes of the metric
      */
-    public MetricName metricName(String name, String description, Map<String, String> tags) {
-        return metrics.metricName(name, className, description, new HashMap<>(tags));
-    }
+    MetricName metricName(String name, String description, Map<String, String> tags);
 
     /**
-     * Add a metric to monitor an object that implements MetricValueProvider. This metric won't be associated with any
+     * Add a metric to monitor an object that implements {@link MetricValueProvider}. This metric won't be associated with any
      * sensor. This is a way to expose existing values as metrics.
      *
      * @param metricName The name of the metric
      * @param metricValueProvider The metric value provider associated with this metric
      * @throws IllegalArgumentException if a metric with same name already exists.
      */
-    public synchronized void addMetric(MetricName metricName, MetricValueProvider<?> metricValueProvider) {
-        metrics.addMetric(metricName, null, metricValueProvider);
-        metricNames.add(metricName);
-    }
+    void addMetric(MetricName metricName, MetricValueProvider<?> metricValueProvider);
 
     /**
-     * Remove a metric if it exists and return it. Return null otherwise.
+     * Remove a metric if it exists.
      *
      * @param metricName The name of the metric
-     * @return the removed KafkaMetric or null if no such metric exists
      */
-    public synchronized KafkaMetric removeMetric(MetricName metricName) {
-        if (metricNames.remove(metricName)) {
-            return metrics.removeMetric(metricName);
-        }
-        return null;
-    }
+    void removeMetric(MetricName metricName);
 
     /**
      * Get or create a sensor with the given unique name.
      *
      * @param name The sensor name
      * @return The sensor
+     * @throws IllegalArgumentException if a sensor with same name already exists.
      */
-    public synchronized Sensor sensor(String name) {
-        Sensor sensor = metrics.sensor(name);
-        sensors.add(name);
-        return sensor;
-    }
+    Sensor sensor(String name);
 
     /**
      * Remove a sensor (if it exists) and its associated metrics.
      *
      * @param name The name of the sensor to be removed
      */
-    public synchronized void removeSensor(String name) {
-        metrics.removeSensor(name);
-        sensors.remove(name);
-    }
-
-    /**
-     * Delete all metrics and sensors registered by this plugin
-     */
-    void close() {
-        for (MetricName metricName : metricNames) {
-            metrics.removeMetric(metricName);
-        }
-        for (String sensor : sensors) {
-            metrics.removeSensor(sensor);
-        }
-    }
+    void removeSensor(String name);
 }

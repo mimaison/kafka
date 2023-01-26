@@ -22,6 +22,9 @@ import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigDef.Width;
 import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.common.metrics.Metrics;
+import org.apache.kafka.common.metrics.Monitorable;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.connector.ConnectRecord;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -30,6 +33,7 @@ import org.apache.kafka.connect.runtime.isolation.PluginDesc;
 import org.apache.kafka.connect.runtime.isolation.Plugins;
 import org.apache.kafka.connect.transforms.Transformation;
 import org.apache.kafka.connect.transforms.predicates.Predicate;
+import org.apache.kafka.connect.util.ConnectorTaskId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +41,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -270,7 +275,7 @@ public class ConnectorConfig extends AbstractConfig {
     /**
      * Returns the initialized list of {@link Transformation} which are specified in {@link #TRANSFORMS_CONFIG}.
      */
-    public <R extends ConnectRecord<R>> List<Transformation<R>> transformations() {
+    public <R extends ConnectRecord<R>> List<Transformation<R>> transformations(Metrics metrics, ConnectorTaskId connectorTaskId) {
         final List<String> transformAliases = getList(TRANSFORMS_CONFIG);
 
         final List<Transformation<R>> transformations = new ArrayList<>(transformAliases.size());
@@ -284,6 +289,14 @@ public class ConnectorConfig extends AbstractConfig {
                 Object predicateAlias = configs.remove(PredicatedTransformation.PREDICATE_CONFIG);
                 Object negate = configs.remove(PredicatedTransformation.NEGATE_CONFIG);
                 transformation.configure(configs);
+                if (transformation instanceof Monitorable) {
+                    Map<String, String> tags = new LinkedHashMap<>();
+                    tags.put("class", transformation.getClass().getSimpleName());
+                    tags.put("connector", connectorTaskId.connector());
+                    tags.put("task", String.valueOf(connectorTaskId.task()));
+                    tags.put("alias", alias);
+                    ((Monitorable)transformations).setPluginMetrics(new PluginMetricsImpl(metrics, tags));
+                }
                 if (predicateAlias != null) {
                     String predicatePrefix = PREDICATES_PREFIX + predicateAlias + ".";
                     @SuppressWarnings("unchecked")

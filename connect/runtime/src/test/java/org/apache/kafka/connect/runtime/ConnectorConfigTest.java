@@ -147,7 +147,7 @@ public class ConnectorConfigTest<R extends ConnectRecord<R>> {
         props.put("transforms.a.type", SimpleTransformation.class.getName());
         props.put("transforms.a.magic.number", "42");
         final ConnectorConfig config = new ConnectorConfig(MOCK_PLUGINS, props);
-        final List<Transformation<R>> transformations = config.transformations();
+        final List<Transformation<R>> transformations = config.transformations(null, null);
         assertEquals(1, transformations.size());
         final SimpleTransformation<R> xform = (SimpleTransformation<R>) transformations.get(0);
         assertEquals(42, xform.magicNumber);
@@ -175,7 +175,7 @@ public class ConnectorConfigTest<R extends ConnectRecord<R>> {
         props.put("transforms.b.type", SimpleTransformation.class.getName());
         props.put("transforms.b.magic.number", "84");
         final ConnectorConfig config = new ConnectorConfig(MOCK_PLUGINS, props);
-        final List<Transformation<R>> transformations = config.transformations();
+        final List<Transformation<R>> transformations = config.transformations(null, null);
         assertEquals(2, transformations.size());
         assertEquals(42, ((SimpleTransformation<R>) transformations.get(0)).magicNumber);
         assertEquals(84, ((SimpleTransformation<R>) transformations.get(1)).magicNumber);
@@ -282,7 +282,7 @@ public class ConnectorConfigTest<R extends ConnectRecord<R>> {
 
     private void assertPredicatedTransform(Map<String, String> props, boolean expectedNegated) {
         final ConnectorConfig config = new ConnectorConfig(MOCK_PLUGINS, props);
-        final List<Transformation<R>> transformations = config.transformations();
+        final List<Transformation<R>> transformations = config.transformations(null, null);
         assertEquals(1, transformations.size());
         assertTrue(transformations.get(0) instanceof PredicatedTransformation);
         PredicatedTransformation<?> predicated = (PredicatedTransformation<?>) transformations.get(0);

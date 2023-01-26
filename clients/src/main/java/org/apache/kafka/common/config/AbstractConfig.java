@@ -21,7 +21,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Monitorable;
-import org.apache.kafka.common.metrics.PluginMetrics;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
 import org.apache.kafka.common.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -389,7 +390,7 @@ public class AbstractConfig {
         }
     }
 
-    private <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
+    private <T> T getConfiguredInstance(Object klass, Class<T> t, Map<String, Object> configPairs, Metrics metrics, String pluginId) {
         if (klass == null)
             return null;
 
@@ -412,7 +413,10 @@ public class AbstractConfig {
         if (o instanceof Configurable)
             ((Configurable) o).configure(configPairs);
         if (metrics != null && o instanceof Monitorable) {
-            ((Monitorable) o).setPluginMetrics(new PluginMetrics(metrics, name));
+            Map<String, String> tags = new LinkedHashMap<>();
+            tags.put("class", name);
+            tags.put("config", pluginId);
+            ((Monitorable) o).setPluginMetrics(new PluginMetricsImpl(metrics, tags));
         }
 
         return t.cast(o);
@@ -436,7 +440,7 @@ public class AbstractConfig {
 
     public <T> T getConfiguredInstance(String key, Class<T> t, Map<String, Object> configPairs, Metrics metrics) {
         Class<?> c = getClass(key);
-        return getConfiguredInstance(c, t, configPairs, metrics);
+        return getConfiguredInstance(c, t, configPairs, metrics, key);
     }
 
     /**
@@ -462,11 +466,11 @@ public class AbstractConfig {
      * @return The list of configured instances
      */
     public <T> List<T> getConfiguredInstances(String key, Class<T> t, Map<String, Object> configOverrides) {
-        return getConfiguredInstances(getList(key), t, configOverrides, null);
+        return getConfiguredInstances(getList(key), t, configOverrides, null, "");
     }
 
     public <T> List<T> getConfiguredInstances(String key, Class<T> t, Map<String, Object> configOverrides, Metrics metrics) {
-        return getConfiguredInstances(getList(key), t, configOverrides, metrics);
+        return getConfiguredInstances(getList(key), t, configOverrides, metrics, key);
     }
 
     /**
@@ -478,14 +482,14 @@ public class AbstractConfig {
      * @param configOverrides Configuration overrides to use.
      * @return The list of configured instances
      */
-    public <T> List<T> getConfiguredInstances(List<String> classNames, Class<T> t, Map<String, Object> configOverrides, Metrics metrics) {
+    public <T> List<T> getConfiguredInstances(List<String> classNames, Class<T> t, Map<String, Object> configOverrides, Metrics metrics, String pluginId) {
         List<T> objects = new ArrayList<>();
         if (classNames == null)
             return objects;
         Map<String, Object> configPairs = originals();
         configPairs.putAll(configOverrides);
         for (Object klass : classNames) {
-            Object o = getConfiguredInstance(klass, t, configPairs, metrics);
+            Object o = getConfiguredInstance(klass, t, configPairs, metrics, pluginId);
             objects.add(t.cast(o));
         }
         return objects;
