@@ -160,6 +160,24 @@ allprojects {
     }
   }
   task printAllDependencies(type: DependencyReportTask) {}
+
+  task createVersionFile() {
+    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
+    inputs.property "commitId", commitId
+    inputs.property "version", version
+    outputs.file receiptFile
+
+    doLast {
+      def data = [
+              commitId: commitId,
+              version: version,
+      ]
+
+      receiptFile.parentFile.mkdirs()
+      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
+      receiptFile.setText(content, "ISO-8859-1")
+    }
+  }
 }
 
 def determineCommitId() {
@@ -1330,24 +1348,6 @@ project(':clients') {
     generator project(':generator')
   }
 
-  task createVersionFile() {
-    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
-    inputs.property "commitId", commitId
-    inputs.property "version", version
-    outputs.file receiptFile
-
-    doLast {
-      def data = [
-        commitId: commitId,
-        version: version,
-      ]
-
-      receiptFile.parentFile.mkdirs()
-      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
-      receiptFile.setText(content, "ISO-8859-1")
-    }
-  }
-
   jar {
     dependsOn createVersionFile
     from("$buildDir") {
@@ -1460,24 +1460,6 @@ project(':raft') {
     generator project(':generator')
   }
 
-  task createVersionFile() {
-    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
-    inputs.property "commitId", commitId
-    inputs.property "version", version
-    outputs.file receiptFile
-
-    doLast {
-      def data = [
-        commitId: commitId,
-        version: version,
-      ]
-
-      receiptFile.parentFile.mkdirs()
-      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
-      receiptFile.setText(content, "ISO-8859-1")
-    }
-  }
-
   task processMessages(type:JavaExec) {
     mainClass = "org.apache.kafka.message.MessageGenerator"
     classpath = configurations.generator
@@ -1547,24 +1529,6 @@ project(':server-common') {
     testRuntimeOnly libs.slf4jlog4j
   }
 
-  task createVersionFile() {
-    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
-    inputs.property "commitId", commitId
-    inputs.property "version", version
-    outputs.file receiptFile
-
-    doLast {
-      def data = [
-              commitId: commitId,
-              version: version,
-      ]
-
-      receiptFile.parentFile.mkdirs()
-      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
-      receiptFile.setText(content, "ISO-8859-1")
-    }
-  }
-
   sourceSets {
     main {
       java {
@@ -1603,24 +1567,6 @@ project(':storage:api') {
     testImplementation libs.mockitoCore
 
     testRuntimeOnly libs.slf4jlog4j
-  }
-
-  task createVersionFile() {
-    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
-    inputs.property "commitId", commitId
-    inputs.property "version", version
-    outputs.file receiptFile
-
-    doLast {
-      def data = [
-              commitId: commitId,
-              version: version,
-      ]
-
-      receiptFile.parentFile.mkdirs()
-      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
-      receiptFile.setText(content, "ISO-8859-1")
-    }
   }
 
   sourceSets {
@@ -1679,24 +1625,6 @@ project(':storage') {
     testRuntimeOnly libs.slf4jlog4j
 
     generator project(':generator')
-  }
-
-  task createVersionFile() {
-    def receiptFile = file("$buildDir/kafka/$buildVersionFileName")
-    inputs.property "commitId", commitId
-    inputs.property "version", version
-    outputs.file receiptFile
-
-    doLast {
-      def data = [
-              commitId: commitId,
-              version: version,
-      ]
-
-      receiptFile.parentFile.mkdirs()
-      def content = data.entrySet().collect { "$it.key=$it.value" }.sort().join("\n")
-      receiptFile.setText(content, "ISO-8859-1")
-    }
   }
 
   task processMessages(type:JavaExec) {
