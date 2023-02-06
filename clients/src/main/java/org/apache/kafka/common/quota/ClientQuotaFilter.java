@@ -17,8 +17,10 @@
 
 package org.apache.kafka.common.quota;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -57,6 +59,68 @@ public class ClientQuotaFilter {
      * @param components the components for the filter
      */
     public static ClientQuotaFilter containsOnly(Collection<ClientQuotaFilterComponent> components) {
+        return new ClientQuotaFilter(components, true);
+    }
+
+    public static ClientQuotaFilter forDefaultUser() {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.USER);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forDefaultClientId() {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.CLIENT_ID);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forDefaultIp() {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.IP);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forUser(String user) {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.USER, user);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forClientId(String clientId) {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.CLIENT_ID, clientId);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forIp(String ip) {
+        ClientQuotaFilterComponent component = ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.IP, ip);
+        return new ClientQuotaFilter(Collections.singletonList(component), true);
+    }
+
+    public static ClientQuotaFilter forUserAndClientId(String user, String clientId) {
+        List<ClientQuotaFilterComponent> components = Arrays.asList(
+                ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.USER, user),
+                ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.CLIENT_ID, clientId)
+        );
+        return new ClientQuotaFilter(components, true);
+    }
+
+    public static ClientQuotaFilter forDefaultUserAndDefaultClientId() {
+        List<ClientQuotaFilterComponent> components = Arrays.asList(
+                ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.USER),
+                ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.CLIENT_ID)
+        );
+        return new ClientQuotaFilter(components, true);
+    }
+
+    public static ClientQuotaFilter forUserAndDefaultClientId(String user) {
+        List<ClientQuotaFilterComponent> components = Arrays.asList(
+                ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.USER, user),
+                ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.CLIENT_ID)
+        );
+        return new ClientQuotaFilter(components, true);
+    }
+
+    public static ClientQuotaFilter forDefaultUserAndClientId(String clientId) {
+        List<ClientQuotaFilterComponent> components = Arrays.asList(
+                ClientQuotaFilterComponent.ofDefaultEntity(ClientQuotaEntity.USER),
+                ClientQuotaFilterComponent.ofEntity(ClientQuotaEntity.CLIENT_ID, clientId)
+        );
         return new ClientQuotaFilter(components, true);
     }
 
