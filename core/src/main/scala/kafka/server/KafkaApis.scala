@@ -80,6 +80,7 @@ import java.util.{Collections, Optional, OptionalInt}
 import scala.annotation.nowarn
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{Map, Seq, Set, mutable}
+import scala.compat.java8.OptionConverters.RichOptionalGeneric
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
@@ -3232,37 +3233,84 @@ class KafkaApis(val requestChannel: RequestChannel,
 
   def handleDescribeClientQuotasRequest(request: RequestChannel.Request): Unit = {
     val describeClientQuotasRequest = request.body[DescribeClientQuotasRequest]
-
+    val version = request.header.apiVersion()
     if (!authHelper.authorize(request.context, DESCRIBE_CONFIGS, CLUSTER, CLUSTER_NAME)) {
       requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
         describeClientQuotasRequest.getErrorResponse(requestThrottleMs, Errors.CLUSTER_AUTHORIZATION_FAILED.exception))
     } else {
       metadataSupport match {
         case ZkSupport(adminManager, controller, zkClient, forwardingManager, metadataCache, _) =>
-          val result = adminManager.describeClientQuotas(describeClientQuotasRequest.filter)
+          if (version < 2) {
+            val result = adminManager.describeClientQuotas(describeClientQuotasRequest.filter)
 
-          val entriesData = result.iterator.map { case (quotaEntity, quotaValues) =>
-            val entityData = quotaEntity.entries.asScala.iterator.map { case (entityType, entityName) =>
-              new DescribeClientQuotasResponseData.EntityData()
-                .setEntityType(entityType)
-                .setEntityName(entityName)
+            val entriesData = result.iterator.map { case (quotaEntity, quotaValues) =>
+              val entityData = quotaEntity.entries.asScala.iterator.map { case (entityType, entityName) =>
+                new DescribeClientQuotasResponseData.EntityData()
+                  .setEntityType(entityType)
+                  .setEntityName(entityName)
+              }.toBuffer
+
+              val valueData = quotaValues.iterator.map { case (key, value) =>
+                new DescribeClientQuotasResponseData.ValueData()
+                  .setKey(key)
+                  .setValue(value)
+              }.toBuffer
+
+              new DescribeClientQuotasResponseData.EntryData()
+                .setEntity(entityData.asJava)
+                .setValues(valueData.asJava)
             }.toBuffer
 
-            val valueData = quotaValues.iterator.map { case (key, value) =>
-              new DescribeClientQuotasResponseData.ValueData()
-                .setKey(key)
-                .setValue(value)
+            requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
+              new DescribeClientQuotasResponse(new DescribeClientQuotasResponseData()
+                .setThrottleTimeMs(requestThrottleMs)
+                .setEntries(entriesData.asJava)))
+          } else {
+            val results = adminManager.describeClientQuotas(describeClientQuotasRequest.filters)
+
+            val filterResults = results.iterator.map { case (filter, quota) =>
+
+              val entriesData = quota.iterator.map { case (quotaEntity, quotaValues) =>
+                val entityData = quotaEntity.entries.asScala.iterator.map { case (entityType, entityName) =>
+                  new DescribeClientQuotasResponseData.EntityData()
+                    .setEntityType(entityType)
+                    .setEntityName(entityName)
+                }.toBuffer
+
+                val valueData = quotaValues.iterator.map { case (key, value) =>
+                  new DescribeClientQuotasResponseData.ValueData()
+                    .setKey(key)
+                    .setValue(value)
+                }.toBuffer
+
+                new DescribeClientQuotasResponseData.EntryData()
+                  .setEntity(entityData.asJava)
+                  .setValues(valueData.asJava)
+              }.toBuffer
+
+              val components = filter.components().asScala.map { c =>
+                val matchType = c.`match`().asScala match {
+                  case null => DescribeClientQuotasRequest.MATCH_TYPE_SPECIFIED
+                  case None => DescribeClientQuotasRequest.MATCH_TYPE_DEFAULT
+                  case _ => DescribeClientQuotasRequest.MATCH_TYPE_SPECIFIED
+                }
+                val `match` = if (c.`match`.isPresent) c.`match`.get else null
+                new DescribeClientQuotasResponseData.ComponentData()
+                  .setMatch(`match`)
+                  .setEntityType(c.entityType())
+                  .setMatchType(matchType)
+              }.toBuffer
+
+              new DescribeClientQuotasResponseData.DescribeClientQuotasFilterResult()
+                .setEntries(entriesData.asJava)
+                .setComponents(components.asJava)
             }.toBuffer
 
-            new DescribeClientQuotasResponseData.EntryData()
-              .setEntity(entityData.asJava)
-              .setValues(valueData.asJava)
-          }.toBuffer
-
-          requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
-            new DescribeClientQuotasResponse(new DescribeClientQuotasResponseData()
-              .setThrottleTimeMs(requestThrottleMs)
-              .setEntries(entriesData.asJava)))
+            requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs =>
+              new DescribeClientQuotasResponse(new DescribeClientQuotasResponseData()
+                .setThrottleTimeMs(requestThrottleMs)
+                .setFilterResults(filterResults.asJava)))
+          }
         case RaftSupport(_, metadataCache) =>
           val result = metadataCache.describeClientQuotas(describeClientQuotasRequest.data())
           requestHelper.sendResponseMaybeThrottle(request, requestThrottleMs => {

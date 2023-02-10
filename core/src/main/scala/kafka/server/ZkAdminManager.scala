@@ -593,6 +593,52 @@ class ZkAdminManager(val config: KafkaConfig,
     new ClientQuotaEntity((user.map(u => ClientQuotaEntity.USER -> u) ++ clientId.map(c => ClientQuotaEntity.CLIENT_ID -> c)).toMap.asJava)
   }
 
+  def describeClientQuotas(filters: java.util.Set[ClientQuotaFilter]): Map[ClientQuotaFilter, Map[ClientQuotaEntity, Map[String, Double]]] = {
+    var results: Map[ClientQuotaFilter, Map[ClientQuotaEntity, Map[String, Double]]] = Map()
+    filters.forEach { filter =>
+      var userComponent: Option[ClientQuotaFilterComponent] = None
+      var clientIdComponent: Option[ClientQuotaFilterComponent] = None
+      var ipComponent: Option[ClientQuotaFilterComponent] = None
+      filter.components.forEach { component =>
+        component.entityType match {
+          case ClientQuotaEntity.USER =>
+            if (userComponent.isDefined)
+              throw new InvalidRequestException(s"Duplicate user filter component entity type")
+            userComponent = Some(component)
+          case ClientQuotaEntity.CLIENT_ID =>
+            if (clientIdComponent.isDefined)
+              throw new InvalidRequestException(s"Duplicate client filter component entity type")
+            clientIdComponent = Some(component)
+          case ClientQuotaEntity.IP =>
+            if (ipComponent.isDefined)
+              throw new InvalidRequestException(s"Duplicate ip filter component entity type")
+            ipComponent = Some(component)
+          case "" =>
+            throw new InvalidRequestException(s"Unexpected empty filter component entity type")
+          case et =>
+            // Supplying other entity types is not yet supported.
+            throw new UnsupportedVersionException(s"Custom entity type '${et}' not supported")
+        }
+      }
+      if ((userComponent.isDefined || clientIdComponent.isDefined) && ipComponent.isDefined)
+        throw new InvalidRequestException(s"Invalid entity filter component combination, IP filter component should not be used with " +
+          s"user or clientId filter component.")
+
+      val userClientQuotas = if (ipComponent.isEmpty)
+        handleDescribeClientQuotas(userComponent, clientIdComponent, filter.strict)
+      else
+        Map.empty
+
+      val ipQuotas = if (userComponent.isEmpty && clientIdComponent.isEmpty)
+        handleDescribeIpQuotas(ipComponent, filter.strict)
+      else
+        Map.empty
+
+      results += (filter -> (userClientQuotas ++ ipQuotas).toMap)
+    }
+    results
+  }
+
   def describeClientQuotas(filter: ClientQuotaFilter): Map[ClientQuotaEntity, Map[String, Double]] = {
     var userComponent: Option[ClientQuotaFilterComponent] = None
     var clientIdComponent: Option[ClientQuotaFilterComponent] = None

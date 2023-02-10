@@ -18,9 +18,6 @@ package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.internals.KafkaFutureImpl;
 import org.apache.kafka.common.message.DescribeClientQuotasResponseData;
-import org.apache.kafka.common.message.DescribeClientQuotasResponseData.EntityData;
-import org.apache.kafka.common.message.DescribeClientQuotasResponseData.EntryData;
-import org.apache.kafka.common.message.DescribeClientQuotasResponseData.ValueData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
 import org.apache.kafka.common.protocol.Errors;
@@ -49,14 +46,14 @@ public class DescribeClientQuotasResponse extends AbstractResponse {
         }
 
         Map<ClientQuotaEntity, Map<String, Double>> result = new HashMap<>(data.entries().size());
-        for (EntryData entries : data.entries()) {
+        for (DescribeClientQuotasResponseData.OldEntryData entries : data.entries()) {
             Map<String, String> entity = new HashMap<>(entries.entity().size());
-            for (EntityData entityData : entries.entity()) {
+            for (DescribeClientQuotasResponseData.OldEntityData entityData : entries.entity()) {
                 entity.put(entityData.entityType(), entityData.entityName());
             }
 
             Map<String, Double> values = new HashMap<>(entries.values().size());
-            for (ValueData valueData : entries.values()) {
+            for (DescribeClientQuotasResponseData.OldValueData valueData : entries.values()) {
                 values.put(valueData.key(), valueData.value());
             }
 
@@ -91,25 +88,25 @@ public class DescribeClientQuotasResponse extends AbstractResponse {
 
     public static DescribeClientQuotasResponse fromQuotaEntities(Map<ClientQuotaEntity, Map<String, Double>> entities,
                                                                  int throttleTimeMs) {
-        List<EntryData> entries = new ArrayList<>(entities.size());
+        List<DescribeClientQuotasResponseData.OldEntryData> entries = new ArrayList<>(entities.size());
         for (Map.Entry<ClientQuotaEntity, Map<String, Double>> entry : entities.entrySet()) {
             ClientQuotaEntity quotaEntity = entry.getKey();
-            List<EntityData> entityData = new ArrayList<>(quotaEntity.entries().size());
+            List<DescribeClientQuotasResponseData.OldEntityData> entityData = new ArrayList<>(quotaEntity.entries().size());
             for (Map.Entry<String, String> entityEntry : quotaEntity.entries().entrySet()) {
-                entityData.add(new EntityData()
+                entityData.add(new DescribeClientQuotasResponseData.OldEntityData()
                         .setEntityType(entityEntry.getKey())
                         .setEntityName(entityEntry.getValue()));
             }
 
             Map<String, Double> quotaValues = entry.getValue();
-            List<ValueData> valueData = new ArrayList<>(quotaValues.size());
+            List<DescribeClientQuotasResponseData.OldValueData> valueData = new ArrayList<>(quotaValues.size());
             for (Map.Entry<String, Double> valuesEntry : entry.getValue().entrySet()) {
-                valueData.add(new ValueData()
+                valueData.add(new DescribeClientQuotasResponseData.OldValueData()
                         .setKey(valuesEntry.getKey())
                         .setValue(valuesEntry.getValue()));
             }
 
-            entries.add(new EntryData()
+            entries.add(new DescribeClientQuotasResponseData.OldEntryData()
                     .setEntity(entityData)
                     .setValues(valueData));
         }

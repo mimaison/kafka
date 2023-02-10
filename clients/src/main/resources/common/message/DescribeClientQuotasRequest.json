@@ -19,19 +19,39 @@
   "listeners": ["zkBroker", "broker"],
   "name": "DescribeClientQuotasRequest",
   // Version 1 enables flexible versions.
-  "validVersions": "0-1",
+  // Version 2 adds support for batching.
+  "validVersions": "0-2",
   "flexibleVersions": "1+",
   "fields": [
-    { "name": "Components", "type": "[]ComponentData", "versions": "0+",
+    { "name": "Components", "type": "[]OldComponentData", "versions": "0-1",
       "about": "Filter components to apply to quota entities.", "fields": [
-      { "name": "EntityType", "type": "string", "versions": "0+",
+      { "name": "EntityType", "type": "string", "versions": "0-1",
         "about": "The entity type that the filter component applies to." },
-      { "name": "MatchType", "type": "int8", "versions": "0+",
+      { "name": "MatchType", "type": "int8", "versions": "0-1",
         "about": "How to match the entity {0 = exact name, 1 = default name, 2 = any specified name}." },
-      { "name": "Match", "type": "string", "versions": "0+", "nullableVersions": "0+",
+      { "name": "Match", "type": "string", "versions": "0-1", "nullableVersions": "0-1",
         "about": "The string to match against, or null if unused for the match type." }
     ]},
     { "name": "Strict", "type": "bool", "versions": "0+",
-      "about": "Whether the match is strict, i.e. should exclude entities with unspecified entity types." }
+      "about": "Whether the match is strict, i.e. should exclude entities with unspecified entity types." },
+    {
+      "name": "Filters",
+      "type": "[]DescribeClientQuotasFilter",
+      "versions": "2+",
+      "about": "The filters to use when describing client quotas.",
+      "fields": [
+        { "name": "Components", "type": "[]ComponentData", "versions": "2+",
+          "about": "Filter components to apply to quota entities.", "fields": [
+          { "name": "EntityType", "type": "string", "versions": "2+",
+            "about": "The entity type that the filter component applies to." },
+          { "name": "MatchType", "type": "int8", "versions": "2+",
+            "about": "How to match the entity {0 = exact name, 1 = default name, 2 = any specified name}." },
+          { "name": "Match", "type": "string", "versions": "2+", "nullableVersions": "2+",
+            "about": "The string to match against, or null if unused for the match type." }
+        ]},
+        { "name": "Strict", "type": "bool", "versions": "2+",
+          "about": "Whether the match is strict, i.e. should exclude entities with unspecified entity types." }
+      ]
+    }
   ]
 }

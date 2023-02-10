@@ -26,7 +26,10 @@ import org.apache.kafka.common.quota.ClientQuotaFilterComponent;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class DescribeClientQuotasRequest extends AbstractRequest {
     // These values must not change.
@@ -39,26 +42,36 @@ public class DescribeClientQuotasRequest extends AbstractRequest {
         private final DescribeClientQuotasRequestData data;
 
         public Builder(ClientQuotaFilter filter) {
-            super(ApiKeys.DESCRIBE_CLIENT_QUOTAS);
+            this(Collections.singleton(filter));
+        }
 
-            List<ComponentData> componentData = new ArrayList<>(filter.components().size());
-            for (ClientQuotaFilterComponent component : filter.components()) {
-                ComponentData fd = new ComponentData().setEntityType(component.entityType());
-                if (component.match() == null) {
-                    fd.setMatchType(MATCH_TYPE_SPECIFIED);
-                    fd.setMatch(null);
-                } else if (component.match().isPresent()) {
-                    fd.setMatchType(MATCH_TYPE_EXACT);
-                    fd.setMatch(component.match().get());
-                } else {
-                    fd.setMatchType(MATCH_TYPE_DEFAULT);
-                    fd.setMatch(null);
+        public Builder(Set<ClientQuotaFilter> filters) {
+            super(ApiKeys.DESCRIBE_CLIENT_QUOTAS);
+            List<DescribeClientQuotasRequestData.DescribeClientQuotasFilter> f = new ArrayList<>(filters.size());
+
+            for (ClientQuotaFilter filter : filters) {
+                List<ComponentData> componentData = new ArrayList<>(filter.components().size());
+                for (ClientQuotaFilterComponent component : filter.components()) {
+                    ComponentData fd = new ComponentData().setEntityType(component.entityType());
+                    if (component.match() == null) {
+                        fd.setMatchType(MATCH_TYPE_SPECIFIED);
+                        fd.setMatch(null);
+                    } else if (component.match().isPresent()) {
+                        fd.setMatchType(MATCH_TYPE_EXACT);
+                        fd.setMatch(component.match().get());
+                    } else {
+                        fd.setMatchType(MATCH_TYPE_DEFAULT);
+                        fd.setMatch(null);
+                    }
+                    componentData.add(fd);
                 }
-                componentData.add(fd);
+                DescribeClientQuotasRequestData.DescribeClientQuotasFilter f1 = new DescribeClientQuotasRequestData.DescribeClientQuotasFilter()
+                        .setComponents(componentData)
+                        .setStrict(filter.strict());
+                f.add(f1);
             }
-            this.data = new DescribeClientQuotasRequestData()
-                .setComponents(componentData)
-                .setStrict(filter.strict());
+
+            this.data = new DescribeClientQuotasRequestData().setFilters(f);
         }
 
         @Override
@@ -79,9 +92,39 @@ public class DescribeClientQuotasRequest extends AbstractRequest {
         this.data = data;
     }
 
+    public Set<ClientQuotaFilter> filters() {
+        Set<ClientQuotaFilter> filters = new HashSet<>();
+        for (DescribeClientQuotasRequestData.DescribeClientQuotasFilter filter : data.filters()) {
+            List<ClientQuotaFilterComponent> components = new ArrayList<>(filter.components().size());
+            for (ComponentData componentData : filter.components()) {
+                ClientQuotaFilterComponent component;
+                switch (componentData.matchType()) {
+                    case MATCH_TYPE_EXACT:
+                        component = ClientQuotaFilterComponent.ofEntity(componentData.entityType(), componentData.match());
+                        break;
+                    case MATCH_TYPE_DEFAULT:
+                        component = ClientQuotaFilterComponent.ofDefaultEntity(componentData.entityType());
+                        break;
+                    case MATCH_TYPE_SPECIFIED:
+                        component = ClientQuotaFilterComponent.ofEntityType(componentData.entityType());
+                        break;
+                    default:
+                        throw new IllegalArgumentException("Unexpected match type: " + componentData.matchType());
+                }
+                components.add(component);
+            }
+            if (data.strict()) {
+                filters.add(ClientQuotaFilter.containsOnly(components));
+            } else {
+                filters.add(ClientQuotaFilter.contains(components));
+            }
+        }
+        return filters;
+    }
+
     public ClientQuotaFilter filter() {
         List<ClientQuotaFilterComponent> components = new ArrayList<>(data.components().size());
-        for (ComponentData componentData : data.components()) {
+        for (DescribeClientQuotasRequestData.OldComponentData componentData : data.components()) {
             ClientQuotaFilterComponent component;
             switch (componentData.matchType()) {
                 case MATCH_TYPE_EXACT:
