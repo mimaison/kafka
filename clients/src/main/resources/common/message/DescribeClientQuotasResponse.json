@@ -27,16 +27,16 @@
       "about": "The error code, or `0` if the quota description succeeded." },
     { "name": "ErrorMessage", "type": "string", "versions": "0-1", "nullableVersions": "0-1",
       "about": "The error message, or `null` if the quota description succeeded." },
-    { "name": "Entries", "type": "[]OldEntryData", "versions": "0-1", "nullableVersions": "0-1",
+    { "name": "Entries", "type": "[]EntryData", "versions": "0-1", "nullableVersions": "0-1",
       "about": "A result entry.", "fields": [
-      { "name": "Entity", "type": "[]OldEntityData", "versions": "0-1",
+      { "name": "Entity", "type": "[]EntityData", "versions": "0-1",
         "about": "The quota entity description.", "fields": [
         { "name": "EntityType", "type": "string", "versions": "0-1",
           "about": "The entity type." },
         { "name": "EntityName", "type": "string", "versions": "0-1", "nullableVersions": "0-1",
           "about": "The entity name, or null if the default." }
       ]},
-      { "name": "Values", "type": "[]OldValueData", "versions": "0-1",
+      { "name": "Values", "type": "[]ValueData", "versions": "0-1",
         "about": "The quota values for the entity.", "fields": [
         { "name": "Key", "type": "string", "versions": "0-1",
           "about": "The quota configuration key." },
@@ -50,7 +50,7 @@
       "versions": "2+",
       "about": "The results for each filter.",
       "fields": [
-        { "name": "Components", "type": "[]ComponentData", "versions": "2+",
+        { "name": "Components", "type": "[]FilterComponent", "versions": "2+",
           "about": "Filter components to apply to quota entities.", "fields": [
           { "name": "EntityType", "type": "string", "versions": "2+",
             "about": "The entity type that the filter component applies to." },
@@ -63,16 +63,16 @@
           "about": "The error code, or `0` if the quota description succeeded." },
         { "name": "ErrorMessage", "type": "string", "versions": "2+", "nullableVersions": "2+",
           "about": "The error message, or `null` if the quota description succeeded." },
-        { "name": "Entries", "type": "[]EntryData", "versions": "2+", "nullableVersions": "2+",
+        { "name": "Quotas", "type": "[]Quotas", "versions": "2+", "nullableVersions": "2+",
           "about": "A result entry.", "fields": [
-          { "name": "Entity", "type": "[]EntityData", "versions": "2+",
+          { "name": "Entity", "type": "[]Entity", "versions": "2+",
             "about": "The quota entity description.", "fields": [
             { "name": "EntityType", "type": "string", "versions": "2+",
               "about": "The entity type." },
             { "name": "EntityName", "type": "string", "versions": "2+", "nullableVersions": "2+",
               "about": "The entity name, or null if the default." }
           ]},
-          { "name": "Values", "type": "[]ValueData", "versions": "2+",
+          { "name": "Values", "type": "[]Value", "versions": "2+",
             "about": "The quota values for the entity.", "fields": [
             { "name": "Key", "type": "string", "versions": "2+",
               "about": "The quota configuration key." },

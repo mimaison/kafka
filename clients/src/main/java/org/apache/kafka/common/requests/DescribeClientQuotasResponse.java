@@ -46,14 +46,14 @@ public class DescribeClientQuotasResponse extends AbstractResponse {
         }
 
         Map<ClientQuotaEntity, Map<String, Double>> result = new HashMap<>(data.entries().size());
-        for (DescribeClientQuotasResponseData.OldEntryData entries : data.entries()) {
+        for (DescribeClientQuotasResponseData.EntryData entries : data.entries()) {
             Map<String, String> entity = new HashMap<>(entries.entity().size());
-            for (DescribeClientQuotasResponseData.OldEntityData entityData : entries.entity()) {
+            for (DescribeClientQuotasResponseData.EntityData entityData : entries.entity()) {
                 entity.put(entityData.entityType(), entityData.entityName());
             }
 
             Map<String, Double> values = new HashMap<>(entries.values().size());
-            for (DescribeClientQuotasResponseData.OldValueData valueData : entries.values()) {
+            for (DescribeClientQuotasResponseData.ValueData valueData : entries.values()) {
                 values.put(valueData.key(), valueData.value());
             }
 
@@ -88,25 +88,25 @@ public class DescribeClientQuotasResponse extends AbstractResponse {
 
     public static DescribeClientQuotasResponse fromQuotaEntities(Map<ClientQuotaEntity, Map<String, Double>> entities,
                                                                  int throttleTimeMs) {
-        List<DescribeClientQuotasResponseData.OldEntryData> entries = new ArrayList<>(entities.size());
+        List<DescribeClientQuotasResponseData.EntryData> entries = new ArrayList<>(entities.size());
         for (Map.Entry<ClientQuotaEntity, Map<String, Double>> entry : entities.entrySet()) {
             ClientQuotaEntity quotaEntity = entry.getKey();
-            List<DescribeClientQuotasResponseData.OldEntityData> entityData = new ArrayList<>(quotaEntity.entries().size());
+            List<DescribeClientQuotasResponseData.EntityData> entityData = new ArrayList<>(quotaEntity.entries().size());
             for (Map.Entry<String, String> entityEntry : quotaEntity.entries().entrySet()) {
-                entityData.add(new DescribeClientQuotasResponseData.OldEntityData()
+                entityData.add(new DescribeClientQuotasResponseData.EntityData()
                         .setEntityType(entityEntry.getKey())
                         .setEntityName(entityEntry.getValue()));
             }
 
             Map<String, Double> quotaValues = entry.getValue();
-            List<DescribeClientQuotasResponseData.OldValueData> valueData = new ArrayList<>(quotaValues.size());
+            List<DescribeClientQuotasResponseData.ValueData> valueData = new ArrayList<>(quotaValues.size());
             for (Map.Entry<String, Double> valuesEntry : entry.getValue().entrySet()) {
-                valueData.add(new DescribeClientQuotasResponseData.OldValueData()
+                valueData.add(new DescribeClientQuotasResponseData.ValueData()
                         .setKey(valuesEntry.getKey())
                         .setValue(valuesEntry.getValue()));
             }
 
-            entries.add(new DescribeClientQuotasResponseData.OldEntryData()
+            entries.add(new DescribeClientQuotasResponseData.EntryData()
                     .setEntity(entityData)
                     .setValues(valueData));
         }

@@ -18,6 +18,7 @@ package org.apache.kafka.common.requests;
 
 import org.apache.kafka.common.message.DescribeClientQuotasRequestData;
 import org.apache.kafka.common.message.DescribeClientQuotasRequestData.ComponentData;
+import org.apache.kafka.common.message.DescribeClientQuotasRequestData.FilterComponent;
 import org.apache.kafka.common.message.DescribeClientQuotasResponseData;
 import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.protocol.ByteBufferAccessor;
@@ -50,9 +51,9 @@ public class DescribeClientQuotasRequest extends AbstractRequest {
             List<DescribeClientQuotasRequestData.DescribeClientQuotasFilter> f = new ArrayList<>(filters.size());
 
             for (ClientQuotaFilter filter : filters) {
-                List<ComponentData> componentData = new ArrayList<>(filter.components().size());
+                List<FilterComponent> componentData = new ArrayList<>(filter.components().size());
                 for (ClientQuotaFilterComponent component : filter.components()) {
-                    ComponentData fd = new ComponentData().setEntityType(component.entityType());
+                    FilterComponent fd = new FilterComponent().setEntityType(component.entityType());
                     if (component.match() == null) {
                         fd.setMatchType(MATCH_TYPE_SPECIFIED);
                         fd.setMatch(null);
@@ -96,20 +97,20 @@ public class DescribeClientQuotasRequest extends AbstractRequest {
         Set<ClientQuotaFilter> filters = new HashSet<>();
         for (DescribeClientQuotasRequestData.DescribeClientQuotasFilter filter : data.filters()) {
             List<ClientQuotaFilterComponent> components = new ArrayList<>(filter.components().size());
-            for (ComponentData componentData : filter.components()) {
+            for (FilterComponent filterComponent : filter.components()) {
                 ClientQuotaFilterComponent component;
-                switch (componentData.matchType()) {
+                switch (filterComponent.matchType()) {
                     case MATCH_TYPE_EXACT:
-                        component = ClientQuotaFilterComponent.ofEntity(componentData.entityType(), componentData.match());
+                        component = ClientQuotaFilterComponent.ofEntity(filterComponent.entityType(), filterComponent.match());
                         break;
                     case MATCH_TYPE_DEFAULT:
-                        component = ClientQuotaFilterComponent.ofDefaultEntity(componentData.entityType());
+                        component = ClientQuotaFilterComponent.ofDefaultEntity(filterComponent.entityType());
                         break;
                     case MATCH_TYPE_SPECIFIED:
-                        component = ClientQuotaFilterComponent.ofEntityType(componentData.entityType());
+                        component = ClientQuotaFilterComponent.ofEntityType(filterComponent.entityType());
                         break;
                     default:
-                        throw new IllegalArgumentException("Unexpected match type: " + componentData.matchType());
+                        throw new IllegalArgumentException("Unexpected match type: " + filterComponent.matchType());
                 }
                 components.add(component);
             }
@@ -124,7 +125,7 @@ public class DescribeClientQuotasRequest extends AbstractRequest {
 
     public ClientQuotaFilter filter() {
         List<ClientQuotaFilterComponent> components = new ArrayList<>(data.components().size());
-        for (DescribeClientQuotasRequestData.OldComponentData componentData : data.components()) {
+        for (ComponentData componentData : data.components()) {
             ClientQuotaFilterComponent component;
             switch (componentData.matchType()) {
                 case MATCH_TYPE_EXACT:

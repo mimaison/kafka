@@ -50,6 +50,7 @@ import org.apache.kafka.common.security.scram.internals.{ScramCredentialUtils, S
 import org.apache.kafka.common.utils.Sanitizer
 import org.apache.kafka.storage.internals.log.LogConfig
 
+import scala.annotation.nowarn
 import scala.collection.{Map, mutable, _}
 import scala.jdk.CollectionConverters._
 
@@ -593,6 +594,7 @@ class ZkAdminManager(val config: KafkaConfig,
     new ClientQuotaEntity((user.map(u => ClientQuotaEntity.USER -> u) ++ clientId.map(c => ClientQuotaEntity.CLIENT_ID -> c)).toMap.asJava)
   }
 
+  @nowarn("cat=deprecation")
   def describeClientQuotas(filters: java.util.Set[ClientQuotaFilter]): Map[ClientQuotaFilter, Map[ClientQuotaEntity, Map[String, Double]]] = {
     var results: Map[ClientQuotaFilter, Map[ClientQuotaEntity, Map[String, Double]]] = Map()
     filters.forEach { filter =>

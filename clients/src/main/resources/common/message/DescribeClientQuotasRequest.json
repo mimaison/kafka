@@ -23,7 +23,7 @@
   "validVersions": "0-2",
   "flexibleVersions": "1+",
   "fields": [
-    { "name": "Components", "type": "[]OldComponentData", "versions": "0-1",
+    { "name": "Components", "type": "[]ComponentData", "versions": "0-1",
       "about": "Filter components to apply to quota entities.", "fields": [
       { "name": "EntityType", "type": "string", "versions": "0-1",
         "about": "The entity type that the filter component applies to." },
@@ -40,7 +40,7 @@
       "versions": "2+",
       "about": "The filters to use when describing client quotas.",
       "fields": [
-        { "name": "Components", "type": "[]ComponentData", "versions": "2+",
+        { "name": "Components", "type": "[]FilterComponent", "versions": "2+",
           "about": "Filter components to apply to quota entities.", "fields": [
           { "name": "EntityType", "type": "string", "versions": "2+",
             "about": "The entity type that the filter component applies to." },

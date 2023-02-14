@@ -3270,22 +3270,22 @@ class KafkaApis(val requestChannel: RequestChannel,
 
             val filterResults = results.iterator.map { case (filter, quota) =>
 
-              val entriesData = quota.iterator.map { case (quotaEntity, quotaValues) =>
+              val entries = quota.iterator.map { case (quotaEntity, quotaValues) =>
                 val entityData = quotaEntity.entries.asScala.iterator.map { case (entityType, entityName) =>
-                  new DescribeClientQuotasResponseData.EntityData()
+                  new DescribeClientQuotasResponseData.Entity()
                     .setEntityType(entityType)
                     .setEntityName(entityName)
                 }.toBuffer
 
-                val valueData = quotaValues.iterator.map { case (key, value) =>
-                  new DescribeClientQuotasResponseData.ValueData()
+                val value = quotaValues.iterator.map { case (key, value) =>
+                  new DescribeClientQuotasResponseData.Value()
                     .setKey(key)
                     .setValue(value)
                 }.toBuffer
 
-                new DescribeClientQuotasResponseData.EntryData()
+                new DescribeClientQuotasResponseData.Quotas()
                   .setEntity(entityData.asJava)
-                  .setValues(valueData.asJava)
+                  .setValues(value.asJava)
               }.toBuffer
 
               val components = filter.components().asScala.map { c =>
@@ -3295,14 +3295,14 @@ class KafkaApis(val requestChannel: RequestChannel,
                   case _ => DescribeClientQuotasRequest.MATCH_TYPE_SPECIFIED
                 }
                 val `match` = if (c.`match`.isPresent) c.`match`.get else null
-                new DescribeClientQuotasResponseData.ComponentData()
+                new DescribeClientQuotasResponseData.FilterComponent()
                   .setMatch(`match`)
                   .setEntityType(c.entityType())
                   .setMatchType(matchType)
               }.toBuffer
 
               new DescribeClientQuotasResponseData.DescribeClientQuotasFilterResult()
-                .setEntries(entriesData.asJava)
+                .setQuotas(entries.asJava)
                 .setComponents(components.asJava)
             }.toBuffer
 
