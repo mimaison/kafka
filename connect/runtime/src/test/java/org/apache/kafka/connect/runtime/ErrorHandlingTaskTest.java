@@ -24,6 +24,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.utils.MockTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.components.Versioned;
@@ -434,13 +435,17 @@ public class ErrorHandlingTaskTest {
         oo.put("schemas.enable", "false");
         converter.configure(oo);
 
+        Plugin<Transformation<SinkRecord>> transformationPlugin = metrics.wrap(new FaultyPassthrough<SinkRecord>(), taskId, "");
         TransformationChain<ConsumerRecord<byte[], byte[]>, SinkRecord> sinkTransforms =
-                new TransformationChain<>(singletonList(new TransformationStage<>(new FaultyPassthrough<SinkRecord>())), retryWithToleranceOperator);
+                new TransformationChain<>(singletonList(new TransformationStage<>(transformationPlugin)), retryWithToleranceOperator);
 
+        Plugin<Converter> keyConverterPlugin = metrics.wrap(converter, taskId, true);
+        Plugin<Converter> valueConverterPlugin = metrics.wrap(converter, taskId, false);
+        Plugin<HeaderConverter> headerConverterPlugin = metrics.wrap(headerConverter, taskId);
         workerSinkTask = new WorkerSinkTask(
             taskId, sinkTask, statusListener, initialState, workerConfig,
-            ClusterConfigState.EMPTY, metrics, converter, converter, errorHandlingMetrics,
-            headerConverter, sinkTransforms, consumer, pluginLoader, time,
+            ClusterConfigState.EMPTY, metrics, keyConverterPlugin, valueConverterPlugin, errorHandlingMetrics,
+                headerConverterPlugin, sinkTransforms, consumer, pluginLoader, time,
             retryWithToleranceOperator, workerErrantRecordReporter,
                 statusBackingStore, () -> errorReporters);
     }
@@ -466,18 +471,23 @@ public class ErrorHandlingTaskTest {
 
     private void createSourceTask(TargetState initialState, RetryWithToleranceOperator<SourceRecord> retryWithToleranceOperator,
                                   List<ErrorReporter<SourceRecord>> errorReporters, Converter converter) {
+        Plugin<Transformation<SourceRecord>> transformationPlugin = metrics.wrap(new FaultyPassthrough<SourceRecord>(), taskId, "");
         TransformationChain<SourceRecord, SourceRecord> sourceTransforms = new TransformationChain<>(singletonList(
-                new TransformationStage<>(new FaultyPassthrough<SourceRecord>())), retryWithToleranceOperator);
+                new TransformationStage<>(transformationPlugin)), retryWithToleranceOperator);
 
+        Plugin<Converter> keyConverterPlugin = metrics.wrap(converter, taskId, true);
+        Plugin<Converter> valueConverterPlugin = metrics.wrap(converter, taskId, false);
+        Plugin<HeaderConverter> headerConverterPlugin = metrics.wrap(headerConverter, taskId);
         workerSourceTask = spy(new WorkerSourceTask(
-            taskId, sourceTask, statusListener, initialState, converter,
-                converter, errorHandlingMetrics, headerConverter,
+            taskId, sourceTask, statusListener, initialState, keyConverterPlugin,
+                valueConverterPlugin, errorHandlingMetrics, headerConverterPlugin,
                 sourceTransforms, producer, admin,
                 TopicCreationGroup.configuredGroups(sourceConfig),
                 offsetReader, offsetWriter, offsetStore, workerConfig,
                 ClusterConfigState.EMPTY, metrics, pluginLoader, time,
                 retryWithToleranceOperator,
-                statusBackingStore, Runnable::run, () -> errorReporters));
+                statusBackingStore, Runnable::run, () -> errorReporters,
+                metrics.taskPluginMetrics(taskId)));
 
     }
 

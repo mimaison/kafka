@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.runtime;
 
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.transforms.Transformation;
 import org.apache.kafka.connect.transforms.predicates.Predicate;
@@ -45,21 +46,25 @@ public class TransformationStageTest {
         applyAndAssert(false, true, transformed);
     }
 
+    @SuppressWarnings("unchecked")
     private void applyAndAssert(boolean predicateResult, boolean negate,
                                 SourceRecord expectedResult) {
 
         @SuppressWarnings("unchecked")
+        Plugin<Predicate<SourceRecord>> predicatePlugin = mock(Plugin.class);
         Predicate<SourceRecord> predicate = mock(Predicate.class);
         when(predicate.test(any())).thenReturn(predicateResult);
-        @SuppressWarnings("unchecked")
+        when(predicatePlugin.get()).thenReturn(predicate);
+        Plugin<Transformation<SourceRecord>> transformationPlugin = mock(Plugin.class);
         Transformation<SourceRecord> transformation = mock(Transformation.class);
+        when(transformationPlugin.get()).thenReturn(transformation);
         if (expectedResult == transformed) {
             when(transformation.apply(any())).thenReturn(transformed);
         }
         TransformationStage<SourceRecord> stage = new TransformationStage<>(
-                predicate,
+                predicatePlugin,
                 negate,
-                transformation);
+                transformationPlugin);
 
         assertEquals(expectedResult, stage.apply(initial));
 

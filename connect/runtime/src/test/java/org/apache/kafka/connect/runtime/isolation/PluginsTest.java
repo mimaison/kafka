@@ -23,6 +23,7 @@ import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.provider.ConfigProvider;
 import org.apache.kafka.common.utils.LogCaptureAppender;
+import org.apache.kafka.common.utils.MockTime;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.components.Versioned;
 import org.apache.kafka.connect.connector.Connector;
@@ -36,6 +37,7 @@ import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.rest.ConnectRestExtension;
 import org.apache.kafka.connect.rest.ConnectRestExtensionContext;
+import org.apache.kafka.connect.runtime.ConnectMetrics;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.isolation.Plugins.ClassLoaderUsage;
 import org.apache.kafka.connect.runtime.isolation.TestPlugins.TestPlugin;
@@ -47,6 +49,7 @@ import org.apache.kafka.connect.storage.ConverterType;
 import org.apache.kafka.connect.storage.HeaderConverter;
 import org.apache.kafka.connect.storage.SimpleHeaderConverter;
 
+import org.apache.kafka.connect.util.ConnectorTaskId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +88,8 @@ public class PluginsTest {
     private PluginScanResult nonEmpty;
     private PluginScanResult empty;
     private String missingPluginClass;
+    private ConnectMetrics connectMetrics;
+    private final ConnectorTaskId id = new ConnectorTaskId("connector", 0);
 
     @BeforeEach
     public void setup() {
@@ -124,6 +129,7 @@ public class PluginsTest {
 
     protected void createConfig() {
         this.config = new TestableWorkerConfig(props);
+        this.connectMetrics = new ConnectMetrics("workeId", (WorkerConfig) config, new MockTime(), "clusterId");
     }
 
     @Test
@@ -151,7 +157,8 @@ public class PluginsTest {
         assertNotNull(props.get(WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG));
         HeaderConverter headerConverter = plugins.newHeaderConverter(config,
                                                                      WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG,
-                                                                     ClassLoaderUsage.CURRENT_CLASSLOADER);
+                                                                     ClassLoaderUsage.CURRENT_CLASSLOADER,
+                                                                     connectMetrics, id).get();
         assertNotNull(headerConverter);
         assertInstanceOf(TestHeaderConverter.class, headerConverter);
         this.headerConverter = (TestHeaderConverter) headerConverter;
@@ -162,7 +169,8 @@ public class PluginsTest {
 
         headerConverter = plugins.newHeaderConverter(config,
                                                      WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG,
-                                                     ClassLoaderUsage.PLUGINS);
+                                                     ClassLoaderUsage.PLUGINS,
+                                                     connectMetrics, id).get();
         assertNotNull(headerConverter);
         assertInstanceOf(TestHeaderConverter.class, headerConverter);
         this.headerConverter = (TestHeaderConverter) headerConverter;
@@ -202,12 +210,14 @@ public class PluginsTest {
         // will exit immediately, and so this method always returns null
         HeaderConverter headerConverter = plugins.newHeaderConverter(config,
                                                                      WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG,
-                                                                     ClassLoaderUsage.CURRENT_CLASSLOADER);
+                                                                     ClassLoaderUsage.CURRENT_CLASSLOADER,
+                                                                     connectMetrics, id).get();
         assertNull(headerConverter);
         // But we should always find it (or the worker's default) when using the plugins classloader ...
         headerConverter = plugins.newHeaderConverter(config,
                                                      WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG,
-                                                     ClassLoaderUsage.PLUGINS);
+                                                     ClassLoaderUsage.PLUGINS,
+                                                     connectMetrics, id).get();
         assertNotNull(headerConverter);
         assertInstanceOf(SimpleHeaderConverter.class, headerConverter);
     }
@@ -372,8 +382,8 @@ public class PluginsTest {
         Converter plugin = plugins.newConverter(
             config,
             WorkerConfig.KEY_CONVERTER_CLASS_CONFIG,
-            ClassLoaderUsage.PLUGINS
-        );
+            ClassLoaderUsage.PLUGINS,
+            connectMetrics, id).get();
 
         assertInstanceOf(SamplingTestPlugin.class, plugin, "Cannot collect samples");
         Map<String, SamplingTestPlugin> samples = ((SamplingTestPlugin) plugin).flatten();
@@ -415,8 +425,8 @@ public class PluginsTest {
         HeaderConverter plugin = plugins.newHeaderConverter(
             config,
             WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG,
-            ClassLoaderUsage.PLUGINS
-        );
+            ClassLoaderUsage.PLUGINS,
+            connectMetrics, id).get();
 
         assertInstanceOf(SamplingTestPlugin.class, plugin, "Cannot collect samples");
         Map<String, SamplingTestPlugin> samples = ((SamplingTestPlugin) plugin).flatten();
@@ -609,8 +619,8 @@ public class PluginsTest {
 
             assertNotNull(config.getClass(configKey));
             assertNotNull(config.getConfiguredInstance(configKey, Converter.class));
-            assertNotNull(plugins.newConverter(config, configKey, ClassLoaderUsage.CURRENT_CLASSLOADER));
-            assertNotNull(plugins.newConverter(config, configKey, ClassLoaderUsage.PLUGINS));
+            assertNotNull(plugins.newConverter(config, configKey, ClassLoaderUsage.CURRENT_CLASSLOADER, connectMetrics, id).get());
+            assertNotNull(plugins.newConverter(config, configKey, ClassLoaderUsage.PLUGINS, connectMetrics, id).get());
 
             assertNotNull(Utils.newInstance(alias, Converter.class));
         }
@@ -679,7 +689,7 @@ public class PluginsTest {
     }
 
     protected void instantiateAndConfigureConverter(String configPropName, ClassLoaderUsage classLoaderUsage) {
-        converter = (TestConverter) plugins.newConverter(config, configPropName, classLoaderUsage);
+        converter = (TestConverter) plugins.newConverter(config, configPropName, classLoaderUsage, connectMetrics, id).get();
         assertNotNull(converter);
     }
 

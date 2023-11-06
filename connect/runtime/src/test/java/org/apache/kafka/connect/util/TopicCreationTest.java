@@ -19,6 +19,7 @@ package org.apache.kafka.connect.util;
 
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.runtime.ConnectMetrics;
 import org.apache.kafka.connect.runtime.SourceConnectorConfig;
 import org.apache.kafka.connect.runtime.TransformationStage;
 import org.apache.kafka.connect.runtime.WorkerConfig;
@@ -30,6 +31,7 @@ import org.apache.kafka.connect.transforms.RegexRouter;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -515,7 +517,9 @@ public class TopicCreationTest {
         topicCreation.addTopic(FOO_TOPIC);
         assertFalse(topicCreation.isTopicCreationRequired(FOO_TOPIC));
 
-        List<TransformationStage<SourceRecord>> transformationStages = sourceConfig.transformationStages();
+        ConnectorTaskId connectorTaskId = new ConnectorTaskId("", 0);
+        ConnectMetrics connectMetrics = Mockito.mock(ConnectMetrics.class);
+        List<TransformationStage<SourceRecord>> transformationStages = sourceConfig.transformationStages(connectorTaskId, connectMetrics);
         assertEquals(1, transformationStages.size());
         TransformationStage<SourceRecord> xform = transformationStages.get(0);
         SourceRecord transformed = xform.apply(new SourceRecord(null, null, "topic", 0, null, null, Schema.INT8_SCHEMA, 42));
@@ -622,7 +626,9 @@ public class TopicCreationTest {
         assertEquals(barPartitions, barTopicSpec.numPartitions());
         assertEquals(barTopicProps, barTopicSpec.configs());
 
-        List<TransformationStage<SourceRecord>> transformationStages = sourceConfig.transformationStages();
+        ConnectorTaskId connectorTaskId = new ConnectorTaskId("", 0);
+        ConnectMetrics connectMetrics = Mockito.mock(ConnectMetrics.class);
+        List<TransformationStage<SourceRecord>> transformationStages = sourceConfig.transformationStages(connectorTaskId, connectMetrics);
         assertEquals(2, transformationStages.size());
 
         TransformationStage<SourceRecord> castXForm = transformationStages.get(0);

@@ -23,10 +23,12 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImplTest;
 import org.apache.kafka.common.utils.LogCaptureAppender;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.data.Schema;
@@ -175,6 +177,8 @@ public class WorkerSourceTaskTest {
     private StatusBackingStore statusBackingStore;
     @Mock
     private ErrorHandlingMetrics errorHandlingMetrics;
+    @Mock
+    private PluginMetricsImplTest pluginMetrics;
 
     private static final Map<String, String> TASK_PROPS = new HashMap<>();
 
@@ -248,10 +252,14 @@ public class WorkerSourceTaskTest {
 
     private void createWorkerTask(TargetState initialState, Converter keyConverter, Converter valueConverter,
                                   HeaderConverter headerConverter, RetryWithToleranceOperator<SourceRecord> retryWithToleranceOperator) {
-        workerTask = new WorkerSourceTask(taskId, sourceTask, statusListener, initialState, keyConverter, valueConverter, errorHandlingMetrics, headerConverter,
-                transformationChain, producer, admin, TopicCreationGroup.configuredGroups(sourceConfig),
-                offsetReader, offsetWriter, offsetStore, config, clusterConfigState, metrics, plugins.delegatingLoader(), Time.SYSTEM,
-                retryWithToleranceOperator, statusBackingStore, Runnable::run, Collections::emptyList);
+        Plugin<Converter> keyConverterPlugin = metrics.wrap(keyConverter, taskId, true);
+        Plugin<Converter> valueConverterPlugin = metrics.wrap(valueConverter, taskId, false);
+        Plugin<HeaderConverter> headerConverterPlugin = metrics.wrap(headerConverter, taskId);
+        workerTask = new WorkerSourceTask(taskId, sourceTask, statusListener, initialState, keyConverterPlugin, valueConverterPlugin,
+                errorHandlingMetrics, headerConverterPlugin, transformationChain, producer, admin,
+                TopicCreationGroup.configuredGroups(sourceConfig), offsetReader, offsetWriter, offsetStore, config, clusterConfigState,
+                metrics, plugins.delegatingLoader(), Time.SYSTEM, retryWithToleranceOperator, statusBackingStore,
+                Runnable::run, Collections::emptyList, pluginMetrics);
     }
 
     @ParameterizedTest

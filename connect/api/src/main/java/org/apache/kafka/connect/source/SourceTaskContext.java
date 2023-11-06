@@ -16,6 +16,7 @@
  */
 package org.apache.kafka.connect.source;
 
+import org.apache.kafka.common.metrics.PluginMetrics;
 import org.apache.kafka.connect.storage.OffsetStorageReader;
 
 import java.util.Map;
@@ -61,6 +62,11 @@ public interface SourceTaskContext {
      * @since 3.3
      */
     default TransactionContext transactionContext() {
+        return null;
+    }
+
+    //TODO
+    default PluginMetrics pluginMetrics() {
         return null;
     }
 }

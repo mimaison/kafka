@@ -21,6 +21,8 @@ import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -31,7 +33,7 @@ import java.util.Map;
  * To support this, implementations of this interface should also contain a service provider configuration file in
  * {@code META-INF/services/org.apache.kafka.connect.storage.Converter}.
  */
-public interface Converter {
+public interface Converter extends Closeable {
 
     /**
      * Configure this class.
@@ -97,5 +99,10 @@ public interface Converter {
      */
     default ConfigDef config() {
         return new ConfigDef();
+    }
+
+    @Override
+    default void close() throws IOException {
+        // no-op
     }
 }

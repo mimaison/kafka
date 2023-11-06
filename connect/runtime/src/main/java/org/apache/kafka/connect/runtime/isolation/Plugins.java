@@ -18,6 +18,7 @@ package org.apache.kafka.connect.runtime.isolation;
 
 import org.apache.kafka.common.Configurable;
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.config.provider.ConfigProvider;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.components.Versioned;
@@ -25,6 +26,7 @@ import org.apache.kafka.connect.connector.Connector;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
 import org.apache.kafka.connect.errors.ConnectException;
+import org.apache.kafka.connect.runtime.ConnectMetrics;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.sink.SinkConnector;
 import org.apache.kafka.connect.source.SourceConnector;
@@ -35,6 +37,7 @@ import org.apache.kafka.connect.storage.HeaderConverter;
 import org.apache.kafka.connect.transforms.Transformation;
 import org.apache.kafka.connect.transforms.predicates.Predicate;
 
+import org.apache.kafka.connect.util.ConnectorTaskId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -349,7 +352,7 @@ public class Plugins {
      * @return the instantiated and configured {@link Converter}; null if the configuration did not define the specified property
      * @throws ConnectException if the {@link Converter} implementation class could not be found
      */
-    public Converter newConverter(AbstractConfig config, String classPropertyName, ClassLoaderUsage classLoaderUsage) {
+    public Plugin<Converter> newConverter(AbstractConfig config, String classPropertyName, ClassLoaderUsage classLoaderUsage, ConnectMetrics metrics, ConnectorTaskId connectorTaskId) {
         if (!config.originals().containsKey(classPropertyName)) {
             // This configuration does not define the converter via the specified property name
             return null;
@@ -390,10 +393,11 @@ public class Plugins {
         log.debug("Configuring the {} converter with configuration keys:{}{}",
                   isKeyConverter ? "key" : "value", System.lineSeparator(), converterConfig.keySet());
 
-        Converter plugin;
+        Plugin<Converter> plugin;
         try (LoaderSwap loaderSwap = withClassLoader(klass.getClassLoader())) {
-            plugin = newPlugin(klass);
-            plugin.configure(converterConfig, isKeyConverter);
+            Converter converter = newPlugin(klass);
+            converter.configure(converterConfig, isKeyConverter);
+            plugin = metrics.wrap(converter, connectorTaskId, isKeyConverter);
         }
         return plugin;
     }
@@ -433,7 +437,7 @@ public class Plugins {
      * @return the instantiated and configured {@link HeaderConverter}; null if the configuration did not define the specified property
      * @throws ConnectException if the {@link HeaderConverter} implementation class could not be found
      */
-    public HeaderConverter newHeaderConverter(AbstractConfig config, String classPropertyName, ClassLoaderUsage classLoaderUsage) {
+    public Plugin<HeaderConverter> newHeaderConverter(AbstractConfig config, String classPropertyName, ClassLoaderUsage classLoaderUsage, ConnectMetrics metrics, ConnectorTaskId connectorTaskId) {
         Class<? extends HeaderConverter> klass = null;
         switch (classLoaderUsage) {
             case CURRENT_CLASSLOADER:
@@ -474,10 +478,11 @@ public class Plugins {
         converterConfig.put(ConverterConfig.TYPE_CONFIG, ConverterType.HEADER.getName());
         log.debug("Configuring the header converter with configuration keys:{}{}", System.lineSeparator(), converterConfig.keySet());
 
-        HeaderConverter plugin;
+        Plugin<HeaderConverter> plugin;
         try (LoaderSwap loaderSwap = withClassLoader(klass.getClassLoader())) {
-            plugin = newPlugin(klass);
-            plugin.configure(converterConfig);
+            HeaderConverter headerConverter = newPlugin(klass);
+            headerConverter.configure(converterConfig);
+            plugin = metrics.wrap(headerConverter, connectorTaskId);
         }
         return plugin;
     }

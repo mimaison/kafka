@@ -37,6 +37,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.config.provider.MockFileConfigProvider;
 import org.apache.kafka.common.errors.ClusterAuthorizationException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
@@ -2961,21 +2962,43 @@ public class WorkerTest {
     }
 
     private void mockTaskConverter(ClassLoaderUsage classLoaderUsage, String converterClassConfig, Converter returning) {
-        when(plugins.newConverter(any(AbstractConfig.class), eq(converterClassConfig), eq(classLoaderUsage)))
-                       .thenReturn(returning);
+        Plugin<Converter> converterPlugin = worker.metrics().wrap(returning, TASK_ID, WorkerConfig.KEY_CONVERTER_CLASS_CONFIG.equals((converterClassConfig)));
+        when(plugins.newConverter(
+                any(AbstractConfig.class),
+                eq(converterClassConfig),
+                eq(classLoaderUsage),
+                eq(worker.metrics()),
+                eq(TASK_ID)))
+            .thenReturn(converterPlugin);
     }
 
     private void verifyTaskConverter(String converterClassConfig) {
-        verify(plugins).newConverter(any(AbstractConfig.class), eq(converterClassConfig), eq(ClassLoaderUsage.CURRENT_CLASSLOADER));
+        verify(plugins).newConverter(
+                any(AbstractConfig.class),
+                eq(converterClassConfig),
+                eq(ClassLoaderUsage.CURRENT_CLASSLOADER),
+                eq(worker.metrics()),
+                eq(TASK_ID));
     }
 
     private void mockTaskHeaderConverter(ClassLoaderUsage classLoaderUsage, HeaderConverter returning) {
-        when(plugins.newHeaderConverter(any(AbstractConfig.class), eq(WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG), eq(classLoaderUsage)))
-               .thenReturn(returning);
+        Plugin<HeaderConverter> headerConverterPlugin = worker.metrics().wrap(returning, TASK_ID);
+        when(plugins.newHeaderConverter(
+                any(AbstractConfig.class),
+                eq(WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG),
+                eq(classLoaderUsage),
+                eq(worker.metrics()),
+                eq(TASK_ID)))
+            .thenReturn(headerConverterPlugin);
     }
 
     private void verifyTaskHeaderConverter() {
-        verify(plugins).newHeaderConverter(any(AbstractConfig.class), eq(WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG), eq(ClassLoaderUsage.CURRENT_CLASSLOADER));
+        verify(plugins).newHeaderConverter(
+                any(AbstractConfig.class),
+                eq(WorkerConfig.HEADER_CONVERTER_CLASS_CONFIG),
+                eq(ClassLoaderUsage.CURRENT_CLASSLOADER),
+                eq(worker.metrics()),
+                eq(TASK_ID));
     }
 
     private void mockGenericIsolation() {

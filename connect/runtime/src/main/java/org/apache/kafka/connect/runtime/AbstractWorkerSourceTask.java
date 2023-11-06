@@ -23,8 +23,10 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.metrics.Sensor;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.CumulativeSum;
 import org.apache.kafka.common.metrics.stats.Max;
@@ -190,9 +192,9 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
     protected final Producer<byte[], byte[]> producer;
 
     private final SourceTask task;
-    private final Converter keyConverter;
-    private final Converter valueConverter;
-    private final HeaderConverter headerConverter;
+    private final Plugin<Converter> keyConverterPlugin;
+    private final Plugin<Converter> valueConverterPlugin;
+    private final Plugin<HeaderConverter> headerConverterPlugin;
     private final TopicAdmin admin;
     private final CloseableOffsetStorageReader offsetReader;
     private final SourceTaskMetricsGroup sourceTaskMetricsGroup;
@@ -200,6 +202,7 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
     private final boolean topicTrackingEnabled;
     private final TopicCreation topicCreation;
     private final Executor closeExecutor;
+    private final PluginMetricsImpl pluginMetrics;
 
     // Visible for testing
     List<SourceRecord> toSend;
@@ -211,9 +214,9 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
                                        SourceTask task,
                                        TaskStatus.Listener statusListener,
                                        TargetState initialState,
-                                       Converter keyConverter,
-                                       Converter valueConverter,
-                                       HeaderConverter headerConverter,
+                                       Plugin<Converter> keyConverterPlugin,
+                                       Plugin<Converter> valueConverterPlugin,
+                                       Plugin<HeaderConverter> headerConverterPlugin,
                                        TransformationChain<SourceRecord, SourceRecord> transformationChain,
                                        WorkerSourceTaskContext sourceTaskContext,
                                        Producer<byte[], byte[]> producer,
@@ -230,7 +233,8 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
                                        RetryWithToleranceOperator<SourceRecord> retryWithToleranceOperator,
                                        StatusBackingStore statusBackingStore,
                                        Executor closeExecutor,
-                                       Supplier<List<ErrorReporter<SourceRecord>>> errorReportersSupplier) {
+                                       Supplier<List<ErrorReporter<SourceRecord>>> errorReportersSupplier,
+                                       PluginMetricsImpl pluginMetrics) {
 
         super(id, statusListener, initialState, loader, connectMetrics, errorMetrics,
                 retryWithToleranceOperator, transformationChain, errorReportersSupplier,
@@ -238,9 +242,9 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
 
         this.workerConfig = workerConfig;
         this.task = task;
-        this.keyConverter = keyConverter;
-        this.valueConverter = valueConverter;
-        this.headerConverter = headerConverter;
+        this.keyConverterPlugin = keyConverterPlugin;
+        this.valueConverterPlugin = valueConverterPlugin;
+        this.headerConverterPlugin = headerConverterPlugin;
         this.producer = producer;
         this.admin = admin;
         this.offsetReader = offsetReader;
@@ -252,6 +256,7 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
         this.sourceTaskMetricsGroup = new SourceTaskMetricsGroup(id, connectMetrics);
         this.topicTrackingEnabled = workerConfig.getBoolean(TOPIC_TRACKING_ENABLE_CONFIG);
         this.topicCreation = TopicCreation.newTopicCreation(workerConfig, topicGroups);
+        this.pluginMetrics = pluginMetrics;
     }
 
     @Override
@@ -320,7 +325,10 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
         }
         Utils.closeQuietly(offsetReader, "offset reader");
         Utils.closeQuietly(offsetStore::stop, "offset backing store");
-        Utils.closeQuietly(headerConverter, "header converter");
+        Utils.closeQuietly(headerConverterPlugin, "header converter");
+        Utils.closeQuietly(keyConverterPlugin, "key converter");
+        Utils.closeQuietly(valueConverterPlugin, "value converter");
+        Utils.closeQuietly(pluginMetrics, "plugin metrics");
     }
 
     private void closeProducer(Duration duration) {
@@ -483,13 +491,13 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
             return null;
         }
 
-        RecordHeaders headers = retryWithToleranceOperator.execute(context, () -> convertHeaderFor(record), Stage.HEADER_CONVERTER, headerConverter.getClass());
+        RecordHeaders headers = retryWithToleranceOperator.execute(context, () -> convertHeaderFor(record), Stage.HEADER_CONVERTER, headerConverterPlugin.get().getClass());
 
-        byte[] key = retryWithToleranceOperator.execute(context, () -> keyConverter.fromConnectData(record.topic(), headers, record.keySchema(), record.key()),
-                Stage.KEY_CONVERTER, keyConverter.getClass());
+        byte[] key = retryWithToleranceOperator.execute(context, () -> keyConverterPlugin.get().fromConnectData(record.topic(), headers, record.keySchema(), record.key()),
+                Stage.KEY_CONVERTER, keyConverterPlugin.get().getClass());
 
-        byte[] value = retryWithToleranceOperator.execute(context, () -> valueConverter.fromConnectData(record.topic(), headers, record.valueSchema(), record.value()),
-                Stage.VALUE_CONVERTER, valueConverter.getClass());
+        byte[] value = retryWithToleranceOperator.execute(context, () -> valueConverterPlugin.get().fromConnectData(record.topic(), headers, record.valueSchema(), record.value()),
+                Stage.VALUE_CONVERTER, valueConverterPlugin.get().getClass());
 
         if (context.failed()) {
             return null;
@@ -545,7 +553,7 @@ public abstract class AbstractWorkerSourceTask extends WorkerTask<SourceRecord, 
             String topic = record.topic();
             for (Header header : headers) {
                 String key = header.key();
-                byte[] rawHeader = headerConverter.fromConnectHeader(topic, key, header.schema(), header.value());
+                byte[] rawHeader = headerConverterPlugin.get().fromConnectHeader(topic, key, header.schema(), header.value());
                 result.add(key, rawHeader);
             }
         }

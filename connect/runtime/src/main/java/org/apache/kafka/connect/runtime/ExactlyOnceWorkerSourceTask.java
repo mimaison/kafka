@@ -19,8 +19,10 @@ package org.apache.kafka.connect.runtime;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.internals.Plugin;
 import org.apache.kafka.common.errors.InvalidProducerEpochException;
 import org.apache.kafka.common.metrics.Sensor;
+import org.apache.kafka.common.metrics.internals.PluginMetricsImpl;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Min;
@@ -78,9 +80,9 @@ class ExactlyOnceWorkerSourceTask extends AbstractWorkerSourceTask {
                                        SourceTask task,
                                        TaskStatus.Listener statusListener,
                                        TargetState initialState,
-                                       Converter keyConverter,
-                                       Converter valueConverter,
-                                       HeaderConverter headerConverter,
+                                       Plugin<Converter> keyConverterPlugin,
+                                       Plugin<Converter> valueConverterPlugin,
+                                       Plugin<HeaderConverter> headerConverterPlugin,
                                        TransformationChain<SourceRecord, SourceRecord> transformationChain,
                                        Producer<byte[], byte[]> producer,
                                        TopicAdmin admin,
@@ -100,11 +102,12 @@ class ExactlyOnceWorkerSourceTask extends AbstractWorkerSourceTask {
                                        Executor closeExecutor,
                                        Runnable preProducerCheck,
                                        Runnable postProducerCheck,
-                                       Supplier<List<ErrorReporter<SourceRecord>>> errorReportersSupplier) {
-        super(id, task, statusListener, initialState, keyConverter, valueConverter, headerConverter, transformationChain,
-                new WorkerSourceTaskContext(offsetReader, id, configState, buildTransactionContext(sourceConfig)),
+                                       Supplier<List<ErrorReporter<SourceRecord>>> errorReportersSupplier,
+                                       PluginMetricsImpl pluginMetrics) {
+        super(id, task, statusListener, initialState, keyConverterPlugin, valueConverterPlugin, headerConverterPlugin, transformationChain,
+                new WorkerSourceTaskContext(offsetReader, id, configState, buildTransactionContext(sourceConfig), pluginMetrics),
                 producer, admin, topicGroups, offsetReader, offsetWriter, offsetStore, workerConfig, connectMetrics, errorMetrics,
-                loader, time, retryWithToleranceOperator, statusBackingStore, closeExecutor, errorReportersSupplier);
+                loader, time, retryWithToleranceOperator, statusBackingStore, closeExecutor, errorReportersSupplier, pluginMetrics);
 
         this.transactionOpen = false;
         this.committableRecords = new LinkedHashMap<>();
