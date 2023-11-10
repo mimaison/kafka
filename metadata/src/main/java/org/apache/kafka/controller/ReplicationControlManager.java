@@ -1488,7 +1488,8 @@ public class ReplicationControlManager {
         BrokerHeartbeatReply reply = new BrokerHeartbeatReply(isCaughtUp,
                 states.next().fenced(),
                 states.next().inControlledShutdown(),
-                states.next().shouldShutDown());
+                states.next().shouldShutDown(),
+                states.next().acceptsNewReplicas());
         return ControllerResult.of(records, reply);
     }
 

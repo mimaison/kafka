@@ -19,17 +19,20 @@ package org.apache.kafka.controller;
 
 
 public enum BrokerControlState {
-    FENCED(true, false),
-    UNFENCED(false, false),
-    CONTROLLED_SHUTDOWN(false, false),
-    SHUTDOWN_NOW(true, true);
+    FENCED(true, false, true),
+    UNFENCED(false, false, true),
+    CONTROLLED_SHUTDOWN(false, false, true),
+    SHUTDOWN_NOW(true, true, true),
+    UNFENCED_NO_NEW_REPLICAS(false, false, false);
 
     private final boolean fenced;
     private final boolean shouldShutDown;
+    private final boolean acceptsNewReplicas;
 
-    BrokerControlState(boolean fenced, boolean shouldShutDown) {
+    BrokerControlState(boolean fenced, boolean shouldShutDown, boolean acceptsNewReplicas) {
         this.fenced = fenced;
         this.shouldShutDown = shouldShutDown;
+        this.acceptsNewReplicas = acceptsNewReplicas;
     }
 
     public boolean fenced() {
@@ -42,5 +45,9 @@ public enum BrokerControlState {
 
     public boolean inControlledShutdown() {
         return this == CONTROLLED_SHUTDOWN;
+    }
+
+    public boolean acceptsNewReplicas() {
+        return acceptsNewReplicas;
     }
 }

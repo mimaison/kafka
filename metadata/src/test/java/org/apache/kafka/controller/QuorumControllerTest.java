@@ -589,7 +589,7 @@ public class QuorumControllerTest {
                 "are currently fenced.", active.createTopics(ANONYMOUS_CONTEXT,
                     createTopicsRequestData, Collections.singleton("foo")).
                         get().topics().find("foo").errorMessage());
-            assertEquals(new BrokerHeartbeatReply(true, false, false, false),
+            assertEquals(new BrokerHeartbeatReply(true, false, false, false, true),
                 active.processBrokerHeartbeat(ANONYMOUS_CONTEXT, new BrokerHeartbeatRequestData().
                         setWantFence(false).setBrokerEpoch(5L).setBrokerId(0).
                         setCurrentMetadataOffset(100000L)).get());
@@ -660,7 +660,7 @@ public class QuorumControllerTest {
                 brokerEpochs.put(i, reply.epoch());
             }
             for (int i = 0; i < numBrokers - 1; i++) {
-                assertEquals(new BrokerHeartbeatReply(true, false, false, false),
+                assertEquals(new BrokerHeartbeatReply(true, false, false, false, true),
                     active.processBrokerHeartbeat(ANONYMOUS_CONTEXT, new BrokerHeartbeatRequestData().
                         setWantFence(false).setBrokerEpoch(brokerEpochs.get(i)).
                         setBrokerId(i).setCurrentMetadataOffset(100000L)).get());
@@ -1662,7 +1662,7 @@ public class QuorumControllerTest {
             }
 
             // Ensure that we can complete a heartbeat even though we leave migration transaction hanging
-            assertEquals(new BrokerHeartbeatReply(true, false, false, false),
+            assertEquals(new BrokerHeartbeatReply(true, false, false, false, true),
                 active.processBrokerHeartbeat(ANONYMOUS_CONTEXT, new BrokerHeartbeatRequestData().
                     setWantFence(false).setBrokerEpoch(reply.epoch()).setBrokerId(0).
                     setCurrentMetadataOffset(100100L)).get());

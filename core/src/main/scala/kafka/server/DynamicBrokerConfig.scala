@@ -273,6 +273,7 @@ class DynamicBrokerConfig(private val kafkaConfig: KafkaConfig) extends Logging 
     addBrokerReconfigurable(kafkaServer.socketServer)
     addBrokerReconfigurable(new DynamicProducerStateManagerConfig(kafkaServer.logManager.producerStateManagerConfig))
     addBrokerReconfigurable(new DynamicRemoteLogConfig(kafkaServer))
+    addBrokerReconfigurable(new DynamicLifecyleConfig(kafkaServer))
   }
 
   /**
@@ -1177,5 +1178,31 @@ class DynamicRemoteLogConfig(server: KafkaBroker) extends BrokerReconfigurable w
 object DynamicRemoteLogConfig {
   val ReconfigurableConfigs = Set(
     RemoteLogManagerConfig.REMOTE_LOG_INDEX_FILE_CACHE_TOTAL_SIZE_BYTES_PROP
+  )
+}
+
+class DynamicLifecyleConfig(server: KafkaBroker) extends BrokerReconfigurable with Logging {
+  override def reconfigurableConfigs: Set[String] = {
+    DynamicLifecyleConfig.ReconfigurableConfigs
+  }
+
+  override def validateReconfiguration(newConfig: KafkaConfig): Unit = {
+
+  }
+
+  override def reconfigure(oldConfig: KafkaConfig, newConfig: KafkaConfig): Unit = {
+    val oldValue = oldConfig.getBoolean(KafkaConfig.AdvertisedListenersProp)
+    val newValue = newConfig.getBoolean(KafkaConfig.AdvertisedListenersProp)
+    if (oldValue != newValue) {
+      server.lifecycleManager.setAcceptNewReplicas(newValue)
+      info(s"Dynamic broker lifecycle manager config: ${KafkaConfig.AdvertisedListenersProp} updated, " +
+        s"old value: $oldValue, new value: $newValue")
+    }
+  }
+}
+
+object DynamicLifecyleConfig {
+  val ReconfigurableConfigs = Set(
+    KafkaConfig.AdvertisedListenersProp
   )
 }

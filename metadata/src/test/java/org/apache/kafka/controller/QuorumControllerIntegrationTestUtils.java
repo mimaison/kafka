@@ -143,7 +143,7 @@ public class QuorumControllerIntegrationTestUtils {
                     .setBrokerId(brokerId)
                     .setCurrentMetadataOffset(100000)
             ).get();
-            assertEquals(new BrokerHeartbeatReply(true, false, false, false), reply);
+            assertEquals(new BrokerHeartbeatReply(true, false, false, false, true), reply);
         }
     }
 
