@@ -407,7 +407,7 @@ public class ReplicationControlManagerTest {
                         setBrokerId(brokerId).setBrokerEpoch(defaultBrokerEpoch(brokerId)).
                         setCurrentMetadataOffset(1).
                         setWantFence(false).setWantShutDown(false), 0);
-                assertEquals(new BrokerHeartbeatReply(true, false, false, false),
+                assertEquals(new BrokerHeartbeatReply(true, false, false, false, true),
                     result.response());
                 replay(result.records());
             }
@@ -1801,7 +1801,7 @@ public class ReplicationControlManagerTest {
                 setBrokerId(4).setBrokerEpoch(newEpoch).
                 setCurrentMetadataOffset(1).
                 setWantFence(false).setWantShutDown(false), 0);
-        assertEquals(new BrokerHeartbeatReply(true, false, false, false),
+        assertEquals(new BrokerHeartbeatReply(true, false, false, false, true),
             result.response());
         ctx.replay(result.records());
 

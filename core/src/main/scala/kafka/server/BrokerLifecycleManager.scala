@@ -200,6 +200,8 @@ class BrokerLifecycleManager(
    */
   @volatile private var previousBrokerEpoch: OptionalLong = OptionalLong.empty()
 
+  private var _acceptNewReplicas = true
+
   /**
    * The event queue.
    */
@@ -241,6 +243,10 @@ class BrokerLifecycleManager(
    */
   def propagateDirectoryFailure(directory: Uuid): Unit = {
     eventQueue.append(new OfflineDirEvent(directory))
+  }
+
+  def setAcceptNewReplicas(acceptNewReplicas: Boolean): Unit = {
+    _acceptNewReplicas = acceptNewReplicas
   }
 
   def brokerEpoch: Long = _brokerEpoch
@@ -423,7 +429,9 @@ class BrokerLifecycleManager(
       setCurrentMetadataOffset(metadataOffset).
       setWantFence(!readyToUnfence).
       setWantShutDown(_state == BrokerState.PENDING_CONTROLLED_SHUTDOWN).
-      setOfflineLogDirs(offlineDirsPending.toSeq.asJava)
+      setOfflineLogDirs(offlineDirsPending.toSeq.asJava).
+      setAcceptNewReplicas(_acceptNewReplicas)
+
     if (isTraceEnabled) {
       trace(s"Sending broker heartbeat $data")
     }

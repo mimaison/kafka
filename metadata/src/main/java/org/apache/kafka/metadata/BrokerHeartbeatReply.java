@@ -41,14 +41,18 @@ public class BrokerHeartbeatReply {
      */
     private final boolean shouldShutDown;
 
+    private final boolean acceptsNewReplicas;
+
     public BrokerHeartbeatReply(boolean isCaughtUp,
                                 boolean isFenced,
                                 boolean inControlledShutdown,
-                                boolean shouldShutDown) {
+                                boolean shouldShutDown,
+                                boolean acceptsNewReplicas) {
         this.isCaughtUp = isCaughtUp;
         this.isFenced = isFenced;
         this.inControlledShutdown = inControlledShutdown;
         this.shouldShutDown = shouldShutDown;
+        this.acceptsNewReplicas = acceptsNewReplicas;
     }
 
     public boolean isCaughtUp() {
@@ -67,9 +71,13 @@ public class BrokerHeartbeatReply {
         return shouldShutDown;
     }
 
+    public boolean acceptsNewReplicas() {
+        return acceptsNewReplicas;
+    }
+
     @Override
     public int hashCode() {
-        return Objects.hash(isCaughtUp, isFenced, inControlledShutdown, shouldShutDown);
+        return Objects.hash(isCaughtUp, isFenced, inControlledShutdown, shouldShutDown, acceptsNewReplicas);
     }
 
     @Override
@@ -79,7 +87,8 @@ public class BrokerHeartbeatReply {
         return other.isCaughtUp == isCaughtUp &&
             other.isFenced == isFenced &&
             other.inControlledShutdown == inControlledShutdown &&
-            other.shouldShutDown == shouldShutDown;
+            other.shouldShutDown == shouldShutDown &&
+            other.acceptsNewReplicas == acceptsNewReplicas;
     }
 
     @Override
@@ -88,6 +97,7 @@ public class BrokerHeartbeatReply {
             ", isFenced=" + isFenced +
             ", inControlledShutdown=" + inControlledShutdown +
             ", shouldShutDown = " + shouldShutDown +
+            ", acceptsNewReplicas = " + acceptsNewReplicas +
             ")";
     }
 }

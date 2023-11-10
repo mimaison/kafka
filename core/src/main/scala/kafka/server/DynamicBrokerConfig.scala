@@ -90,7 +90,8 @@ object DynamicBrokerConfig {
     DynamicListenerConfig.ReconfigurableConfigs ++
     SocketServer.ReconfigurableConfigs ++
     ProducerStateManagerConfig.RECONFIGURABLE_CONFIGS.asScala ++
-    DynamicRemoteLogConfig.ReconfigurableConfigs
+    DynamicRemoteLogConfig.ReconfigurableConfigs ++
+    DynamicLifecyleConfig.ReconfigurableConfigs
 
   private val ClusterLevelListenerConfigs = Set(KafkaConfig.MaxConnectionsProp, KafkaConfig.MaxConnectionCreationRateProp, KafkaConfig.NumNetworkThreadsProp)
   private val PerBrokerConfigs = (DynamicSecurityConfigs ++ DynamicListenerConfig.ReconfigurableConfigs).diff(
@@ -273,6 +274,7 @@ class DynamicBrokerConfig(private val kafkaConfig: KafkaConfig) extends Logging 
     addBrokerReconfigurable(kafkaServer.socketServer)
     addBrokerReconfigurable(new DynamicProducerStateManagerConfig(kafkaServer.logManager.producerStateManagerConfig))
     addBrokerReconfigurable(new DynamicRemoteLogConfig(kafkaServer))
+    addBrokerReconfigurable(new DynamicLifecyleConfig(kafkaServer))
   }
 
   /**
@@ -1177,5 +1179,31 @@ class DynamicRemoteLogConfig(server: KafkaBroker) extends BrokerReconfigurable w
 object DynamicRemoteLogConfig {
   val ReconfigurableConfigs = Set(
     RemoteLogManagerConfig.REMOTE_LOG_INDEX_FILE_CACHE_TOTAL_SIZE_BYTES_PROP
+  )
+}
+
+class DynamicLifecyleConfig(server: KafkaBroker) extends BrokerReconfigurable with Logging {
+  override def reconfigurableConfigs: Set[String] = {
+    DynamicLifecyleConfig.ReconfigurableConfigs
+  }
+
+  override def validateReconfiguration(newConfig: KafkaConfig): Unit = {
+
+  }
+
+  override def reconfigure(oldConfig: KafkaConfig, newConfig: KafkaConfig): Unit = {
+    val oldValue = oldConfig.getBoolean(KafkaConfig.AcceptNewReplicasProp)
+    val newValue = newConfig.getBoolean(KafkaConfig.AcceptNewReplicasProp)
+    if (oldValue != newValue) {
+      server.lifecycleManager.setAcceptNewReplicas(newValue)
+      info(s"Dynamic broker lifecycle manager config: ${KafkaConfig.AcceptNewReplicasProp} updated, " +
+        s"old value: $oldValue, new value: $newValue")
+    }
+  }
+}
+
+object DynamicLifecyleConfig {
+  val ReconfigurableConfigs = Set(
+    KafkaConfig.AcceptNewReplicasProp
   )
 }

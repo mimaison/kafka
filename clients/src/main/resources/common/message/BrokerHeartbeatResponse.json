@@ -17,7 +17,7 @@
   "apiKey": 63,
   "type": "response",
   "name": "BrokerHeartbeatResponse",
-  "validVersions": "0-1",
+  "validVersions": "0-2",
   "flexibleVersions": "0+",
   "fields": [
     { "name": "ThrottleTimeMs", "type": "int32", "versions": "0+",
@@ -29,6 +29,8 @@
     { "name": "IsFenced", "type": "bool", "versions": "0+", "default": "true",
       "about": "True if the broker is fenced." },
     { "name": "ShouldShutDown", "type": "bool", "versions": "0+",
-      "about": "True if the broker should proceed with its shutdown." }
+      "about": "True if the broker should proceed with its shutdown." },
+    { "name": "AcceptsNewReplicas", "type": "bool", "versions": "2+", "default": "true",
+      "about": "True if the broker accepts new replicas." }
   ]
 }
