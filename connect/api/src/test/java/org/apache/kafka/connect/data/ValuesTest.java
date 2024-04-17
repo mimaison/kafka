@@ -18,7 +18,6 @@ package org.apache.kafka.connect.data;
 
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.connect.data.Schema.Type;
-import org.apache.kafka.connect.data.Values.Parser;
 import org.apache.kafka.connect.errors.DataException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -88,76 +87,76 @@ public class ValuesTest {
         // For more information, see https://issues.apache.org/jira/browse/KAFKA-10574
         byte[] bytes = new byte[] {-17, -65,  -65};
         String str = new String(bytes, StandardCharsets.UTF_8);
-        SchemaAndValue schemaAndValue = Values.parseString(str);
+        SchemaAndValue schemaAndValue = Parser.parseString(str);
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals(str, schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseUnquotedEmbeddedMapKeysAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("{foo: 3}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{foo: 3}");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("{foo: 3}", schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseUnquotedEmbeddedMapValuesAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("{3: foo}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{3: foo}");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("{3: foo}", schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseUnquotedArrayElementsAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("[foo]");
+        SchemaAndValue schemaAndValue = Parser.parseString("[foo]");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("[foo]", schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseStringsBeginningWithNullAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("null=");
+        SchemaAndValue schemaAndValue = Parser.parseString("null=");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("null=", schemaAndValue.value());
     }
 
     @Test
     public void shouldParseStringsBeginningWithTrueAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("true}");
+        SchemaAndValue schemaAndValue = Parser.parseString("true}");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("true}", schemaAndValue.value());
     }
 
     @Test
     public void shouldParseStringsBeginningWithFalseAsStrings() {
-        SchemaAndValue schemaAndValue = Values.parseString("false]");
+        SchemaAndValue schemaAndValue = Parser.parseString("false]");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("false]", schemaAndValue.value());
     }
 
     @Test
     public void shouldParseTrueAsBooleanIfSurroundedByWhitespace() {
-        SchemaAndValue schemaAndValue = Values.parseString(WHITESPACE + "true" + WHITESPACE);
+        SchemaAndValue schemaAndValue = Parser.parseString(WHITESPACE + "true" + WHITESPACE);
         assertEquals(Type.BOOLEAN, schemaAndValue.schema().type());
         assertEquals(true, schemaAndValue.value());
     }
 
     @Test
     public void shouldParseFalseAsBooleanIfSurroundedByWhitespace() {
-        SchemaAndValue schemaAndValue = Values.parseString(WHITESPACE + "false" + WHITESPACE);
+        SchemaAndValue schemaAndValue = Parser.parseString(WHITESPACE + "false" + WHITESPACE);
         assertEquals(Type.BOOLEAN, schemaAndValue.schema().type());
         assertEquals(false, schemaAndValue.value());
     }
 
     @Test
     public void shouldParseNullAsNullIfSurroundedByWhitespace() {
-        SchemaAndValue schemaAndValue = Values.parseString(WHITESPACE + "null" + WHITESPACE);
+        SchemaAndValue schemaAndValue = Parser.parseString(WHITESPACE + "null" + WHITESPACE);
         assertNull(schemaAndValue);
     }
 
     @Test
     public void shouldParseBooleanLiteralsEmbeddedInArray() {
-        SchemaAndValue schemaAndValue = Values.parseString("[true, false]");
+        SchemaAndValue schemaAndValue = Parser.parseString("[true, false]");
         assertEquals(Type.ARRAY, schemaAndValue.schema().type());
         assertEquals(Type.BOOLEAN, schemaAndValue.schema().valueSchema().type());
         assertEquals(Arrays.asList(true, false), schemaAndValue.value());
@@ -165,7 +164,7 @@ public class ValuesTest {
 
     @Test
     public void shouldParseBooleanLiteralsEmbeddedInMap() {
-        SchemaAndValue schemaAndValue = Values.parseString("{true: false, false: true}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{true: false, false: true}");
         assertEquals(Type.MAP, schemaAndValue.schema().type());
         assertEquals(Type.BOOLEAN, schemaAndValue.schema().keySchema().type());
         assertEquals(Type.BOOLEAN, schemaAndValue.schema().valueSchema().type());
@@ -177,42 +176,42 @@ public class ValuesTest {
 
     @Test
     public void shouldNotParseAsMapWithoutCommas() {
-        SchemaAndValue schemaAndValue = Values.parseString("{6:9 4:20}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{6:9 4:20}");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("{6:9 4:20}", schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseAsArrayWithoutCommas() {
-        SchemaAndValue schemaAndValue = Values.parseString("[0 1 2]");
+        SchemaAndValue schemaAndValue = Parser.parseString("[0 1 2]");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("[0 1 2]", schemaAndValue.value());
     }
 
     @Test
     public void shouldParseEmptyMap() {
-        SchemaAndValue schemaAndValue = Values.parseString("{}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{}");
         assertEquals(Type.MAP, schemaAndValue.schema().type());
         assertEquals(Collections.emptyMap(), schemaAndValue.value());
     }
 
     @Test
     public void shouldParseEmptyArray() {
-        SchemaAndValue schemaAndValue = Values.parseString("[]");
+        SchemaAndValue schemaAndValue = Parser.parseString("[]");
         assertEquals(Type.ARRAY, schemaAndValue.schema().type());
         assertEquals(Collections.emptyList(), schemaAndValue.value());
     }
 
     @Test
     public void shouldNotParseAsMapWithNullKeys() {
-        SchemaAndValue schemaAndValue = Values.parseString("{null: 3}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{null: 3}");
         assertEquals(Type.STRING, schemaAndValue.schema().type());
         assertEquals("{null: 3}", schemaAndValue.value());
     }
 
     @Test
     public void shouldParseNull() {
-        SchemaAndValue schemaAndValue = Values.parseString("null");
+        SchemaAndValue schemaAndValue = Parser.parseString("null");
         assertNull(schemaAndValue);
     }
 
@@ -223,7 +222,7 @@ public class ValuesTest {
 
     @Test
     public void shouldParseNullMapValues() {
-        SchemaAndValue schemaAndValue = Values.parseString("{3: null}");
+        SchemaAndValue schemaAndValue = Parser.parseString("{3: null}");
         assertEquals(Type.MAP, schemaAndValue.schema().type());
         assertEquals(Type.INT8, schemaAndValue.schema().keySchema().type());
         assertEquals(Collections.singletonMap((byte) 3, null), schemaAndValue.value());
@@ -231,7 +230,7 @@ public class ValuesTest {
 
     @Test
     public void shouldParseNullArrayElements() {
-        SchemaAndValue schemaAndValue = Values.parseString("[null]");
+        SchemaAndValue schemaAndValue = Parser.parseString("[null]");
         assertEquals(Type.ARRAY, schemaAndValue.schema().type());
         assertEquals(Collections.singletonList(null), schemaAndValue.value());
     }
@@ -384,7 +383,7 @@ public class ValuesTest {
     }
 
     private void assertParseStringArrayWithNoSchema(List<Object> expected, String str) {
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.ARRAY, result.schema().type());
         assertNull(result.schema().valueSchema());
         List<?> list = (List<?>) result.value();
@@ -426,7 +425,7 @@ public class ValuesTest {
     }
 
     private void assertParseStringMapWithNoSchema(Map<Object, Object> expected, String str) {
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.MAP, result.schema().type());
         assertNull(result.schema().valueSchema());
         Map<?, ?> list = (Map<?, ?>) result.value();
@@ -439,7 +438,7 @@ public class ValuesTest {
     @Test
     public void shouldParseStringListWithExtraDelimitersAndReturnString() {
         String str = "[1, 2, 3,,,]";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.STRING, result.schema().type());
         assertEquals(str, result.value());
     }
@@ -447,7 +446,7 @@ public class ValuesTest {
     @Test
     public void shouldParseTimestampStringAsTimestamp() throws Exception {
         String str = "2019-08-23T14:34:54.346Z";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.INT64, result.schema().type());
         assertEquals(Timestamp.LOGICAL_NAME, result.schema().name());
         java.util.Date expected = new SimpleDateFormat(Values.ISO_8601_TIMESTAMP_FORMAT_PATTERN).parse(str);
@@ -457,7 +456,7 @@ public class ValuesTest {
     @Test
     public void shouldParseDateStringAsDate() throws Exception {
         String str = "2019-08-23";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.INT32, result.schema().type());
         assertEquals(Date.LOGICAL_NAME, result.schema().name());
         java.util.Date expected = new SimpleDateFormat(Values.ISO_8601_DATE_FORMAT_PATTERN).parse(str);
@@ -467,7 +466,7 @@ public class ValuesTest {
     @Test
     public void shouldParseTimeStringAsDate() throws Exception {
         String str = "14:34:54.346Z";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.INT32, result.schema().type());
         assertEquals(Time.LOGICAL_NAME, result.schema().name());
         java.util.Date expected = new SimpleDateFormat(Values.ISO_8601_TIME_FORMAT_PATTERN).parse(str);
@@ -477,7 +476,7 @@ public class ValuesTest {
     @Test
     public void shouldParseTimestampStringWithEscapedColonsAsTimestamp() throws Exception {
         String str = "2019-08-23T14\\:34\\:54.346Z";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.INT64, result.schema().type());
         assertEquals(Timestamp.LOGICAL_NAME, result.schema().name());
         String expectedStr = "2019-08-23T14:34:54.346Z";
@@ -488,7 +487,7 @@ public class ValuesTest {
     @Test
     public void shouldParseTimeStringWithEscapedColonsAsDate() throws Exception {
         String str = "14\\:34\\:54.346Z";
-        SchemaAndValue result = Values.parseString(str);
+        SchemaAndValue result = Parser.parseString(str);
         assertEquals(Type.INT32, result.schema().type());
         assertEquals(Time.LOGICAL_NAME, result.schema().name());
         String expectedStr = "14:34:54.346Z";
@@ -500,7 +499,7 @@ public class ValuesTest {
     public void shouldParseDateStringAsDateInArray() throws Exception {
         String dateStr = "2019-08-23";
         String arrayStr = "[" + dateStr + "]";
-        SchemaAndValue result = Values.parseString(arrayStr);
+        SchemaAndValue result = Parser.parseString(arrayStr);
         assertEquals(Type.ARRAY, result.schema().type());
         Schema elementSchema = result.schema().valueSchema();
         assertEquals(Type.INT32, elementSchema.type());
@@ -513,7 +512,7 @@ public class ValuesTest {
     public void shouldParseTimeStringAsTimeInArray() throws Exception {
         String timeStr = "14:34:54.346Z";
         String arrayStr = "[" + timeStr + "]";
-        SchemaAndValue result = Values.parseString(arrayStr);
+        SchemaAndValue result = Parser.parseString(arrayStr);
         assertEquals(Type.ARRAY, result.schema().type());
         Schema elementSchema = result.schema().valueSchema();
         assertEquals(Type.INT32, elementSchema.type());
@@ -526,7 +525,7 @@ public class ValuesTest {
     public void shouldParseTimestampStringAsTimestampInArray() throws Exception {
         String tsStr = "2019-08-23T14:34:54.346Z";
         String arrayStr = "[" + tsStr + "]";
-        SchemaAndValue result = Values.parseString(arrayStr);
+        SchemaAndValue result = Parser.parseString(arrayStr);
         assertEquals(Type.ARRAY, result.schema().type());
         Schema elementSchema = result.schema().valueSchema();
         assertEquals(Type.INT64, elementSchema.type());
@@ -541,7 +540,7 @@ public class ValuesTest {
         String tsStr2 = "2019-01-23T15:12:34.567Z";
         String tsStr3 = "2019-04-23T19:12:34.567Z";
         String arrayStr = "[" + tsStr1 + "," + tsStr2 + ",   " + tsStr3 + "]";
-        SchemaAndValue result = Values.parseString(arrayStr);
+        SchemaAndValue result = Parser.parseString(arrayStr);
         assertEquals(Type.ARRAY, result.schema().type());
         Schema elementSchema = result.schema().valueSchema();
         assertEquals(Type.INT64, elementSchema.type());
@@ -557,7 +556,7 @@ public class ValuesTest {
         String keyStr = "k1";
         String timeStr = "14:34:54.346Z";
         String mapStr = "{\"" + keyStr + "\":\"" + timeStr + "\"}";
-        SchemaAndValue result = Values.parseString(mapStr);
+        SchemaAndValue result = Parser.parseString(mapStr);
         assertEquals(Type.MAP, result.schema().type());
         Schema keySchema = result.schema().keySchema();
         Schema valueSchema = result.schema().valueSchema();
@@ -573,7 +572,7 @@ public class ValuesTest {
         String keyStr = "k1";
         String timeStr = "14:34:54.346Z";
         String mapStr = "{\"" + keyStr + "\":" + timeStr + "}";
-        SchemaAndValue result = Values.parseString(mapStr);
+        SchemaAndValue result = Parser.parseString(mapStr);
         assertEquals(Type.MAP, result.schema().type());
         Schema keySchema = result.schema().keySchema();
         Schema valueSchema = result.schema().valueSchema();
@@ -811,7 +810,7 @@ public class ValuesTest {
                 BigDecimal.valueOf(Long.MIN_VALUE).subtract(BigDecimal.ONE), (byte) 1, (byte) 1);
         List<Object> expected = new ArrayList<>(decimals); // most values are directly reproduced with the same type
         expected.set(0, "1.0"); // The quotes are parsed away, but the value remains a string
-        SchemaAndValue schemaAndValue = Values.parseString(decimals.toString());
+        SchemaAndValue schemaAndValue = Parser.parseString(decimals.toString());
         Schema schema = schemaAndValue.schema();
         assertEquals(Type.ARRAY, schema.type());
         assertNull(schema.valueSchema());
@@ -825,14 +824,14 @@ public class ValuesTest {
     @Test
     public void shouldParseBigIntegerAsDecimalWithZeroScale() {
         BigInteger value = BigInteger.valueOf(Long.MAX_VALUE).add(new BigInteger("1"));
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Decimal.schema(0), schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof BigDecimal);
         assertEquals(value, ((BigDecimal) schemaAndValue.value()).unscaledValue());
         value = BigInteger.valueOf(Long.MIN_VALUE).subtract(new BigInteger("1"));
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Decimal.schema(0), schemaAndValue.schema());
@@ -843,14 +842,14 @@ public class ValuesTest {
     @Test
     public void shouldParseByteAsInt8() {
         Byte value = Byte.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT8_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Byte);
         assertEquals(value.byteValue(), ((Byte) schemaAndValue.value()).byteValue());
         value = Byte.MIN_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT8_SCHEMA, schemaAndValue.schema());
@@ -861,14 +860,14 @@ public class ValuesTest {
     @Test
     public void shouldParseShortAsInt16() {
         Short value = Short.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT16_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Short);
         assertEquals(value.shortValue(), ((Short) schemaAndValue.value()).shortValue());
         value = Short.MIN_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT16_SCHEMA, schemaAndValue.schema());
@@ -879,14 +878,14 @@ public class ValuesTest {
     @Test
     public void shouldParseIntegerAsInt32() {
         Integer value = Integer.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT32_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Integer);
         assertEquals(value.intValue(), ((Integer) schemaAndValue.value()).intValue());
         value = Integer.MIN_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT32_SCHEMA, schemaAndValue.schema());
@@ -897,14 +896,14 @@ public class ValuesTest {
     @Test
     public void shouldParseLongAsInt64() {
         Long value = Long.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT64_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Long);
         assertEquals(value.longValue(), ((Long) schemaAndValue.value()).longValue());
         value = Long.MIN_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.INT64_SCHEMA, schemaAndValue.schema());
@@ -915,14 +914,14 @@ public class ValuesTest {
     @Test
     public void shouldParseFloatAsFloat32() {
         Float value = Float.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.FLOAT32_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Float);
         assertEquals(value, (Float) schemaAndValue.value(), 0);
         value = -Float.MAX_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.FLOAT32_SCHEMA, schemaAndValue.schema());
@@ -933,14 +932,14 @@ public class ValuesTest {
     @Test
     public void shouldParseDoubleAsFloat64() {
         Double value = Double.MAX_VALUE;
-        SchemaAndValue schemaAndValue = Values.parseString(
+        SchemaAndValue schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.FLOAT64_SCHEMA, schemaAndValue.schema());
         assertTrue(schemaAndValue.value() instanceof Double);
         assertEquals(value, (Double) schemaAndValue.value(), 0);
         value = -Double.MAX_VALUE;
-        schemaAndValue = Values.parseString(
+        schemaAndValue = Parser.parseString(
             String.valueOf(value)
         );
         assertEquals(Schema.FLOAT64_SCHEMA, schemaAndValue.schema());
@@ -950,12 +949,12 @@ public class ValuesTest {
 
     @Test
     public void shouldParseFractionalPartsAsIntegerWhenNoFractionalPart() {
-        assertEquals(new SchemaAndValue(Schema.INT8_SCHEMA, (byte) 1), Values.parseString("1.0"));
-        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 1.1f), Values.parseString("1.1"));
-        assertEquals(new SchemaAndValue(Schema.INT16_SCHEMA, (short) 300), Values.parseString("300.0"));
-        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 300.01f), Values.parseString("300.01"));
-        assertEquals(new SchemaAndValue(Schema.INT32_SCHEMA, 66000), Values.parseString("66000.0"));
-        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 66000.0008f), Values.parseString("66000.0008"));
+        assertEquals(new SchemaAndValue(Schema.INT8_SCHEMA, (byte) 1), Parser.parseString("1.0"));
+        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 1.1f), Parser.parseString("1.1"));
+        assertEquals(new SchemaAndValue(Schema.INT16_SCHEMA, (short) 300), Parser.parseString("300.0"));
+        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 300.01f), Parser.parseString("300.01"));
+        assertEquals(new SchemaAndValue(Schema.INT32_SCHEMA, 66000), Parser.parseString("66000.0"));
+        assertEquals(new SchemaAndValue(Schema.FLOAT32_SCHEMA, 66000.0008f), Parser.parseString("66000.0008"));
     }
 
     protected void assertParsed(String input) {

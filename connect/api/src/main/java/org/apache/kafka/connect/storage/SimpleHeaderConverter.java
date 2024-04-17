@@ -19,6 +19,7 @@ package org.apache.kafka.connect.storage;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.connect.components.Versioned;
+import org.apache.kafka.connect.data.Parser;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaAndValue;
 import org.apache.kafka.connect.data.Values;
@@ -65,7 +66,7 @@ public class SimpleHeaderConverter implements HeaderConverter, Versioned {
         }
         try {
             String str = new String(value, UTF_8);
-            return Values.parseString(str);
+            return Parser.parseString(str);
         } catch (NoSuchElementException e) {
             throw new DataException("Failed to deserialize value for header '" + headerKey + "' on topic '" + topic + "'", e);
         } catch (Throwable t) {
