@@ -1857,6 +1857,7 @@ public final class QuorumController implements Controller {
             setFeatureControlManager(featureControl).
             setZkMigrationEnabled(zkMigrationEnabled).
             setBrokerUncleanShutdownHandler(this::handleUncleanBrokerShutdown).
+            setConfigurationControlManager(configurationControl).
             build();
         this.producerIdControlManager = new ProducerIdControlManager.Builder().
             setLogContext(logContext).

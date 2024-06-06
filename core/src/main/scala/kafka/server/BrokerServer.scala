@@ -306,6 +306,12 @@ class BrokerServer(
 
         override def handleFailure(directoryId: Uuid): Unit =
           lifecycleManager.propagateDirectoryFailure(directoryId, config.logDirFailureTimeoutMs)
+
+        override def handleCordoned(directoryId: Uuid): Unit =
+          lifecycleManager.propogateDirectoryCordoned(directoryId)
+
+        override def handleUncordoned(directoryId: Uuid): Unit =
+          lifecycleManager.propogateDirectoryUncordoned(directoryId)
       }
 
       this._replicaManager = new ReplicaManager(

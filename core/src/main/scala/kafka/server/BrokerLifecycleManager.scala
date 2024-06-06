@@ -157,6 +157,8 @@ class BrokerLifecycleManager(
    */
   private var offlineDirs = mutable.Map[Uuid, Boolean]()
 
+  private var cordonedLogDirs = mutable.Map[Uuid, Boolean]()
+
   /**
    * True if we sent a event queue to the active controller requesting controlled
    * shutdown.  This variable can only be read or written from the event queue thread.
@@ -264,6 +266,14 @@ class BrokerLifecycleManager(
       new OfflineDirBrokerFailureEvent(directory))
   }
 
+  def propogateDirectoryCordoned(directory: Uuid): Unit = {
+    eventQueue.append(new CordonedDirEvent(directory))
+  }
+
+  def propogateDirectoryUncordoned(directory: Uuid): Unit = {
+    eventQueue.append(new UncordonedDirEvent(directory))
+  }
+
   def resendBrokerRegistrationUnlessZkMode(): Unit = {
     eventQueue.append(new ResendBrokerRegistrationUnlessZkModeEvent())
   }
@@ -349,6 +359,32 @@ class BrokerLifecycleManager(
       if (!offlineDirs.getOrElse(offlineDir, false)) {
         error(s"Shutting down because couldn't communicate offline log dir $offlineDir with controllers")
         shutdownHook()
+      }
+    }
+  }
+
+  private class CordonedDirEvent(val dir: Uuid) extends EventQueue.Event {
+    override def run(): Unit = {
+      if (cordonedLogDirs.isEmpty) {
+        cordonedLogDirs = mutable.Map(dir -> true)
+      } else {
+        cordonedLogDirs += (dir -> true)
+      }
+      if (registered) {
+        scheduleNextCommunicationImmediately()
+      }
+    }
+  }
+
+  private class UncordonedDirEvent(val dir: Uuid) extends EventQueue.Event {
+    override def run(): Unit = {
+      if (cordonedLogDirs.isEmpty) {
+        cordonedLogDirs = mutable.Map(dir -> false)
+      } else {
+        cordonedLogDirs += (dir -> false)
+      }
+      if (registered) {
+        scheduleNextCommunicationImmediately()
       }
     }
   }

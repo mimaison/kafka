@@ -19,7 +19,7 @@
   "listeners": ["controller"],
   "name": "BrokerHeartbeatRequest",
   "validVersions": "0-1",
-  "flexibleVersions": "0+",
+  "flexibleVersions": "1+",
   "fields": [
     { "name": "BrokerId", "type": "int32", "versions": "0+", "entityType": "brokerId",
       "about": "The broker ID." },
@@ -32,6 +32,8 @@
     { "name": "WantShutDown", "type": "bool", "versions": "0+",
       "about": "True if the broker wants to be shut down, false otherwise." },
     { "name": "OfflineLogDirs", "type":  "[]uuid", "versions": "1+", "taggedVersions": "1+", "tag": "0",
-      "about": "Log directories that failed and went offline." }
+      "about": "Log directories that failed and went offline." },
+    { "name": "CordonedLogDirs", "type":  "[]uuid", "versions": "1+", "taggedVersions": "2+", "tag": "1",
+      "about": "Log directories that are cordoned." }
   ]
 }

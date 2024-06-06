@@ -29,9 +29,11 @@ import org.apache.kafka.common.requests.ApiError;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.metadata.KafkaConfigSchema;
 import org.apache.kafka.server.common.ApiMessageAndVersion;
+import org.apache.kafka.server.config.ServerLogConfigs;
 import org.apache.kafka.server.mutable.BoundedList;
 import org.apache.kafka.server.policy.AlterConfigPolicy;
 import org.apache.kafka.server.policy.AlterConfigPolicy.RequestMetadata;
+import org.apache.kafka.server.util.Csv;
 import org.apache.kafka.timeline.SnapshotRegistry;
 import org.apache.kafka.timeline.TimelineHashMap;
 
@@ -48,6 +50,7 @@ import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import static org.apache.kafka.clients.admin.AlterConfigOp.OpType.APPEND;
@@ -513,5 +516,13 @@ public class ConfigurationControlManager {
     Map<String, String> currentControllerConfig() {
         Map<String, String> result = configData.get(currentController);
         return (result == null) ? Collections.emptyMap() : result;
+    }
+
+    boolean brokersHasUncordonedLogDir(int id) {
+        Map<String, String> brokerConfigs = configData.get(new ConfigResource(Type.BROKER, String.valueOf(id)));
+        List<String> logDirs = Csv.parseCsvList(brokerConfigs.get(ServerLogConfigs.LOG_DIRS_CONFIG));
+        List<String> cordondLogDirs = Csv.parseCsvList(brokerConfigs.get(ServerLogConfigs.CORDONED_LOG_DIRS));
+        logDirs.removeAll(cordondLogDirs);
+        return logDirs.size() > 0;
     }
 }

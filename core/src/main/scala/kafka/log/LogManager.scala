@@ -102,6 +102,7 @@ class LogManager(logDirs: Seq[File],
   private val strayLogs = new Pool[TopicPartition, UnifiedLog]()
 
   private val _liveLogDirs: ConcurrentLinkedQueue[File] = createAndValidateLogDirs(logDirs, initialOfflineDirs)
+  private var _cordonedLogDirs: Set[File] = Set()
   @volatile private var _currentDefaultConfig = initialDefaultConfig
   @volatile private var numRecoveryThreadsPerDataDir = recoveryThreadsPerDataDir
 
@@ -114,6 +115,14 @@ class LogManager(logDirs: Seq[File],
 
   def reconfigureDefaultLogConfig(logConfig: LogConfig): Unit = {
     this._currentDefaultConfig = logConfig
+  }
+
+  def updateCordonedLogDirs(newCordonedLogDirs: Set[File]): Unit = {
+    _cordonedLogDirs = newCordonedLogDirs
+  }
+
+  def cordonedLogDirs(): Set[File] = {
+    _cordonedLogDirs
   }
 
   def currentDefaultConfig: LogConfig = _currentDefaultConfig

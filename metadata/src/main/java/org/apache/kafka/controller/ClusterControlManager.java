@@ -94,6 +94,7 @@ public class ClusterControlManager {
         private FeatureControlManager featureControl = null;
         private boolean zkMigrationEnabled = false;
         private BrokerUncleanShutdownHandler brokerUncleanShutdownHandler = null;
+        private ConfigurationControlManager configurationControlManager = null;
 
         Builder setLogContext(LogContext logContext) {
             this.logContext = logContext;
@@ -137,6 +138,11 @@ public class ClusterControlManager {
 
         Builder setBrokerUncleanShutdownHandler(BrokerUncleanShutdownHandler brokerUncleanShutdownHandler) {
             this.brokerUncleanShutdownHandler = brokerUncleanShutdownHandler;
+            return this;
+        }
+
+        Builder setConfigurationControlManager(ConfigurationControlManager configurationControlManager) {
+            this.configurationControlManager = configurationControlManager;
             return this;
         }
 
@@ -655,7 +661,7 @@ public class ClusterControlManager {
         ControllerRegistration newRegistration = new ControllerRegistration.Builder(record).build();
         ControllerRegistration prevRegistration =
             controllerRegistrations.put(record.controllerId(), newRegistration);
-        log.info("Replayed RegisterControllerRecord contaning {}.{}", newRegistration,
+        log.info("Replayed RegisterControllerRecord containing {}.{}", newRegistration,
             prevRegistration == null ? "" :
                 " Previous incarnation was " + prevRegistration.incarnationId());
     }
@@ -758,6 +764,9 @@ public class ClusterControlManager {
         List<Uuid> directories = registration.directories();
         if (directories.isEmpty()) {
             return DirectoryId.MIGRATING;
+        }
+        for (Uuid directory : directories) {
+
         }
         if (directories.size() == 1) {
             return directories.get(0);

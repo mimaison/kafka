@@ -39,6 +39,9 @@ public class ServerLogConfigs {
     public static final String LOG_DIR_DOC = "The directory in which the log data is kept (supplemental for " + LOG_DIRS_CONFIG + " property)";
     public static final String LOG_DIRS_DOC = "A comma-separated list of the directories where the log data is stored. If not set, the value in " + LOG_DIR_CONFIG + " is used.";
 
+    public static final String CORDONED_LOG_DIRS = "cordoned.log.dirs";
+    public static final String CORDONED_LOG_DIRS_DOC = ""; //TODO
+
     public static final String LOG_SEGMENT_BYTES_CONFIG = ServerTopicConfigSynonyms.serverSynonym(TopicConfig.SEGMENT_BYTES_CONFIG);
     public static final String LOG_SEGMENT_BYTES_DOC = "The maximum size of a single log file";
 

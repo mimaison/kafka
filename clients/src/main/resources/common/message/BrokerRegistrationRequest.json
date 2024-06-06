@@ -18,12 +18,14 @@
 // Version 2 adds LogDirs for KIP-858
 
 // Version 3 adds the PreviousBrokerEpoch for the KIP-966
+
+// Version 4 adds CordonedLogDirs
 {
   "apiKey":62,
   "type": "request",
   "listeners": ["controller"],
   "name": "BrokerRegistrationRequest",
-  "validVersions": "0-3",
+  "validVersions": "0-4",
   "flexibleVersions": "0+",
   "fields": [
     { "name": "BrokerId", "type": "int32", "versions": "0+", "entityType": "brokerId",
@@ -61,6 +63,8 @@
     { "name": "LogDirs", "type":  "[]uuid", "versions":  "2+",
       "about": "Log directories configured in this broker which are available.", "ignorable": true },
     { "name": "PreviousBrokerEpoch", "type": "int64", "versions": "3+", "default": "-1", "ignorable": true,
-      "about": "The epoch before a clean shutdown." }
+      "about": "The epoch before a clean shutdown." },
+    { "name": "CordonedLogDirs", "type":  "[]uuid", "versions":  "4+",
+      "about": "Log directories that are cordoned.", "ignorable": true }
   ]
 }

@@ -40,12 +40,13 @@ import org.apache.kafka.coordinator.transaction.TransactionLogConfigs
 import org.apache.kafka.network.SocketServerConfigs
 import org.apache.kafka.security.PasswordEncoder
 import org.apache.kafka.server.ProcessRole
-import org.apache.kafka.server.config.{ConfigType, ServerConfigs, ReplicationConfigs, ServerLogConfigs, ServerTopicConfigSynonyms, ZooKeeperInternals}
+import org.apache.kafka.server.config.{ConfigType, ReplicationConfigs, ServerConfigs, ServerLogConfigs, ServerTopicConfigSynonyms, ZooKeeperInternals}
 import org.apache.kafka.server.log.remote.storage.RemoteLogManagerConfig
 import org.apache.kafka.server.metrics.{ClientMetricsReceiverPlugin, MetricConfigs}
 import org.apache.kafka.server.telemetry.ClientTelemetry
 import org.apache.kafka.storage.internals.log.{LogConfig, ProducerStateManagerConfig}
 
+import java.io.File
 import scala.annotation.nowarn
 import scala.collection._
 import scala.jdk.CollectionConverters._
@@ -665,7 +666,7 @@ object DynamicLogConfig {
   // Exclude message.format.version for now since we need to check that the version
   // is supported on all brokers in the cluster.
   val ReconfigurableConfigs: Set[String] =
-    ServerTopicConfigSynonyms.TOPIC_CONFIG_SYNONYMS.values.asScala.toSet - ServerLogConfigs.LOG_MESSAGE_FORMAT_VERSION_CONFIG
+    ServerTopicConfigSynonyms.TOPIC_CONFIG_SYNONYMS.values.asScala.toSet - ServerLogConfigs.LOG_MESSAGE_FORMAT_VERSION_CONFIG + ServerLogConfigs.CORDONED_LOG_DIRS
   val KafkaConfigToLogConfigName: Map[String, String] =
     ServerTopicConfigSynonyms.TOPIC_CONFIG_SYNONYMS.asScala.map { case (k, v) => (v, k) }
 }
@@ -711,8 +712,14 @@ class DynamicLogConfig(logManager: LogManager, server: KafkaBroker) extends Brok
       }
     }
 
+    def validateCordonedLogDirs(): Unit = {
+      info(s"validating $newConfig")
+      info(s"log.dirs: ${newConfig.logDirs}, cordoned: ${newConfig.cordonedLogDirs}")
+    }
+
     validateLogLocalRetentionMs()
     validateLogLocalRetentionBytes()
+    validateCordonedLogDirs()
   }
 
   private def updateLogsConfig(newBrokerDefaults: Map[String, Object]): Unit = {
@@ -730,6 +737,19 @@ class DynamicLogConfig(logManager: LogManager, server: KafkaBroker) extends Brok
   }
 
   override def reconfigure(oldConfig: KafkaConfig, newConfig: KafkaConfig): Unit = {
+    info(s"old cordoned value ${oldConfig.cordonedLogDirs} / new value ${newConfig.cordonedLogDirs}")
+    logManager.updateCordonedLogDirs(newConfig.cordonedLogDirs.map(logdir => new File(logdir)))
+    info(s"updated logmanager : ${logManager.cordonedLogDirs()}")
+    val newCordoned: Set[String] = newConfig.cordonedLogDirs -- oldConfig.cordonedLogDirs
+    val newUncordoned: Set[String] = oldConfig.cordonedLogDirs -- newConfig.cordonedLogDirs
+    newCordoned.foreach { d =>
+      val logDirId = logManager.directoryId(d)
+      server.replicaManager.directoryEventHandler.handleCordoned(logDirId.get)
+    }
+    newUncordoned.foreach { d =>
+      val logDirId = logManager.directoryId(d)
+      server.replicaManager.directoryEventHandler.handleUncordoned(logDirId.get)
+    }
     val originalLogConfig = logManager.currentDefaultConfig
     val originalUncleanLeaderElectionEnable = originalLogConfig.uncleanLeaderElectionEnable
     val newBrokerDefaults = new util.HashMap[String, Object](originalLogConfig.originals)

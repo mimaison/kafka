@@ -27,6 +27,8 @@ public interface DirectoryEventHandler {
     DirectoryEventHandler NOOP = new DirectoryEventHandler() {
         @Override public void handleAssignment(TopicIdPartition partition, Uuid directoryId, String reason, Runnable callback) {}
         @Override public void handleFailure(Uuid directoryId) {}
+        @Override public void handleCordoned(Uuid directoryId) {}
+        @Override public void handleUncordoned(Uuid directoryId) {}
     };
 
     /**
@@ -42,4 +44,8 @@ public interface DirectoryEventHandler {
      * @param directoryId  The directory ID
      */
     void handleFailure(Uuid directoryId);
+
+    void handleCordoned(Uuid directoryId);
+
+    void handleUncordoned(Uuid directoryId);
 }
