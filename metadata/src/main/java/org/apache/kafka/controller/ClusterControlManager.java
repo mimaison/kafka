@@ -765,9 +765,6 @@ public class ClusterControlManager {
         if (directories.isEmpty()) {
             return DirectoryId.MIGRATING;
         }
-        for (Uuid directory : directories) {
-
-        }
         if (directories.size() == 1) {
             return directories.get(0);
         }

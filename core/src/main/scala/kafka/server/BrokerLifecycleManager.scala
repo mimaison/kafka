@@ -436,7 +436,8 @@ class BrokerLifecycleManager(
         setListeners(_advertisedListeners).
         setRack(rack.orNull).
         setPreviousBrokerEpoch(previousBrokerEpoch.orElse(-1L)).
-        setLogDirs(sortedLogDirs)
+        setLogDirs(sortedLogDirs).
+        setCordonedLogDirs(cordonedLogDirs.keys.toSeq.asJava)
     if (isDebugEnabled) {
       debug(s"Sending broker registration $data")
     }
@@ -508,7 +509,8 @@ class BrokerLifecycleManager(
       setCurrentMetadataOffset(metadataOffset).
       setWantFence(!readyToUnfence).
       setWantShutDown(_state == BrokerState.PENDING_CONTROLLED_SHUTDOWN).
-      setOfflineLogDirs(offlineDirs.keys.toSeq.asJava)
+      setOfflineLogDirs(offlineDirs.keys.toSeq.asJava).
+      setCordonedLogDirs(cordonedLogDirs.keys.toSeq.asJava)
     if (isTraceEnabled) {
       trace(s"Sending broker heartbeat $data")
     }

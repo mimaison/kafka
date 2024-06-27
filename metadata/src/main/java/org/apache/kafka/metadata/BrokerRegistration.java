@@ -53,6 +53,7 @@ public class BrokerRegistration {
         private boolean inControlledShutdown;
         private boolean isMigratingZkBroker;
         private List<Uuid> directories;
+        private List<Uuid> cordonedDirectories;
 
         public Builder() {
             this.id = 0;
@@ -65,6 +66,7 @@ public class BrokerRegistration {
             this.inControlledShutdown = false;
             this.isMigratingZkBroker = false;
             this.directories = Collections.emptyList();
+            this.cordonedDirectories = Collections.emptyList();
         }
 
         public Builder setId(int id) {
@@ -127,6 +129,11 @@ public class BrokerRegistration {
             return this;
         }
 
+        public Builder setCordonedDirectories(List<Uuid> directories) {
+            this.cordonedDirectories = directories;
+            return this;
+        }
+
         public BrokerRegistration build() {
             return new BrokerRegistration(
                 id,
@@ -138,7 +145,8 @@ public class BrokerRegistration {
                 fenced,
                 inControlledShutdown,
                 isMigratingZkBroker,
-                directories);
+                directories,
+                cordonedDirectories);
         }
     }
 
@@ -160,6 +168,7 @@ public class BrokerRegistration {
     private final boolean inControlledShutdown;
     private final boolean isMigratingZkBroker;
     private final List<Uuid> directories;
+    private final List<Uuid> cordonedDirectories;
 
     private BrokerRegistration(
         int id,
@@ -171,7 +180,8 @@ public class BrokerRegistration {
         boolean fenced,
         boolean inControlledShutdown,
         boolean isMigratingZkBroker,
-        List<Uuid> directories
+        List<Uuid> directories,
+        List<Uuid> cordonedDirectories
     ) {
         this.id = id;
         this.epoch = epoch;
@@ -193,6 +203,7 @@ public class BrokerRegistration {
         directories = new ArrayList<>(directories);
         directories.sort(Uuid::compareTo);
         this.directories = Collections.unmodifiableList(directories);
+        this.cordonedDirectories = Collections.unmodifiableList(cordonedDirectories);
     }
 
     public static BrokerRegistration fromRecord(RegisterBrokerRecord record) {
