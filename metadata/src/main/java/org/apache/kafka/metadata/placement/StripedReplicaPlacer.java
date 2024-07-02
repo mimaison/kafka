@@ -19,6 +19,8 @@ package org.apache.kafka.metadata.placement;
 
 import org.apache.kafka.common.errors.InvalidReplicationFactorException;
 import org.apache.kafka.metadata.OptionalStringComparator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -116,6 +118,9 @@ import java.util.stream.Collectors;
  * happen.
  */
 public class StripedReplicaPlacer implements ReplicaPlacer {
+
+    private static final Logger LOG = LoggerFactory.getLogger(StripedReplicaPlacer.class);
+
     /**
      * A list of brokers that we can iterate through.
      */
@@ -299,6 +304,7 @@ public class StripedReplicaPlacer implements ReplicaPlacer {
             int numTotalBrokersCount = 0, numUnfencedBrokersCount = 0;
             while (iterator.hasNext()) {
                 UsableBroker broker = iterator.next();
+                LOG.info("RackList has {}", broker.id());
                 Rack rack = racks.get(broker.rack());
                 if (rack == null) {
                     rackNames.add(broker.rack());

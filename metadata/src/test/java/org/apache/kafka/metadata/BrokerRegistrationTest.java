@@ -117,20 +117,22 @@ public class BrokerRegistrationTest {
             "incarnationId=3MfdxWlNSn2UDYsmDP1pYg, listeners=[Endpoint(" +
             "listenerName='INTERNAL', securityProtocol=PLAINTEXT, " +
             "host='localhost', port=9091)], supportedFeatures={foo: 1-2}, " +
-            "rack=Optional.empty, fenced=true, inControlledShutdown=false, isMigratingZkBroker=false, directories=[])",
+            "rack=Optional.empty, fenced=true, inControlledShutdown=false, " +
+            "isMigratingZkBroker=false, directories=[], cordonedDirectories=[])",
             REGISTRATIONS.get(1).toString());
         assertEquals("BrokerRegistration(id=2, epoch=0, " +
             "incarnationId=eY7oaG1RREie5Kk9uy1l6g, listeners=[Endpoint(" +
             "listenerName='INTERNAL', securityProtocol=PLAINTEXT, " +
             "host='localhost', port=9092)], supportedFeatures={bar: 1-4, foo: 2-3}, " +
-            "rack=Optional[myrack], fenced=false, inControlledShutdown=true, isMigratingZkBroker=false, directories=[])",
+            "rack=Optional[myrack], fenced=false, inControlledShutdown=true, " +
+            "isMigratingZkBroker=false, directories=[], cordonedDirectories=[])",
             REGISTRATIONS.get(2).toString());
         assertEquals("BrokerRegistration(id=3, epoch=0, " +
             "incarnationId=1t8VyWx2TCSTpUWuqj-FOw, listeners=[Endpoint(" +
             "listenerName='INTERNAL', securityProtocol=PLAINTEXT, " +
             "host='localhost', port=9093)], supportedFeatures={metadata.version: 7}, " +
             "rack=Optional.empty, fenced=false, inControlledShutdown=true, isMigratingZkBroker=true, " +
-            "directories=[r4HpEsMuST6nQ4rznIEJVA])",
+            "directories=[r4HpEsMuST6nQ4rznIEJVA], cordonedDirectories=[])",
             REGISTRATIONS.get(3).toString());
     }
 

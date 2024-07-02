@@ -94,7 +94,6 @@ public class ClusterControlManager {
         private FeatureControlManager featureControl = null;
         private boolean zkMigrationEnabled = false;
         private BrokerUncleanShutdownHandler brokerUncleanShutdownHandler = null;
-        private ConfigurationControlManager configurationControlManager = null;
 
         Builder setLogContext(LogContext logContext) {
             this.logContext = logContext;
@@ -138,11 +137,6 @@ public class ClusterControlManager {
 
         Builder setBrokerUncleanShutdownHandler(BrokerUncleanShutdownHandler brokerUncleanShutdownHandler) {
             this.brokerUncleanShutdownHandler = brokerUncleanShutdownHandler;
-            return this;
-        }
-
-        Builder setConfigurationControlManager(ConfigurationControlManager configurationControlManager) {
-            this.configurationControlManager = configurationControlManager;
             return this;
         }
 
@@ -519,6 +513,24 @@ public class ClusterControlManager {
         return OptionalLong.empty();
     }
 
+    public void updateCordonedLogDirs(int brokerId, List<Uuid> cordonedLogDirs) {
+        BrokerRegistration brokerRegistration = brokerRegistrations.get(brokerId);
+        brokerRegistrations.put(brokerId,
+            new BrokerRegistration.Builder().
+                setId(brokerId).
+                setEpoch(brokerRegistration.epoch()).
+                setIncarnationId(brokerRegistration.incarnationId()).
+                setListeners(brokerRegistration.listeners()).
+                setSupportedFeatures(brokerRegistration.supportedFeatures()).
+                setRack(brokerRegistration.rack()).
+                setFenced(brokerRegistration.fenced()).
+                setInControlledShutdown(brokerRegistration.inControlledShutdown()).
+                setIsMigratingZkBroker(brokerRegistration.isMigratingZkBroker()).
+                setDirectories(brokerRegistration.directories()).
+                setCordonedDirectories(cordonedLogDirs).
+                build());
+    }
+
     public void replay(RegisterBrokerRecord record, long offset) {
         registerBrokerRecordOffsets.put(record.brokerId(), offset);
         int brokerId = record.brokerId();
@@ -541,6 +553,7 @@ public class ClusterControlManager {
                 setInControlledShutdown(record.inControlledShutdown()).
                 setIsMigratingZkBroker(record.isMigratingZkBroker()).
                 setDirectories(record.logDirs()).
+                setCordonedDirectories(record.cordonedLogDirs()).
                     build());
         updateDirectories(brokerId, prevRegistration == null ? null : prevRegistration.directories(), record.logDirs());
         if (heartbeatManager != null) {
@@ -583,6 +596,7 @@ public class ClusterControlManager {
             record.epoch(),
             BrokerRegistrationFencingChange.FENCE.asBoolean(),
             BrokerRegistrationInControlledShutdownChange.NONE.asBoolean(),
+            Optional.empty(),
             Optional.empty()
         );
     }
@@ -594,6 +608,7 @@ public class ClusterControlManager {
             record.epoch(),
             BrokerRegistrationFencingChange.UNFENCE.asBoolean(),
             BrokerRegistrationInControlledShutdownChange.NONE.asBoolean(),
+            Optional.empty(),
             Optional.empty()
         );
     }
@@ -608,13 +623,15 @@ public class ClusterControlManager {
                 () -> new IllegalStateException(String.format("Unable to replay %s: unknown " +
                     "value for inControlledShutdown field: %x", record, record.inControlledShutdown())));
         Optional<List<Uuid>> directoriesChange = Optional.ofNullable(record.logDirs()).filter(list -> !list.isEmpty());
+        Optional<List<Uuid>> cordonedDirectoriesChange = Optional.ofNullable(record.cordonedLogDirs()).filter(list -> !list.isEmpty());
         replayRegistrationChange(
             record,
             record.brokerId(),
             record.brokerEpoch(),
             fencingChange.asBoolean(),
             inControlledShutdownChange.asBoolean(),
-            directoriesChange
+            directoriesChange,
+            cordonedDirectoriesChange
         );
     }
 
@@ -624,7 +641,8 @@ public class ClusterControlManager {
         long brokerEpoch,
         Optional<Boolean> fencingChange,
         Optional<Boolean> inControlledShutdownChange,
-        Optional<List<Uuid>> directoriesChange
+        Optional<List<Uuid>> directoriesChange,
+        Optional<List<Uuid>> cordonedDirectoriesChange
     ) {
         BrokerRegistration curRegistration = brokerRegistrations.get(brokerId);
         if (curRegistration == null) {
@@ -637,7 +655,8 @@ public class ClusterControlManager {
             BrokerRegistration nextRegistration = curRegistration.cloneWith(
                 fencingChange,
                 inControlledShutdownChange,
-                directoriesChange
+                directoriesChange,
+                cordonedDirectoriesChange
             );
             if (!curRegistration.equals(nextRegistration)) {
                 log.info("Replayed {} modifying the registration for broker {}: {}",
@@ -671,6 +690,7 @@ public class ClusterControlManager {
             throw new RuntimeException("ClusterControlManager is not active.");
         }
         return heartbeatManager.usableBrokers(
+            id -> brokerRegistrations.get(id).hasUncordonedDirs(),
             id -> brokerRegistrations.get(id).rack());
     }
 

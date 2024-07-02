@@ -1576,6 +1576,7 @@ public class ReplicationControlManager {
         heartbeatManager.touch(brokerId,
             states.next().fenced(),
             request.currentMetadataOffset());
+        clusterControl.updateCordonedLogDirs(brokerId, request.cordonedLogDirs());
         if (featureControl.metadataVersion().isDirectoryAssignmentSupported()) {
             handleDirectoriesOffline(brokerId, brokerEpoch, request.offlineLogDirs(), records);
         }

@@ -365,11 +365,13 @@ class BrokerLifecycleManager(
 
   private class CordonedDirEvent(val dir: Uuid) extends EventQueue.Event {
     override def run(): Unit = {
+      info(s"in CordonedDirEvent.run with $dir")
       if (cordonedLogDirs.isEmpty) {
         cordonedLogDirs = mutable.Map(dir -> true)
       } else {
         cordonedLogDirs += (dir -> true)
       }
+      info(s"in CordonedDirEvent.run $cordonedLogDirs")
       if (registered) {
         scheduleNextCommunicationImmediately()
       }
@@ -378,11 +380,13 @@ class BrokerLifecycleManager(
 
   private class UncordonedDirEvent(val dir: Uuid) extends EventQueue.Event {
     override def run(): Unit = {
+      info(s"in UncordonedDirEvent.run with $dir")
       if (cordonedLogDirs.isEmpty) {
         cordonedLogDirs = mutable.Map(dir -> false)
       } else {
         cordonedLogDirs += (dir -> false)
       }
+      info(s"in UncordonedDirEvent.run $cordonedLogDirs")
       if (registered) {
         scheduleNextCommunicationImmediately()
       }
@@ -438,6 +442,7 @@ class BrokerLifecycleManager(
         setPreviousBrokerEpoch(previousBrokerEpoch.orElse(-1L)).
         setLogDirs(sortedLogDirs).
         setCordonedLogDirs(cordonedLogDirs.keys.toSeq.asJava)
+    info(s"Sending broker registration $data")
     if (isDebugEnabled) {
       debug(s"Sending broker registration $data")
     }
@@ -511,6 +516,7 @@ class BrokerLifecycleManager(
       setWantShutDown(_state == BrokerState.PENDING_CONTROLLED_SHUTDOWN).
       setOfflineLogDirs(offlineDirs.keys.toSeq.asJava).
       setCordonedLogDirs(cordonedLogDirs.keys.toSeq.asJava)
+    info(s"Sending broker heartbeat $data")
     if (isTraceEnabled) {
       trace(s"Sending broker heartbeat $data")
     }

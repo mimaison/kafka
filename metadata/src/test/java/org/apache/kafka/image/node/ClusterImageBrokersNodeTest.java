@@ -47,6 +47,7 @@ public class ClusterImageBrokersNodeTest {
                     setRack(Optional.empty()).
                     setFenced(false).
                     setDirectories(Arrays.asList(Uuid.fromString("anCdBWcFTlu8gE1wP6bh3g"), Uuid.fromString("JsnDDNVyTL289kYk6sPzig"))).
+                    setCordonedDirectories(Collections.singletonList(Uuid.fromString("JsnDDNVyTL289kYk6sPzig"))).
                     setInControlledShutdown(false).build()),
             Collections.emptyMap());
 
@@ -69,7 +70,8 @@ public class ClusterImageBrokersNodeTest {
             "fenced=false, " +
             "inControlledShutdown=false, " +
             "isMigratingZkBroker=false, " +
-            "directories=[JsnDDNVyTL289kYk6sPzig, anCdBWcFTlu8gE1wP6bh3g])",
+            "directories=[JsnDDNVyTL289kYk6sPzig, anCdBWcFTlu8gE1wP6bh3g], " +
+            "cordonedDirectories=[JsnDDNVyTL289kYk6sPzig])",
             child.stringify());
     }
 

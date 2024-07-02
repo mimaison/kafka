@@ -192,6 +192,7 @@ public class BrokerHeartbeatManagerTest {
         Set<UsableBroker> brokers = new HashSet<>();
         for (Iterator<UsableBroker> iterator = new UsableBrokerIterator(
             manager.brokers().iterator(),
+            id -> id % 10 != 0,
             id -> id % 2 == 0 ? Optional.of("rack1") : Optional.of("rack2"));
              iterator.hasNext(); ) {
             brokers.add(iterator.next());
@@ -203,30 +204,34 @@ public class BrokerHeartbeatManagerTest {
     public void testUsableBrokerIterator() {
         BrokerHeartbeatManager manager = newBrokerHeartbeatManager();
         assertEquals(Collections.emptySet(), usableBrokersToSet(manager));
-        for (int brokerId = 0; brokerId < 5; brokerId++) {
+        for (int brokerId = 1; brokerId < 6; brokerId++) {
             manager.register(brokerId, true);
         }
-        manager.touch(0, false, 100);
         manager.touch(1, false, 100);
-        manager.touch(2, false, 98);
-        manager.touch(3, false, 100);
-        manager.touch(4, true, 100);
+        manager.touch(2, false, 100);
+        manager.touch(3, false, 98);
+        manager.touch(4, false, 100);
+        manager.touch(5, true, 100);
         assertEquals(98L, manager.lowestActiveOffset());
         Set<UsableBroker> expected = new HashSet<>();
-        expected.add(new UsableBroker(0, Optional.of("rack1"), false));
         expected.add(new UsableBroker(1, Optional.of("rack2"), false));
         expected.add(new UsableBroker(2, Optional.of("rack1"), false));
         expected.add(new UsableBroker(3, Optional.of("rack2"), false));
-        expected.add(new UsableBroker(4, Optional.of("rack1"), true));
+        expected.add(new UsableBroker(4, Optional.of("rack1"), false));
+        expected.add(new UsableBroker(5, Optional.of("rack2"), true));
         assertEquals(expected, usableBrokersToSet(manager));
-        manager.maybeUpdateControlledShutdownOffset(2, 0);
+        manager.maybeUpdateControlledShutdownOffset(3, 0);
         assertEquals(100L, manager.lowestActiveOffset());
         assertThrows(RuntimeException.class,
-            () -> manager.maybeUpdateControlledShutdownOffset(4, 0));
-        manager.touch(4, false, 100);
-        manager.maybeUpdateControlledShutdownOffset(4, 0);
-        expected.remove(new UsableBroker(2, Optional.of("rack1"), false));
-        expected.remove(new UsableBroker(4, Optional.of("rack1"), true));
+            () -> manager.maybeUpdateControlledShutdownOffset(5, 0));
+        manager.touch(5, false, 100);
+        manager.maybeUpdateControlledShutdownOffset(5, 0);
+        expected.remove(new UsableBroker(3, Optional.of("rack2"), false));
+        expected.remove(new UsableBroker(5, Optional.of("rack2"), true));
+        assertEquals(expected, usableBrokersToSet(manager));
+
+        manager.register(10, false);
+        manager.touch(10, false, 100);
         assertEquals(expected, usableBrokersToSet(manager));
     }
 
