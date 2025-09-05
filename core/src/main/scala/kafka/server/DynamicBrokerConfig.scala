@@ -842,7 +842,10 @@ class DynamicMetricReporterState(brokerId: Int, config: KafkaConfig, metrics: Me
       metrics.addReporter(reporter)
       currentReporters += reporter.getClass.getName -> reporter
       val clientTelemetryReceiver = reporter match {
-        case telemetry: ClientTelemetry => telemetry.clientReceiver()
+        case telemetry: ClientTelemetry =>
+          val exporter = telemetry.clientExporter()
+          if (exporter != null) exporter
+          else telemetry.clientReceiver()
         case _ => null
       }
 

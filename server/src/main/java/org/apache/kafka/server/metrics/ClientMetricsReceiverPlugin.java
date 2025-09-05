@@ -17,7 +17,8 @@
 package org.apache.kafka.server.metrics;
 
 import org.apache.kafka.common.requests.PushTelemetryRequest;
-import org.apache.kafka.common.requests.RequestContext;
+import org.apache.kafka.common.telemetry.internals.ClientTelemetryContextImpl;
+import org.apache.kafka.server.telemetry.ClientTelemetryExporter;
 import org.apache.kafka.server.telemetry.ClientTelemetryReceiver;
 
 import java.util.ArrayList;
@@ -30,28 +31,33 @@ import java.util.List;
  */
 public class ClientMetricsReceiverPlugin {
 
-    private final List<ClientTelemetryReceiver> receivers;
+    private final List<Object> receiversAndExporters;
 
     public ClientMetricsReceiverPlugin() {
-        this.receivers = Collections.synchronizedList(new ArrayList<>());
+        this.receiversAndExporters = Collections.synchronizedList(new ArrayList<>());
     }
 
     public boolean isEmpty() {
-        return receivers.isEmpty();
+        return receiversAndExporters.isEmpty();
     }
 
-    public void add(ClientTelemetryReceiver receiver) {
-        receivers.add(receiver);
+    public void add(Object receiver) {
+        receiversAndExporters.add(receiver);
     }
 
     public DefaultClientTelemetryPayload getPayLoad(PushTelemetryRequest request) {
         return new DefaultClientTelemetryPayload(request);
     }
 
-    public void exportMetrics(RequestContext context, PushTelemetryRequest request) {
+    @SuppressWarnings("deprecation")
+    public void exportMetrics(ClientTelemetryContextImpl context, PushTelemetryRequest request) {
         DefaultClientTelemetryPayload payload = getPayLoad(request);
-        for (ClientTelemetryReceiver receiver : receivers) {
-            receiver.exportMetrics(context, payload);
+        for (Object receiverOrExporter : receiversAndExporters) {
+            if (receiverOrExporter instanceof ClientTelemetryExporter exporter) {
+                exporter.exportMetrics(context, payload);
+            } else if (receiverOrExporter instanceof ClientTelemetryReceiver receiver) {
+                receiver.exportMetrics(context.authorizableRequestContext(), payload);
+            }
         }
     }
 }

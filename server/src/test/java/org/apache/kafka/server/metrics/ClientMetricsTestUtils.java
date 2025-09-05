@@ -24,6 +24,9 @@ import org.apache.kafka.common.requests.RequestHeader;
 import org.apache.kafka.common.security.auth.KafkaPrincipal;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
 import org.apache.kafka.server.authorizer.AuthorizableRequestContext;
+import org.apache.kafka.server.telemetry.ClientTelemetryContext;
+import org.apache.kafka.common.telemetry.internals.ClientTelemetryContextImpl;
+import org.apache.kafka.server.telemetry.ClientTelemetryExporter;
 import org.apache.kafka.server.telemetry.ClientTelemetryPayload;
 import org.apache.kafka.server.telemetry.ClientTelemetryReceiver;
 import org.apache.kafka.test.TestUtils;
@@ -53,6 +56,21 @@ public class ClientMetricsTestUtils {
         props.put(ClientMetricsConfigs.INTERVAL_MS_CONFIG, Integer.toString(INTERVAL_MS_TEST_DEFAULT));
         props.put(ClientMetricsConfigs.MATCH_CONFIG, String.join(",", MATCH_TEST_DEFAULT));
         return props;
+    }
+
+    public static ClientTelemetryContextImpl clientTelemetryContext(int pushInterval) throws UnknownHostException {
+        return new ClientTelemetryContextImpl(
+                new RequestContext(
+                    new RequestHeader(ApiKeys.GET_TELEMETRY_SUBSCRIPTIONS, (short) 0, "producer-1", 0),
+                    TestUtils.randomString(5),
+                    InetAddress.getLocalHost(),
+                    Optional.of(CLIENT_PORT),
+                    KafkaPrincipal.ANONYMOUS,
+                    ListenerName.forSecurityProtocol(SecurityProtocol.PLAINTEXT),
+                    SecurityProtocol.PLAINTEXT,
+                    new ClientInformation("apache-kafka-java", "3.5.2"),
+                    false),
+                pushInterval);
     }
 
     public static RequestContext requestContext() throws UnknownHostException {
@@ -95,12 +113,46 @@ public class ClientMetricsTestUtils {
     }
 
     public static class TestClientMetricsReceiver implements ClientTelemetryReceiver {
+        public AuthorizableRequestContext context = null;
         public int exportMetricsInvokedCount = 0;
         public List<ByteBuffer> metricsData = new ArrayList<>();
 
+        @Override
         public void exportMetrics(AuthorizableRequestContext context, ClientTelemetryPayload payload) {
+            this.context = context;
             exportMetricsInvokedCount += 1;
             metricsData.add(payload.data());
+        }
+    }
+
+    public static class TestClientMetricsExporter implements ClientTelemetryExporter {
+        public ClientTelemetryContext context = null;
+        public int exportMetricsInvokedCount = 0;
+        public List<ByteBuffer> metricsData = new ArrayList<>();
+
+        @Override
+        public void exportMetrics(ClientTelemetryContext context, ClientTelemetryPayload payload) {
+            this.context = context;
+            exportMetricsInvokedCount += 1;
+            metricsData.add(payload.data());
+        }
+    }
+
+    public static class TestClientMetricsExporterReceiver implements ClientTelemetryExporter, ClientTelemetryReceiver {
+        public ClientTelemetryContext context = null;
+        public int exportMetricsInvokedCount = 0;
+        public List<ByteBuffer> metricsData = new ArrayList<>();
+
+        @Override
+        public void exportMetrics(ClientTelemetryContext context, ClientTelemetryPayload payload) {
+            this.context = context;
+            exportMetricsInvokedCount += 1;
+            metricsData.add(payload.data());
+        }
+
+        @Override
+        public void exportMetrics(AuthorizableRequestContext context, ClientTelemetryPayload payload) {
+            throw new IllegalStateException("Should not be called");
         }
     }
 }

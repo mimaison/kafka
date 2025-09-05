@@ -51,6 +51,7 @@ import org.apache.kafka.server.metrics.ClientMetricsInstance;
 import org.apache.kafka.server.metrics.ClientMetricsInstanceMetadata;
 import org.apache.kafka.server.metrics.ClientMetricsReceiverPlugin;
 import org.apache.kafka.server.network.ConnectionDisconnectListener;
+import org.apache.kafka.common.telemetry.internals.ClientTelemetryContextImpl;
 import org.apache.kafka.server.util.timer.SystemTimer;
 import org.apache.kafka.server.util.timer.SystemTimerReaper;
 import org.apache.kafka.server.util.timer.Timer;
@@ -214,7 +215,7 @@ public class ClientMetricsManager implements AutoCloseable {
         if (metrics != null && metrics.limit() > 0) {
             try {
                 long exportTimeStartMs = time.hiResClockMs();
-                receiverPlugin.exportMetrics(requestContext, request);
+                receiverPlugin.exportMetrics(new ClientTelemetryContextImpl(requestContext, clientInstance.pushIntervalMs()), request);
                 clientMetricsStats.recordPluginExport(clientInstanceId, time.hiResClockMs() - exportTimeStartMs);
             } catch (Throwable exception) {
                 clientMetricsStats.recordPluginErrorCount(clientInstanceId);

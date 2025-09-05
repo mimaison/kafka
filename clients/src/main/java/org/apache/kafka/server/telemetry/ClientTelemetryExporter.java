@@ -17,28 +17,22 @@
 
 package org.apache.kafka.server.telemetry;
 
-import org.apache.kafka.server.authorizer.AuthorizableRequestContext;
-
 /**
- * {@code ClientTelemetryReceiver} defines the behaviour for telemetry receiver on the broker side
+ * {@code ClientTelemetryExporter} defines the behaviour for telemetry exporter on the broker side
  * which receives client telemetry metrics.
- * <p>
- * This interface is deprecated, {@link ClientTelemetryExporter} should be used
- * instead.
  */
-@Deprecated(since = "4.2.0")
-public interface ClientTelemetryReceiver {
+public interface ClientTelemetryExporter {
+
     /**
-     * Called by the broker when a client reports telemetry metrics. The associated request context
-     * can be used by the metrics plugin to retrieve additional client information such as client ids
-     * or endpoints.
+     * Called by the broker when a client reports telemetry metrics. The associated telemetry context
+     * can be used by the metrics plugin to retrieve additional client information such as client ids,
+     * endpoints or the push interval.
      * <p>
      * This method may be called from the request handling thread, and as such should avoid blocking.
      *
-     * @param context the client request context for the corresponding {@code PushTelemetryRequest}
+     * @param context the client telemetry context for the corresponding {@code PushTelemetryRequest}
      *                api call.
      * @param payload the encoded telemetry payload as sent by the client.
      */
-    void exportMetrics(AuthorizableRequestContext context, ClientTelemetryPayload payload);
-
+     void exportMetrics(ClientTelemetryContext context, ClientTelemetryPayload payload);
 }

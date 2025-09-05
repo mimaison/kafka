@@ -32,5 +32,19 @@ public interface ClientTelemetry {
      *
      * @return broker side instance of {@link ClientTelemetryReceiver}.
      */
-    ClientTelemetryReceiver clientReceiver();
+    @Deprecated
+    default ClientTelemetryReceiver clientReceiver() {
+        return null;
+    }
+
+    /**
+     * Called by the broker to fetch instance of {@link ClientTelemetryExporter}.
+     * <p>
+     * This instance may be cached by the broker.
+     *
+     * @return broker side instance of {@link ClientTelemetryExporter}.
+     */
+    default ClientTelemetryExporter clientExporter() {
+        return null;
+    }
 }
