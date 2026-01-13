@@ -617,15 +617,40 @@ class DynamicBrokerConfigTest {
   }
 
   @Test
-  def testSynonyms(): Unit = {
-    assertEquals(List("listener.name.secure.ssl.keystore.type", "ssl.keystore.type"),
-      DynamicBrokerConfig.brokerConfigSynonyms("listener.name.secure.ssl.keystore.type", matchListenerOverride = true))
-    assertEquals(List("listener.name.sasl_ssl.plain.sasl.jaas.config", "sasl.jaas.config"),
-      DynamicBrokerConfig.brokerConfigSynonyms("listener.name.sasl_ssl.plain.sasl.jaas.config", matchListenerOverride = true))
-    assertEquals(List("some.config"),
-      DynamicBrokerConfig.brokerConfigSynonyms("some.config", matchListenerOverride = true))
-    assertEquals(List(ServerLogConfigs.LOG_ROLL_TIME_MILLIS_CONFIG, ServerLogConfigs.LOG_ROLL_TIME_HOURS_CONFIG),
-      DynamicBrokerConfig.brokerConfigSynonyms(ServerLogConfigs.LOG_ROLL_TIME_MILLIS_CONFIG, matchListenerOverride = true))
+  def testBrokerConfigSynonyms(): Unit = {
+    val logRollTimeConfigs = List(ServerLogConfigs.LOG_ROLL_TIME_MILLIS_CONFIG, ServerLogConfigs.LOG_ROLL_TIME_HOURS_CONFIG)
+    for (config <- logRollTimeConfigs) {
+      assertEquals(logRollTimeConfigs, DynamicBrokerConfig.brokerConfigSynonyms(config, matchListenerOverride = false))
+    }
+    val logRollJitterConfigs = List(ServerLogConfigs.LOG_ROLL_TIME_JITTER_MILLIS_CONFIG, ServerLogConfigs.LOG_ROLL_TIME_JITTER_HOURS_CONFIG)
+    for (config <- logRollJitterConfigs) {
+      assertEquals(logRollJitterConfigs, DynamicBrokerConfig.brokerConfigSynonyms(config, matchListenerOverride = false))
+    }
+    val logFlushConfigs = List(ServerLogConfigs.LOG_FLUSH_INTERVAL_MS_CONFIG, ServerLogConfigs.LOG_FLUSH_SCHEDULER_INTERVAL_MS_CONFIG)
+    assertEquals(logFlushConfigs, DynamicBrokerConfig.brokerConfigSynonyms(ServerLogConfigs.LOG_FLUSH_INTERVAL_MS_CONFIG, matchListenerOverride = false))
+    val logRetentionConfigs = List(ServerLogConfigs.LOG_RETENTION_TIME_MILLIS_CONFIG, ServerLogConfigs.LOG_RETENTION_TIME_MINUTES_CONFIG, ServerLogConfigs.LOG_RETENTION_TIME_HOURS_CONFIG)
+    for (config <- logRetentionConfigs) {
+      assertEquals(logRetentionConfigs, DynamicBrokerConfig.brokerConfigSynonyms(config, matchListenerOverride = false))
+    }
+    val params = List(
+      // config, expected, matchListenerOverride
+      ("listener.name.NAME.CONFIG", List("listener.name.NAME.CONFIG", "CONFIG"), true),
+      ("listener.name.NAME.CONFIG", List("listener.name.NAME.CONFIG"), false),
+      ("listener.name.CONFIG", List("listener.name.CONFIG"), true),
+      ("listener.name.CONFIG", List("listener.name.CONFIG"), false),
+      ("listener.name.CONFIG.", List("listener.name.CONFIG."), true),
+      ("listener.name.CONFIG.", List("listener.name.CONFIG."), false),
+      ("listener.name.NAME.sasl.login.class", List("listener.name.NAME.sasl.login.class", "sasl.login.class"), true),
+      ("listener.name.NAME.sasl.login.class", List("listener.name.NAME.sasl.login.class"), false),
+      ("listener.name.sasl.login.class", List("listener.name.sasl.login.class", "sasl.login.class"), true),
+      ("listener.name.sasl.login.class", List("listener.name.sasl.login.class"), false),
+    )
+    params.foreach {
+      case (config, expected, matchListenerOverride) =>
+        assertEquals(expected, DynamicBrokerConfig.brokerConfigSynonyms(config, matchListenerOverride = matchListenerOverride))
+    }
+    assertEquals(List("some.config"), DynamicBrokerConfig.brokerConfigSynonyms("some.config", matchListenerOverride = true))
+    assertEquals(List("some.config"), DynamicBrokerConfig.brokerConfigSynonyms("some.config", matchListenerOverride = false))
   }
 
   @Test

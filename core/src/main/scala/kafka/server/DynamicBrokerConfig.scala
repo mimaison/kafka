@@ -129,11 +129,11 @@ object DynamicBrokerConfig {
         List(ServerLogConfigs.LOG_FLUSH_INTERVAL_MS_CONFIG, ServerLogConfigs.LOG_FLUSH_SCHEDULER_INTERVAL_MS_CONFIG)
       case ServerLogConfigs.LOG_RETENTION_TIME_MILLIS_CONFIG | ServerLogConfigs.LOG_RETENTION_TIME_MINUTES_CONFIG | ServerLogConfigs.LOG_RETENTION_TIME_HOURS_CONFIG =>
         List(ServerLogConfigs.LOG_RETENTION_TIME_MILLIS_CONFIG, ServerLogConfigs.LOG_RETENTION_TIME_MINUTES_CONFIG, ServerLogConfigs.LOG_RETENTION_TIME_HOURS_CONFIG)
-      case ListenerConfigRegex(baseName) if matchListenerOverride =>
+      case ListenerConfigRegex(baseName) if matchListenerOverride && baseName.nonEmpty =>
         // `ListenerMechanismConfigs` are specified as listenerPrefix.mechanism.<configName>
         // and other listener configs are specified as listenerPrefix.<configName>
         // Add <configName> as a synonym in both cases.
-        val mechanismConfig = ListenerMechanismConfigs.find(baseName.endsWith)
+        val mechanismConfig = ListenerMechanismConfigs.find(c => c.endsWith(baseName))
         List(name, mechanismConfig.getOrElse(baseName))
       case _ => List(name)
     }
