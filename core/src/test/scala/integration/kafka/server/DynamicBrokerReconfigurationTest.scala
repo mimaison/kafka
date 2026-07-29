@@ -29,7 +29,7 @@ import java.util.concurrent._
 import javax.management.ObjectName
 import com.yammer.metrics.core.MetricName
 import kafka.api.SaslSetup
-import kafka.network.{DataPlaneAcceptor, RequestChannel}
+import kafka.network.DataPlaneAcceptor
 import kafka.utils._
 import kafka.utils.Implicits._
 import org.apache.kafka.clients.CommonClientConfigs
@@ -53,7 +53,7 @@ import org.apache.kafka.common.record.TimestampType
 import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.apache.kafka.coordinator.transaction.TransactionLogConfig
-import org.apache.kafka.network.{Processor, SocketServerConfigs}
+import org.apache.kafka.network.{Processor, RequestChannel, SocketServerConfigs}
 import org.apache.kafka.raft.MetadataLogConfig
 import org.apache.kafka.security.JaasTestUtils
 import org.apache.kafka.server.config.{ReplicationConfigs, ServerConfigs, ServerLogConfigs, ServerTopicConfigSynonyms}
@@ -884,7 +884,7 @@ class DynamicBrokerReconfigurationTest extends QuorumTestHarness with SaslSetup 
 
   private def isProcessorMetric(metricName: MetricName): Boolean = {
     val mbeanName = metricName.getMBeanName
-    mbeanName.contains(s"${Processor.NETWORK_PROCESSOR_METRIC_TAG}=") || mbeanName.contains(s"${RequestChannel.ProcessorMetricTag}=")
+    mbeanName.contains(s"${Processor.NETWORK_PROCESSOR_METRIC_TAG}=") || mbeanName.contains(s"${RequestChannel.PROCESSOR_METRIC_TAG}=")
   }
 
   private def clearLeftOverProcessorMetrics(): Unit = {

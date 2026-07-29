@@ -18,7 +18,6 @@
 package org.apache.kafka.jmh.metadata;
 
 import kafka.coordinator.transaction.TransactionCoordinator;
-import kafka.network.RequestChannel;
 import kafka.server.KafkaApis;
 import kafka.server.KafkaConfig;
 import kafka.server.ReplicaManager;
@@ -49,6 +48,7 @@ import org.apache.kafka.image.MetadataProvenance;
 import org.apache.kafka.metadata.KRaftMetadataCache;
 import org.apache.kafka.metadata.MockConfigRepository;
 import org.apache.kafka.network.Request;
+import org.apache.kafka.network.RequestChannel;
 import org.apache.kafka.network.RequestConvertToJson;
 import org.apache.kafka.network.metrics.RequestChannelMetrics;
 import org.apache.kafka.raft.KRaftConfigs;

@@ -208,7 +208,7 @@ Configuration:
           - ref: KafkaInfoAppender
           - ref: KafkaDebugAppender
 
-      - name: kafka.network.RequestChannel$
+      - name: org.apache.kafka.network.RequestChannel
         level: {{ log_level|default("DEBUG") }}
         additivity: false
         AppenderRef:

@@ -17,13 +17,12 @@
 
 package kafka.server
 
-import kafka.network.RequestChannel
-import org.apache.kafka.server.quota.QuotaFactory.QuotaManagers
 import org.apache.kafka.common.errors.ClusterAuthorizationException
 import org.apache.kafka.common.requests.AbstractResponse
 import org.apache.kafka.common.utils.Time
-import org.apache.kafka.network.Request
+import org.apache.kafka.network.{Request, RequestChannel}
 import org.apache.kafka.server.quota.{ClientQuotaManager, ControllerMutationQuota, ThrottleCallback}
+import org.apache.kafka.server.quota.QuotaFactory.QuotaManagers
 
 class RequestHandlerHelper(
   requestChannel: RequestChannel,

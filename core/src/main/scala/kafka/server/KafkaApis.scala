@@ -18,8 +18,6 @@
 package kafka.server
 
 import kafka.coordinator.transaction.TransactionCoordinator
-import kafka.network.RequestChannel
-import org.apache.kafka.server.quota.QuotaFactory.{QuotaManagers, UNBOUNDED_QUOTA}
 import kafka.server.handlers.DescribeTopicPartitionsRequestHandler
 import kafka.server.share.SharePartitionManager
 import kafka.utils.Logging
@@ -63,12 +61,13 @@ import org.apache.kafka.coordinator.group.{Group, GroupConfig, GroupConfigManage
 import org.apache.kafka.coordinator.share.ShareCoordinator
 import org.apache.kafka.coordinator.transaction.InitProducerIdResult
 import org.apache.kafka.metadata.{ConfigRepository, MetadataCache}
-import org.apache.kafka.network.Request
+import org.apache.kafka.network.{Request, RequestChannel}
 import org.apache.kafka.security.DelegationTokenManager
 import org.apache.kafka.server.{ApiVersionManager, AuthHelper, AutoTopicCreationManager, ClientMetricsManager, FetchManager, ForwardingManager, ProcessRole}
 import org.apache.kafka.server.authorizer._
 import org.apache.kafka.server.common.{GroupVersion, RequestLocal, ShareVersion, StreamsVersion, TransactionVersion}
 import org.apache.kafka.server.quota.{ReplicaQuota, ReplicationQuotaManager}
+import org.apache.kafka.server.quota.QuotaFactory.{QuotaManagers, UNBOUNDED_QUOTA}
 import org.apache.kafka.server.share.context.ShareFetchContext
 import org.apache.kafka.server.share.{ErroneousAndValidPartitionData, SharePartitionKey}
 import org.apache.kafka.server.share.acknowledge.ShareAcknowledgementBatch

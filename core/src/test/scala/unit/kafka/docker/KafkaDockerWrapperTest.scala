@@ -146,7 +146,7 @@ class KafkaDockerWrapperTest {
   @Test
   def testGetLog4jConfigsFromEnv(): Unit = {
     val envVars = Map(
-      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,kafka.network.RequestChannel$=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
+      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,org.apache.kafka.network.RequestChannel=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
       "KAFKA_LOG4J_ROOT_LOGLEVEL" -> "ERROR",
       "SOME_VARIABLE" -> "Some Value"
     )
@@ -156,7 +156,7 @@ class KafkaDockerWrapperTest {
     kafkaLogger.setLevel("INFO")
 
     val requestChannelLogger = new Logger
-    requestChannelLogger.setName("kafka.network.RequestChannel$")
+    requestChannelLogger.setName("org.apache.kafka.network.RequestChannel")
     requestChannelLogger.setLevel("WARN")
 
     val defaultEventHandlerLogger = new Logger
@@ -186,7 +186,7 @@ class KafkaDockerWrapperTest {
     val (defaultConfigsPath, mountedConfigsPath, finalConfigsPath) = createDirs()
 
     val envVars = Map(
-      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,kafka.network.RequestChannel$=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
+      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,org.apache.kafka.network.RequestChannel=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
       "KAFKA_LOG4J_ROOT_LOGLEVEL" -> "ERROR",
       "SOME_VARIABLE" -> "Some Value"
     )
@@ -207,7 +207,7 @@ class KafkaDockerWrapperTest {
         |    Logger:
         |    - name: "kafka"
         |      level: "INFO"
-        |    - name: "kafka.network.RequestChannel$"
+        |    - name: "org.apache.kafka.network.RequestChannel"
         |      level: "WARN"
         |    - name: "kafka.producer.async.DefaultEventHandler"
         |      level: "DEBUG"""".stripMargin
@@ -220,7 +220,7 @@ class KafkaDockerWrapperTest {
     val (defaultConfigsPath, mountedConfigsPath, finalConfigsPath) = createDirs()
 
     val envVars = Map(
-      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,kafka.network.RequestChannel$=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
+      "KAFKA_LOG4J_LOGGERS" -> "kafka=INFO,org.apache.kafka.network.RequestChannel=WARN,kafka.producer.async.DefaultEventHandler=DEBUG,",
       "KAFKA_LOG4J_ROOT_LOGLEVEL" -> "ERROR",
       "SOME_VARIABLE" -> "Some Value"
     )
@@ -260,7 +260,7 @@ class KafkaDockerWrapperTest {
         |    Root:
         |      level: "ERROR"
         |    Logger:
-        |    - name: "kafka.network.RequestChannel$"
+        |    - name: "org.apache.kafka.network.RequestChannel"
         |      level: "WARN"
         |    - name: "kafka.producer.async.DefaultEventHandler"
         |      level: "DEBUG"

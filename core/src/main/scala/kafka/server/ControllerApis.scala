@@ -23,8 +23,6 @@ import java.util.{Collections, OptionalLong}
 import java.util.Map.Entry
 import java.util.concurrent.CompletableFuture
 import java.util.function.Consumer
-import kafka.network.RequestChannel
-import org.apache.kafka.server.quota.QuotaFactory.QuotaManagers
 import kafka.server.logger.RuntimeLoggerManager
 import kafka.utils.Logging
 import org.apache.kafka.clients.admin.{AlterConfigOp, EndpointType}
@@ -52,13 +50,14 @@ import org.apache.kafka.controller.ControllerRequestContext.requestTimeoutMsToDe
 import org.apache.kafka.controller.{Controller, ControllerRequestContext}
 import org.apache.kafka.image.publisher.ControllerRegistrationsPublisher
 import org.apache.kafka.metadata.{BrokerHeartbeatReply, BrokerRegistrationReply, KRaftMetadataCache}
-import org.apache.kafka.network.Request
+import org.apache.kafka.network.{Request, RequestChannel}
 import org.apache.kafka.raft.RaftManager
 import org.apache.kafka.security.DelegationTokenManager
 import org.apache.kafka.server.{ApiVersionManager, AuthHelper, EnvelopeUtils, ProcessRole}
 import org.apache.kafka.server.authorizer.Authorizer
 import org.apache.kafka.server.common.{ApiMessageAndVersion, RequestLocal}
 import org.apache.kafka.server.quota.ControllerMutationQuota
+import org.apache.kafka.server.quota.QuotaFactory.QuotaManagers
 
 import scala.jdk.javaapi.OptionConverters
 

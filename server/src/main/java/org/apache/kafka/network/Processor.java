@@ -21,16 +21,20 @@ import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.requests.RequestHeader;
 import org.apache.kafka.server.ApiVersionManager;
 
+import com.yammer.metrics.core.Meter;
+
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.util.LinkedHashMap;
 
-public class Processor {
+public interface Processor {
 
-    public static final String IDLE_PERCENT_METRIC_NAME = "IdlePercent";
-    public static final String NETWORK_PROCESSOR_METRIC_TAG = "networkProcessor";
-    public static final String LISTENER_METRIC_TAG = "listener";
-    public static final int CONNECTION_QUEUE_SIZE = 20;
+    String IDLE_PERCENT_METRIC_NAME = "IdlePercent";
+    String NETWORK_PROCESSOR_METRIC_TAG = "networkProcessor";
+    String LISTENER_METRIC_TAG = "listener";
+    int CONNECTION_QUEUE_SIZE = 20;
 
-    public static RequestHeader parseRequestHeader(ApiVersionManager apiVersionManager, ByteBuffer buffer) {
+    static RequestHeader parseRequestHeader(ApiVersionManager apiVersionManager, ByteBuffer buffer) {
         RequestHeader header = RequestHeader.parse(buffer);
         if (apiVersionManager.isApiEnabled(header.apiKey(), header.apiVersion())) {
             return header;
@@ -40,4 +44,20 @@ public class Processor {
             throw new UnsupportedVersionException("Received request for api with key " + header.apiKey().id + " (" + header.apiKey().name + ") and unsupported version " + header.apiVersion());
         }
     }
+
+    int id();
+
+    int responseQueueSize();
+
+    void enqueueResponse(Response response);
+
+    void start();
+
+    void close();
+
+    void beginShutdown();
+
+    boolean accept(SocketChannel socketChannel, boolean mayBlock, Meter acceptorBlockedPercentMeter);
+
+    LinkedHashMap<String, String> metricTags();
 }

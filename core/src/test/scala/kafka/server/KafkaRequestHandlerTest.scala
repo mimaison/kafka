@@ -18,7 +18,7 @@
 package kafka.server
 
 import com.yammer.metrics.core.Meter
-import kafka.network.RequestChannel
+
 import org.apache.kafka.common.memory.MemoryPool
 import org.apache.kafka.common.network.{ClientInformation, ListenerName}
 import org.apache.kafka.common.protocol.ApiKeys
@@ -26,7 +26,7 @@ import org.apache.kafka.common.requests.{RequestContext, RequestHeader}
 import org.apache.kafka.common.security.auth.{KafkaPrincipal, SecurityProtocol}
 import org.apache.kafka.common.utils.internals.BufferSupplier
 import org.apache.kafka.common.utils.{MockTime, Time}
-import org.apache.kafka.network.Request
+import org.apache.kafka.network.{Request, RequestChannel}
 import org.apache.kafka.network.metrics.RequestChannelMetrics
 import org.apache.kafka.server.common.RequestLocal
 import org.apache.kafka.server.log.remote.storage.RemoteStorageMetrics

@@ -17,7 +17,6 @@
 
 package kafka.server
 
-import kafka.network.RequestChannel
 import kafka.utils.Logging
 import kafka.server.KafkaRequestHandler.{threadCurrentRequest, threadRequestChannel}
 
@@ -27,7 +26,7 @@ import com.yammer.metrics.core.Meter
 import org.apache.kafka.common.internals.FatalExitError
 import org.apache.kafka.common.utils.internals.{Exit, KafkaThread}
 import org.apache.kafka.common.utils.Time
-import org.apache.kafka.network.{CallbackRequest, Request, ShutdownRequest, WakeupRequest}
+import org.apache.kafka.network.{CallbackRequest, Request, RequestChannel, ShutdownRequest, WakeupRequest}
 import org.apache.kafka.server.common.RequestLocal
 import org.apache.kafka.server.metrics.KafkaMetricsGroup
 

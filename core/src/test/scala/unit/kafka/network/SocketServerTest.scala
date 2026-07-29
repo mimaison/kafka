@@ -36,7 +36,7 @@ import org.apache.kafka.common.security.auth.{KafkaPrincipal, SecurityProtocol}
 import org.apache.kafka.common.security.scram.internals.ScramMechanism
 import org.apache.kafka.common.utils._
 import org.apache.kafka.common.utils.internals.{AppInfoParser, LogContext}
-import org.apache.kafka.network.{CallbackRequest, NoOpResponse, Request, RequestConvertToJson, Response, SendResponse, ShutdownRequest, SocketServerConfigs, WakeupRequest}
+import org.apache.kafka.network.{CallbackRequest, NoOpResponse, Request, RequestChannel, RequestConvertToJson, Response, SendResponse, ShutdownRequest, SocketServerConfigs, WakeupRequest}
 import org.apache.kafka.security.CredentialProvider
 import org.apache.kafka.server.{ApiVersionManager, SimpleApiVersionManager}
 import org.apache.kafka.server.common.{FinalizedFeatures, MetadataVersion}
@@ -1192,7 +1192,7 @@ class SocketServerTest {
     for (_ <- 0 to 1) server.dataPlaneRequestChannel.metrics.get(ApiKeys.PRODUCE.name).requestRate(version).mark()
     server.dataPlaneRequestChannel.metrics.get(ApiKeys.PRODUCE.name).requestRate(version2).mark()
     assertEquals(2, server.dataPlaneRequestChannel.metrics.get(ApiKeys.PRODUCE.name).requestRate(version).count())
-    server.dataPlaneRequestChannel.updateErrorMetrics(ApiKeys.PRODUCE, Map(Errors.NONE -> 1))
+    server.dataPlaneRequestChannel.updateErrorMetrics(ApiKeys.PRODUCE, util.Map.of(Errors.NONE, Integer.valueOf(1)))
     val nonZeroMeters = Map(s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version" -> 2,
       s"kafka.network:type=RequestMetrics,name=RequestsPerSec,request=Produce,version=$version2" -> 1,
       "kafka.network:type=RequestMetrics,name=ErrorsPerSec,request=Produce,error=NONE" -> 1)

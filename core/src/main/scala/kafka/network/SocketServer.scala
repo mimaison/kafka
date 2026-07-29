@@ -24,7 +24,6 @@ import java.util
 import java.util.Optional
 import java.util.concurrent._
 import java.util.concurrent.atomic._
-import org.apache.kafka.network.{CloseConnectionResponse, EndThrottlingResponse, NoOpResponse, Response, SendResponse, StartThrottlingResponse}
 import kafka.server.{BrokerReconfigurable, KafkaConfig}
 import org.apache.kafka.common.message.ApiMessageType.ListenerType
 import kafka.utils._
@@ -40,7 +39,7 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.utils.{Time, Utils}
 import org.apache.kafka.common.utils.internals.LogContext
 import org.apache.kafka.common.{Endpoint, KafkaException, MetricName, Reconfigurable}
-import org.apache.kafka.network.{ConnectionQuotaEntity, ConnectionThrottledException, Processor => JProcessor, Request, SocketServer => JSocketServer, SocketServerConfigs, TooManyConnectionsException}
+import org.apache.kafka.network.{CloseConnectionResponse, ConnectionQuotaEntity, ConnectionThrottledException, EndThrottlingResponse, NoOpResponse, Processor, Request, RequestChannel, Response, SendResponse, SocketServer => JSocketServer, SocketServerConfigs, StartThrottlingResponse, TooManyConnectionsException}
 import org.apache.kafka.security.CredentialProvider
 import org.apache.kafka.server.{ApiVersionManager, ServerSocketFactory}
 import org.apache.kafka.server.config.QuotaConfig
@@ -496,7 +495,7 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
   private val backwardCompatibilityMetricGroup = new KafkaMetricsGroup("kafka.network", "Acceptor")
   private val blockedPercentMeterMetricName = backwardCompatibilityMetricGroup.metricName(
     "AcceptorBlockedPercent",
-    MetricsUtils.getTags(JProcessor.LISTENER_METRIC_TAG, endPoint.listener))
+    MetricsUtils.getTags(Processor.LISTENER_METRIC_TAG, endPoint.listener))
   private val blockedPercentMeter = backwardCompatibilityMetricGroup.newMeter(blockedPercentMeterMetricName,"blocked time", TimeUnit.NANOSECONDS)
   private var currentProcessorIndex = 0
   private[network] val throttledSockets = new mutable.PriorityQueue[DelayedCloseSocket]()
@@ -744,7 +743,7 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
                    securityProtocol: SecurityProtocol,
                    connectionDisconnectListeners: Seq[ConnectionDisconnectListener]): Processor = {
     val name = s"data-plane-kafka-network-thread-$nodeId-${endPoint.listener}-${endPoint.securityProtocol}-$id"
-    new Processor(id,
+    new ProcessorImpl(id,
                   time,
                   config.socketRequestMaxBytes,
                   requestChannel,
@@ -758,7 +757,7 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
                   credentialProvider,
                   memoryPool,
                   logContext,
-                  JProcessor.CONNECTION_QUEUE_SIZE,
+                  Processor.CONNECTION_QUEUE_SIZE,
                   isPrivilegedListener,
                   apiVersionManager,
                   name,
@@ -776,7 +775,7 @@ private[kafka] abstract class Acceptor(val socketServer: SocketServer,
  *                             forwarding requests; if the control plane is not defined, the processor
  *                             relying on the inter broker listener would be acting as the privileged listener.
  */
-private[kafka] class Processor(
+private[kafka] class ProcessorImpl(
   val id: Int,
   time: Time,
   maxRequestSize: Int,
@@ -796,7 +795,7 @@ private[kafka] class Processor(
   apiVersionManager: ApiVersionManager,
   threadName: String,
   connectionDisconnectListeners: Seq[ConnectionDisconnectListener]
-) extends Runnable with Logging {
+) extends Runnable with Logging with Processor {
   private val metricsPackage = "kafka.network"
   private val metricsClassName = "Processor"
   private val metricsGroup = new KafkaMetricsGroup(metricsPackage, metricsClassName)
@@ -811,17 +810,17 @@ private[kafka] class Processor(
   private val responseQueue = new LinkedBlockingDeque[Response]()
 
   private[kafka] val metricTags = mutable.LinkedHashMap(
-    JProcessor.LISTENER_METRIC_TAG -> listenerName.value,
-    JProcessor.NETWORK_PROCESSOR_METRIC_TAG -> id.toString
+    Processor.LISTENER_METRIC_TAG -> listenerName.value,
+    Processor.NETWORK_PROCESSOR_METRIC_TAG -> id.toString
   ).asJava
 
-  metricsGroup.newGauge(JProcessor.IDLE_PERCENT_METRIC_NAME, () => {
+  metricsGroup.newGauge(Processor.IDLE_PERCENT_METRIC_NAME, () => {
     Option(metrics.metric(metrics.metricName("io-wait-ratio", JSocketServer.METRICS_GROUP, metricTags))).fold(0.0)(m =>
       Math.min(m.metricValue.asInstanceOf[Double], 1.0))
   },
     // for compatibility, only add a networkProcessor tag to the Yammer Metrics alias (the equivalent Selector metric
     // also includes the listener name)
-    MetricsUtils.getTags(JProcessor.NETWORK_PROCESSOR_METRIC_TAG, id.toString)
+    MetricsUtils.getTags(Processor.NETWORK_PROCESSOR_METRIC_TAG, id.toString)
   )
 
   private val expiredConnectionsKilledCount = new CumulativeSum()
@@ -986,7 +985,7 @@ private[kafka] class Processor(
       try {
         openOrClosingChannel(receive.source) match {
           case Some(channel) =>
-            header = JProcessor.parseRequestHeader(apiVersionManager, receive.payload)
+            header = Processor.parseRequestHeader(apiVersionManager, receive.payload)
             if (header.apiKey == ApiKeys.SASL_HANDSHAKE && channel.maybeBeginServerReauthentication(receive,
               () => time.nanoseconds()))
               trace(s"Begin re-authentication: $channel")
@@ -1170,8 +1169,8 @@ private[kafka] class Processor(
       close(channel.id)
     }
     selector.close()
-    metricsGroup.removeMetric(JProcessor.IDLE_PERCENT_METRIC_NAME,
-      MetricsUtils.getTags(JProcessor.NETWORK_PROCESSOR_METRIC_TAG, id.toString))
+    metricsGroup.removeMetric(Processor.IDLE_PERCENT_METRIC_NAME,
+      MetricsUtils.getTags(Processor.NETWORK_PROCESSOR_METRIC_TAG, id.toString))
   }
 
   // 'protected` to allow override for testing
@@ -1181,7 +1180,7 @@ private[kafka] class Processor(
     connId
   }
 
-  private[network] def enqueueResponse(response: Response): Unit = {
+  def enqueueResponse(response: Response): Unit = {
     responseQueue.put(response)
     wakeup()
   }
@@ -1193,7 +1192,7 @@ private[kafka] class Processor(
     response
   }
 
-  private[network] def responseQueueSize = responseQueue.size
+  def responseQueueSize: Int = responseQueue.size
 
   // Only for testing
   private[network] def inflightResponseCount: Int = inflightResponses.size
@@ -1673,7 +1672,7 @@ class ConnectionQuotas(config: KafkaConfig, time: Time, metrics: Metrics) extend
       val metricName = metrics.metricName(s"${throttlePrefix}connection-accept-throttle-time",
         JSocketServer.METRICS_GROUP,
         "Tracking average throttle-time, out of non-zero throttle times, per listener",
-        MetricsUtils.getTags(JProcessor.LISTENER_METRIC_TAG, listener.value))
+        MetricsUtils.getTags(Processor.LISTENER_METRIC_TAG, listener.value))
       sensor.add(metricName, new Avg)
       sensor
     }

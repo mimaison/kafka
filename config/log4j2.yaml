@@ -108,7 +108,7 @@ Configuration:
         additivity: false
         AppenderRef:
           ref: RequestAppender
-      # Uncomment the lines below and change log4j.logger.kafka.network.RequestChannel$ to TRACE
+      # Uncomment the lines below and change org.apache.kafka.network.RequestChannel to TRACE
       # for additional output related to the handling of requests
 #      - name: kafka.network.Processor
 #        level: TRACE
@@ -120,8 +120,8 @@ Configuration:
 #        additivity: false
 #        AppenderRef:
 #          ref: RequestAppender
-      # Kafka network RequestChannel$ logger
-      - name: kafka.network.RequestChannel$
+      # Kafka network RequestChannel logger
+      - name: org.apache.kafka.network.RequestChannel
         level: WARN
         additivity: false
         AppenderRef:
